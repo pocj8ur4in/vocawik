@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+
+    <Properties>
+        <Property name="APP_LOG_PATH">${env:LOG_PATH:-logs}</Property>
+        <Property name="LOG_FILE">application</Property>
+        <Property name="CONSOLE_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%t] [%X{requestId}] %style{%c{1.}}{cyan} - %msg%n</Property>
+        <Property name="FILE_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] [%X{requestId}] %c{1.} - %msg%n</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- Console -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${CONSOLE_PATTERN}" disableAnsi="false"/>
+        </Console>
+
+        <!-- Rolling File (dev/prod) -->
+        <RollingFile name="File"
+                     fileName="${APP_LOG_PATH}/${LOG_FILE}.log"
+                     filePattern="${APP_LOG_PATH}/${LOG_FILE}-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${FILE_PATTERN}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+                <TimeBasedTriggeringPolicy interval="1"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <!-- ==================== local ==================== -->
+        <SpringProfile name="local">
+            <Logger name="com.vocawik" level="DEBUG" additivity="false">
+                <AppenderRef ref="Console"/>
+            </Logger>
+
+            <Logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+                <AppenderRef ref="Console"/>
+            </Logger>
+            <Logger name="org.hibernate.orm.jdbc.bind" level="TRACE" additivity="false">
+                <AppenderRef ref="Console"/>
+            </Logger>
+
+            <Root level="INFO">
+                <AppenderRef ref="Console"/>
+            </Root>
+        </SpringProfile>
+
+        <!-- ==================== dev ==================== -->
+        <SpringProfile name="dev">
+            <Logger name="com.vocawik" level="DEBUG" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="File"/>
+            </Logger>
+
+            <Logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+                <AppenderRef ref="File"/>
+            </Logger>
+
+            <Root level="INFO">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="File"/>
+            </Root>
+        </SpringProfile>
+
+        <!-- ==================== prod ==================== -->
+        <SpringProfile name="prod">
+            <Logger name="com.vocawik" level="INFO" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="File"/>
+            </Logger>
+
+            <Root level="WARN">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="File"/>
+            </Root>
+        </SpringProfile>
+    </Loggers>
+
+</Configuration>

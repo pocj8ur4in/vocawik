@@ -1,0 +1,36 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  application:
+    name: vocawik
+    description: vocawik REST API
+    version: v1
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: false
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 60000
+      cache-null-values: false
+
+server:
+  port: 0
+
+jwt:
+  secret: dGVzdC1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLW9ubHktbXVzdC1iZS1hdC1sZWFzdC0yNTYtYml0cy1sb25n
+  issuer: vocawik
+  audience: vocawik-api
+  access-expiration: 3600000
+  refresh-expiration: 86400000

@@ -1,0 +1,73 @@
+name: frontend-ci
+run-name: "frontend-ci"
+
+on:
+  push:
+    branches: [ develop, master ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yaml'
+  pull_request:
+    branches: [ develop, master ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test with coverage
+        run: pnpm test:coverage
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upload artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Upload coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v5
+        with:
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
