@@ -1,0 +1,9 @@
+CREATE TABLE guests (
+	id BIGSERIAL PRIMARY KEY,
+	uuid VARCHAR(36) NOT NULL UNIQUE,
+	created_at TIMESTAMP NOT NULL,
+	updated_at TIMESTAMP NOT NULL,
+	status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+	last_seen_at TIMESTAMP,
+	CONSTRAINT chk_guests_status CHECK (status IN ('ACTIVE', 'BLOCKED'))
+);
