@@ -1,0 +1,26 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "0...100"
+
+flags:
+  backend:
+    paths:
+      - backend/
+  frontend:
+    paths:
+      - frontend/
+
+ignore:
+  - "src/main/java/com/vocawik/MainApplication.java"
+  - "src/main/java/com/vocawik/config/**"
+  - "src/main/java/com/vocawik/dto/**"
+  - "**/package-info.java"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false

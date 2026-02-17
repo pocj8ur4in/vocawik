@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- CSRF is intentionally disabled for stateless REST API -->
+    <Match>
+        <Class name="com.vocawik.security.SecurityConfig" />
+        <Bug pattern="SPRING_CSRF_PROTECTION_DISABLED" />
+    </Match>
+    <Match>
+        <Class name="com.vocawik.security.JwtProvider" />
+        <Bug pattern="CT_CONSTRUCTOR_THROW" />
+    </Match>
+    <Match>
+        <Class name="com.vocawik.security.SecurityConfig" />
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+</FindBugsFilter>

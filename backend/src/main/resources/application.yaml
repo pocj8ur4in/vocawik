@@ -1,0 +1,131 @@
+spring:
+  application:
+    name: ${APPLICATION_NAME}
+    description: ${APPLICATION_DESCRIPTION}
+    version: ${APPLICATION_VERSION}
+  profiles:
+    active: local
+  
+  datasource:
+    url: ${DB_URL}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE}
+      minimum-idle: ${HIKARI_MIN_IDLE}
+      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT}
+      max-lifetime: ${HIKARI_MAX_LIFETIME}
+  
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      cache-null-values: false
+
+  batch:
+    job:
+      enabled: false
+
+server:
+  port: ${SERVER_PORT}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER}
+  audience: ${JWT_AUDIENCE}
+  access-expiration: ${JWT_ACCESS_EXPIRATION}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION}
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENV:${spring.profiles.active}}
+  traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
+  send-default-pii: false
+
+async:
+  core-pool-size: 5
+  max-pool-size: 20
+  queue-capacity: 100
+  thread-name-prefix: async-
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+  info:
+    build:
+      enabled: true
+
+logging:
+  http:
+    request-id-header: X-Request-Id
+    masked-query-keys:
+      - password
+      - passwd
+      - pwd
+      - token
+      - access_token
+      - refresh_token
+      - authorization
+      - auth
+      - secret
+      - api_key
+      - apikey
+      - email
+    masked-header-keys:
+      - authorization
+      - cookie
+      - set-cookie
+      - x-api-key
+      - proxy-authorization
+    logged-headers:
+      - user-agent
+      - x-request-id
+      - authorization
+      - cookie
+    masked-path-keys:
+      - password
+      - passwd
+      - pwd
+      - token
+      - access_token
+      - refresh_token
+      - authorization
+      - auth
+      - secret
+      - api_key
+      - apikey
+      - email
+    trusted-proxy-cidrs:
+      - 127.0.0.1/32
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - ::1/128
