@@ -1,0 +1,192 @@
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+
+plugins {
+	id 'java'
+	id 'jacoco'
+	id 'com.github.spotbugs' version '6.1.2'
+	id 'com.diffplug.spotless' version '7.0.2'
+	id 'org.springframework.boot' version '4.0.1'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.vocawik'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+	configureEach {
+		exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+def versions = [
+	redisson: '3.41.0',
+	springdoc: '2.8.6',
+	jjwt: '0.12.6',
+	mapstruct: '1.6.3',
+	uuidCreator: '6.1.1',
+	sentry: '8.32.0',
+	lombokMapstructBinding: '0.2.0',
+	testcontainers: '1.20.4',
+	archunit: '1.3.0',
+	findsecbugs: '1.14.0',
+	spotbugsTool: '4.9.3',
+]
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.aspectj:aspectjweaver'
+	implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'org.springframework.boot:spring-boot-starter-batch'
+	implementation "org.redisson:redisson:${versions.redisson}"
+	implementation 'org.flywaydb:flyway-core'
+	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+	implementation 'org.postgresql:postgresql'
+	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${versions.springdoc}"
+	implementation "io.jsonwebtoken:jjwt-api:${versions.jjwt}"
+	runtimeOnly "io.jsonwebtoken:jjwt-impl:${versions.jjwt}"
+	runtimeOnly "io.jsonwebtoken:jjwt-jackson:${versions.jjwt}"
+	implementation "org.mapstruct:mapstruct:${versions.mapstruct}"
+	implementation "com.github.f4b6a3:uuid-creator:${versions.uuidCreator}"
+	implementation "io.sentry:sentry-spring-boot-starter-jakarta:${versions.sentry}"
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${versions.lombokMapstructBinding}"
+	annotationProcessor "org.mapstruct:mapstruct-processor:${versions.mapstruct}"
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+	if (org.gradle.internal.os.OperatingSystem.current().isMacOsX()) {
+		def arch = System.getProperty('os.arch')
+		if (arch == 'aarch64') {
+			runtimeOnly(group: 'io.netty', name: 'netty-resolver-dns-native-macos', classifier: 'osx-aarch_64')
+		} else if (arch == 'x86_64' || arch == 'amd64') {
+			runtimeOnly(group: 'io.netty', name: 'netty-resolver-dns-native-macos', classifier: 'osx-x86_64')
+		}
+	}
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation "org.testcontainers:junit-jupiter:${versions.testcontainers}"
+	testImplementation "org.testcontainers:postgresql:${versions.testcontainers}"
+	testImplementation "com.tngtech.archunit:archunit-junit5:${versions.archunit}"
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:${versions.findsecbugs}"
+}
+
+springBoot {
+	buildInfo()
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	finalizedBy jacocoTestReport
+}
+
+def jacocoExcludes = [
+	'**/MainApplication.class',
+	'**/config/**',
+	'**/dto/**',
+]
+
+jacocoTestReport {
+	dependsOn test
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+	afterEvaluate {
+		classDirectories.setFrom(files(classDirectories.files.collect {
+			fileTree(dir: it, excludes: jacocoExcludes)
+		}))
+	}
+}
+
+// Load environment variables from .env.{profile}
+bootRun {
+	def profile = System.getenv('SPRING_PROFILES_ACTIVE') ?: 'local'
+	systemProperty 'spring.profiles.active', profile
+
+	def envFileName = ".env.${profile}"
+	def envFile = file(envFileName)
+	if (envFile.exists() && envFile.isFile()) {
+		envFile.readLines().each { line ->
+			if (!line.startsWith('#') && line.trim() && line.contains('=')) {
+				def parts = line.split('=', 2)
+				environment parts[0].trim(), parts[1].trim()
+			}
+		}
+	}
+}
+
+spotless {
+	java {
+		target("**/*.java")
+		targetExclude("$buildDir/**/*.java", "bin/**/*.java")
+		importOrder()
+		removeUnusedImports()
+		googleJavaFormat().aosp()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
+	format 'misc', {
+		target "*.gradle"
+		trimTrailingWhitespace()
+		leadingSpacesToTabs()
+		endWithNewline()
+	}
+}
+
+spotbugs {
+	toolVersion = versions.spotbugsTool
+	effort.set(Effort.valueOf('MAX'))
+	reportLevel.set(Confidence.valueOf('MEDIUM'))
+	excludeFilter = file('config/spotbugs/exclude.xml')
+}
+
+spotbugsMain {
+	reports {
+		html.required = true
+		xml.required = true
+	}
+}
+
+spotbugsTest.enabled = false
+
+// Suppress Lombok-generated constructor warnings in Javadoc
+javadoc {
+	options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
+compileJava.dependsOn 'spotlessApply'
+
+// Install Git pre-commit hook
+tasks.register('installGitHooks', Copy) {
+	from("${rootDir}/scripts/pre-commit") {
+		filePermissions {
+			unix('rwxr-xr-x')
+		}
+	}
+	into "${rootDir}/.git/hooks"
+}
+
+compileJava.dependsOn 'installGitHooks'
