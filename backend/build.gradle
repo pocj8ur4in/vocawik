@@ -67,7 +67,7 @@ dependencies {
 	runtimeOnly "io.jsonwebtoken:jjwt-jackson:${versions.jjwt}"
 	implementation "org.mapstruct:mapstruct:${versions.mapstruct}"
 	implementation "com.github.f4b6a3:uuid-creator:${versions.uuidCreator}"
-	implementation "io.sentry:sentry-spring-boot-starter-jakarta:${versions.sentry}"
+	implementation "io.sentry:sentry-spring-jakarta:${versions.sentry}"
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${versions.lombokMapstructBinding}"
