@@ -1,6 +1,9 @@
 package com.vocawik.exception;
 
-import com.vocawik.dto.ErrorResponse;
+import com.vocawik.web.error.ErrorResponse;
+import com.vocawik.web.exception.BusinessException;
+import com.vocawik.web.exception.TooManyRequestsException;
+import com.vocawik.web.exception.UnauthorizedException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -87,10 +90,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles business logic exceptions with {@link com.vocawik.dto.ErrorCode}.
+     * Handles business logic exceptions with {@link com.vocawik.web.error.ErrorCode}.
      *
      * @param ex the business exception
-     * @return response with HTTP status defined by {@link com.vocawik.dto.ErrorCode}
+     * @return response with HTTP status defined by {@link com.vocawik.web.error.ErrorCode}
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {

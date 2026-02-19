@@ -2,8 +2,11 @@ package com.vocawik.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.vocawik.dto.ErrorCode;
-import com.vocawik.dto.ErrorResponse;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.error.ErrorResponse;
+import com.vocawik.web.exception.BusinessException;
+import com.vocawik.web.exception.TooManyRequestsException;
+import com.vocawik.web.exception.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

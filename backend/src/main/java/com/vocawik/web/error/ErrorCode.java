@@ -1,4 +1,4 @@
-package com.vocawik.dto;
+package com.vocawik.web.error;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
