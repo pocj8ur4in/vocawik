@@ -50,7 +50,8 @@ class ArchitectureTest {
                     .resideInAPackage("com.vocawik.dto..")
                     .should()
                     .dependOnClassesThat()
-                    .resideInAnyPackage("com.vocawik.domain..");
+                    .resideInAnyPackage("com.vocawik.domain..")
+                    .allowEmptyShould(true);
 
     @ArchTest
     static final ArchRule domain_should_not_depend_on_dto =
@@ -59,7 +60,8 @@ class ArchitectureTest {
                     .resideInAPackage("com.vocawik.domain..")
                     .should()
                     .dependOnClassesThat()
-                    .resideInAnyPackage("com.vocawik.dto..");
+                    .resideInAnyPackage("com.vocawik.dto..")
+                    .allowEmptyShould(true);
 
     @ArchTest
     static final ArchRule non_config_packages_should_not_depend_on_config =

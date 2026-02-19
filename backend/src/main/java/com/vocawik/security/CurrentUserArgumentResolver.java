@@ -1,6 +1,6 @@
 package com.vocawik.security;
 
-import com.vocawik.exception.UnauthorizedException;
+import com.vocawik.web.exception.UnauthorizedException;
 import java.util.UUID;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;

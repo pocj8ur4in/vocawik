@@ -1,7 +1,7 @@
 package com.vocawik.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vocawik.dto.ErrorResponse;
+import com.vocawik.web.error.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;

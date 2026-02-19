@@ -1,6 +1,6 @@
-package com.vocawik.exception;
+package com.vocawik.web.exception;
 
-import com.vocawik.dto.ErrorCode;
+import com.vocawik.web.error.ErrorCode;
 import lombok.Getter;
 
 /**
