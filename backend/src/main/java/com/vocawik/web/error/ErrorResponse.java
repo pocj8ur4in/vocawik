@@ -1,4 +1,4 @@
-package com.vocawik.dto;
+package com.vocawik.web.error;
 
 import java.time.LocalDateTime;
 import lombok.Builder;

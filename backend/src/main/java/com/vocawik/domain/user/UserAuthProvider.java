@@ -1,5 +1,6 @@
 package com.vocawik.domain.user;
 
+import com.vocawik.common.auth.AuthProvider;
 import com.vocawik.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

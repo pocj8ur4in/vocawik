@@ -1,4 +1,4 @@
-package com.vocawik.exception;
+package com.vocawik.web.exception;
 
 /**
  * Thrown when an unauthenticated request accesses a protected resource.

@@ -1,7 +1,7 @@
 package com.vocawik.aop;
 
-import com.vocawik.exception.TooManyRequestsException;
 import com.vocawik.web.ClientIpResolver;
+import com.vocawik.web.exception.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
