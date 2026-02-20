@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.web.exception.UnauthorizedException;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +44,16 @@ class CurrentUserArgumentResolverTest {
     }
 
     @Test
+    @DisplayName("Should support @CurrentUser AuthPrincipal parameter")
+    void supportsParameter_withCurrentUserPrincipal_shouldReturnTrue() {
+        MethodParameter parameter = mock(MethodParameter.class);
+        when(parameter.hasParameterAnnotation(CurrentUser.class)).thenReturn(true);
+        doReturn(AuthPrincipal.class).when(parameter).getParameterType();
+
+        assertThat(resolver.supportsParameter(parameter)).isTrue();
+    }
+
+    @Test
     @DisplayName("Should not support parameter without @CurrentUser")
     void supportsParameter_withoutAnnotation_shouldReturnFalse() {
         MethodParameter parameter = mock(MethodParameter.class);
@@ -68,13 +79,30 @@ class CurrentUserArgumentResolverTest {
         MethodParameter parameter = mock(MethodParameter.class);
         doReturn(UUID.class).when(parameter).getParameterType();
         UUID userUuid = UUID.randomUUID();
+        AuthPrincipal principal = new AuthPrincipal(userUuid, "USER");
         UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(userUuid.toString(), null, List.of());
+                new UsernamePasswordAuthenticationToken(principal, null, List.of());
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         Object result = resolver.resolveArgument(parameter, null, null, null);
 
         assertThat(result).isEqualTo(userUuid);
+    }
+
+    @Test
+    @DisplayName("Should resolve AuthPrincipal from SecurityContext")
+    void resolveArgument_withAuthentication_shouldReturnAuthPrincipal() {
+        MethodParameter parameter = mock(MethodParameter.class);
+        doReturn(AuthPrincipal.class).when(parameter).getParameterType();
+        UUID userUuid = UUID.randomUUID();
+        AuthPrincipal principal = new AuthPrincipal(userUuid, "USER");
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(principal, null, List.of());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        Object result = resolver.resolveArgument(parameter, null, null, null);
+
+        assertThat(result).isEqualTo(principal);
     }
 
     @Test
@@ -105,6 +133,6 @@ class CurrentUserArgumentResolverTest {
 
         assertThatThrownBy(() -> resolver.resolveArgument(null, null, null, null))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessageContaining("Invalid authentication subject");
+                .hasMessageContaining("Invalid authentication principal");
     }
 }

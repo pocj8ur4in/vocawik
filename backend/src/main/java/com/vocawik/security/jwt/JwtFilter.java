@@ -1,4 +1,4 @@
-package com.vocawik.security;
+package com.vocawik.security.jwt;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -9,6 +9,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -49,13 +51,30 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (token != null && jwtProvider.validateAccessToken(token)) {
             String subject = jwtProvider.getSubject(token);
+            String role = jwtProvider.getRole(token);
+
+            // check role exists
+            List<GrantedAuthority> authorities =
+                    role == null || role.isBlank()
+                            ? List.of()
+                            : List.of(new SimpleGrantedAuthority("ROLE_" + role));
+
+            // parse subject as UUID to build AuthPrincipal
+            AuthPrincipal principal;
+            try {
+                principal = new AuthPrincipal(java.util.UUID.fromString(subject), role);
+            } catch (IllegalArgumentException ex) {
+                logger.warn("Invalid JWT subject (not a UUID)");
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(subject, null, List.of());
+                    new UsernamePasswordAuthenticationToken(principal, null, authorities);
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            logger.debug("Set authentication for: " + subject);
+            logger.debug("Set authentication for: {}", principal.userUuid());
         }
 
         filterChain.doFilter(request, response);
