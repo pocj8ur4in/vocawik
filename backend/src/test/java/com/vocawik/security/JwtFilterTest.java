@@ -5,6 +5,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.vocawik.security.jwt.AuthPrincipal;
+import com.vocawik.security.jwt.JwtFilter;
+import com.vocawik.security.jwt.JwtProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -54,12 +57,21 @@ class JwtFilterTest {
         request.addHeader("Authorization", "Bearer " + token);
         given(jwtProvider.validateAccessToken(token)).willReturn(true);
         given(jwtProvider.getSubject(token)).willReturn(subject);
+        given(jwtProvider.getRole(token)).willReturn("USER");
 
-        jwtFilter.doFilterInternal(request, response, filterChain);
+        jwtFilter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
-                .isEqualTo(subject);
+                .isInstanceOf(AuthPrincipal.class);
+        AuthPrincipal principal =
+                (AuthPrincipal)
+                        SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        assertThat(principal.userUuid()).isEqualTo(UUID.fromString(subject));
+        assertThat(principal.role()).isEqualTo("USER");
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+                .extracting(Object::toString)
+                .containsExactly("ROLE_USER");
         verify(filterChain).doFilter(request, response);
     }
 
@@ -70,7 +82,7 @@ class JwtFilterTest {
         request.addHeader("Authorization", "Bearer invalid.token");
         given(jwtProvider.validateAccessToken("invalid.token")).willReturn(false);
 
-        jwtFilter.doFilterInternal(request, response, filterChain);
+        jwtFilter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
@@ -80,7 +92,7 @@ class JwtFilterTest {
     @DisplayName("No Authorization header should not set authentication")
     void doFilterInternal_withoutHeader_shouldNotSetAuthentication()
             throws ServletException, IOException {
-        jwtFilter.doFilterInternal(request, response, filterChain);
+        jwtFilter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
@@ -92,7 +104,7 @@ class JwtFilterTest {
             throws ServletException, IOException {
         request.addHeader("Authorization", "Basic abc123");
 
-        jwtFilter.doFilterInternal(request, response, filterChain);
+        jwtFilter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);

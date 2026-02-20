@@ -1,8 +1,10 @@
 package com.vocawik.security;
 
+import com.vocawik.security.jwt.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -20,12 +22,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * <ul>
  *   <li>CSRF disabled (stateless REST API)
  *   <li>Session policy set to STATELESS for token-based authentication
- *   <li>{@link JwtFilter} registered before {@link UsernamePasswordAuthenticationFilter}
+ *   <li>{@link com.vocawik.security.jwt.JwtFilter} registered before {@link
+ *       UsernamePasswordAuthenticationFilter}
  *   <li>All endpoints are authenticated except for the public ones
  * </ul>
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 

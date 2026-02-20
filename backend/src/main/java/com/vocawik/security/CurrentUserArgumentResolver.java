@@ -1,5 +1,6 @@
 package com.vocawik.security;
 
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.web.exception.UnauthorizedException;
 import java.util.UUID;
 import org.springframework.core.MethodParameter;
@@ -14,14 +15,15 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 /**
  * Resolves {@link CurrentUser}-annotated controller parameters.
  *
- * <p>Extracts the user ID from the JWT subject stored by {@link JwtFilter}.
+ * <p>Extracts the user ID from the {@link AuthPrincipal} stored by {@link
+ * com.vocawik.security.jwt.JwtFilter}.
  */
 @Component
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
     /**
-     * Returns {@code true} if the parameter is annotated with {@link CurrentUser} and is of type
-     * {@link UUID}.
+     * Returns {@code true} if the parameter is annotated with {@link CurrentUser} and is either
+     * {@link UUID} or {@link AuthPrincipal}.
      *
      * @param parameter the method parameter
      * @return whether this resolver supports the parameter
@@ -29,7 +31,8 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
         return parameter.hasParameterAnnotation(CurrentUser.class)
-                && parameter.getParameterType().equals(UUID.class);
+                && (parameter.getParameterType().equals(UUID.class)
+                        || parameter.getParameterType().equals(AuthPrincipal.class));
     }
 
     /**
@@ -57,13 +60,14 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
             throw new UnauthorizedException("Authentication required.");
         }
 
-        UUID userUuid;
-        try {
-            userUuid = UUID.fromString(auth.getName());
-        } catch (IllegalArgumentException e) {
-            throw new UnauthorizedException("Invalid authentication subject.");
+        Object principal = auth.getPrincipal();
+        if (principal instanceof AuthPrincipal authPrincipal) {
+            if (parameter.getParameterType().equals(AuthPrincipal.class)) {
+                return authPrincipal;
+            }
+            return authPrincipal.userUuid();
         }
 
-        return userUuid;
+        throw new UnauthorizedException("Invalid authentication principal.");
     }
 }
