@@ -18,7 +18,11 @@ public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication required."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "Access denied."),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found."),
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred.");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred."),
+
+    // OAuth
+    OAUTH_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_GATEWAY, "OAuth token exchange failed."),
+    OAUTH_USERINFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "OAuth user info fetch failed.");
 
     private final HttpStatus httpStatus;
     private final String message;

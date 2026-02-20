@@ -58,6 +58,15 @@ jwt:
   access-expiration: ${JWT_ACCESS_EXPIRATION}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION}
 
+oauth:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    auth-uri: ${GOOGLE_AUTH_URI:https://accounts.google.com/o/oauth2/v2/auth}
+    token-uri: ${GOOGLE_TOKEN_URI:https://oauth2.googleapis.com/token}
+    user-info-uri: ${GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:}
+
 sentry:
   dsn: ${SENTRY_DSN:}
   environment: ${SENTRY_ENV:${spring.profiles.active}}
