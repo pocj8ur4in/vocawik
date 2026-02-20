@@ -187,7 +187,7 @@ tasks.register('installGitHooks', Copy) {
 			unix('rwxr-xr-x')
 		}
 	}
-	into "${rootDir}/.git/hooks"
+	into "${rootDir.parentFile}/.git/hooks"
 }
 
 compileJava.dependsOn 'installGitHooks'

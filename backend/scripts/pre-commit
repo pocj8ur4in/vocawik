@@ -1,2 +1,7 @@
 #!/bin/sh
-./gradlew spotlessCheck --daemon -q 2>/dev/null
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "${REPO_ROOT}/backend"
+
+./gradlew --no-daemon spotlessCheck spotbugsMain test jacocoTestReport -x spotlessApply -q
