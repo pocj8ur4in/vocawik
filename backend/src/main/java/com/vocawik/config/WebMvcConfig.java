@@ -2,6 +2,7 @@ package com.vocawik.config;
 
 import com.vocawik.security.CurrentUser;
 import com.vocawik.security.CurrentUserArgumentResolver;
+import com.vocawik.security.guest.CurrentGuestArgumentResolver;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final CurrentUserArgumentResolver currentUserArgumentResolver;
+    private final CurrentGuestArgumentResolver currentGuestArgumentResolver;
 
     /**
      * Registers {@code /api/v1} prefix for controllers in the {@code com.vocawik.controller}.
@@ -41,5 +43,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(currentUserArgumentResolver);
+        resolvers.add(currentGuestArgumentResolver);
     }
 }
