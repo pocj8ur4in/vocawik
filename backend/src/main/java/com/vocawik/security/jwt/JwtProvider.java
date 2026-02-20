@@ -1,4 +1,4 @@
-package com.vocawik.security;
+package com.vocawik.security.jwt;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -20,9 +20,10 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class JwtProvider {
+public final class JwtProvider {
 
     private static final String TOKEN_TYPE_CLAIM = "typ";
+    private static final String ROLE_CLAIM = "role";
     private static final String ACCESS_TOKEN_TYPE = "ACCESS";
     private static final String REFRESH_TOKEN_TYPE = "REFRESH";
 
@@ -61,7 +62,18 @@ public class JwtProvider {
      * @return signed JWT access token
      */
     public String generateAccessToken(String subject) {
-        return generateToken(subject, accessExpiration, ACCESS_TOKEN_TYPE);
+        return generateAccessToken(subject, "USER");
+    }
+
+    /**
+     * Generates an access token.
+     *
+     * @param subject user identifier (UUID as string)
+     * @param role user role (e.g. USER, ADMIN)
+     * @return signed JWT access token
+     */
+    public String generateAccessToken(String subject, String role) {
+        return generateToken(subject, role, accessExpiration, ACCESS_TOKEN_TYPE);
     }
 
     /**
@@ -71,7 +83,18 @@ public class JwtProvider {
      * @return signed JWT refresh token
      */
     public String generateRefreshToken(String subject) {
-        return generateToken(subject, refreshExpiration, REFRESH_TOKEN_TYPE);
+        return generateRefreshToken(subject, "USER");
+    }
+
+    /**
+     * Generates a refresh token.
+     *
+     * @param subject user identifier (UUID as string)
+     * @param role user role (e.g. USER, ADMIN)
+     * @return signed JWT refresh token
+     */
+    public String generateRefreshToken(String subject, String role) {
+        return generateToken(subject, role, refreshExpiration, REFRESH_TOKEN_TYPE);
     }
 
     /**
@@ -82,6 +105,34 @@ public class JwtProvider {
      */
     public String getSubject(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    /**
+     * Extracts role claim from a token.
+     *
+     * @param token JWT token
+     * @return role claim value
+     */
+    public String getRole(String token) {
+        return parseClaims(token).get(ROLE_CLAIM, String.class);
+    }
+
+    /**
+     * Returns access token expiry in seconds.
+     *
+     * @return access token expiration (seconds)
+     */
+    public long getAccessExpirationSeconds() {
+        return accessExpiration / 1000;
+    }
+
+    /**
+     * Returns refresh token expiry in seconds.
+     *
+     * @return refresh token expiration (seconds)
+     */
+    public long getRefreshExpirationSeconds() {
+        return refreshExpiration / 1000;
     }
 
     /**
@@ -139,7 +190,7 @@ public class JwtProvider {
         return false;
     }
 
-    private String generateToken(String subject, long expirationMs, String tokenType) {
+    private String generateToken(String subject, String role, long expirationMs, String tokenType) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
@@ -149,6 +200,7 @@ public class JwtProvider {
                 .audience()
                 .add(audience)
                 .and()
+                .claim(ROLE_CLAIM, role)
                 .claim(TOKEN_TYPE_CLAIM, tokenType)
                 .issuedAt(now)
                 .expiration(expiry)
