@@ -68,6 +68,7 @@ dependencies {
 	implementation "org.mapstruct:mapstruct:${versions.mapstruct}"
 	implementation "com.github.f4b6a3:uuid-creator:${versions.uuidCreator}"
 	implementation "io.sentry:sentry-spring-jakarta:${versions.sentry}"
+	compileOnly "com.github.spotbugs:spotbugs-annotations:${versions.spotbugsTool}"
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${versions.lombokMapstructBinding}"
