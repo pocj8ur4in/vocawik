@@ -46,6 +46,19 @@ class JwtProviderTest {
     }
 
     @Test
+    @DisplayName("Refresh token should include jti and family claims")
+    void refreshToken_shouldContainJtiAndFamily() {
+        String subject = UUID.randomUUID().toString();
+        String familyId = UUID.randomUUID().toString();
+        String tokenId = UUID.randomUUID().toString();
+
+        String token = jwtProvider.generateRefreshToken(subject, "USER", familyId, tokenId);
+
+        assertThat(jwtProvider.getTokenId(token)).isEqualTo(tokenId);
+        assertThat(jwtProvider.getRefreshFamily(token)).isEqualTo(familyId);
+    }
+
+    @Test
     @DisplayName("Validate valid token")
     void validateToken_withValidToken_shouldReturnTrue() {
         String token = jwtProvider.generateAccessToken(UUID.randomUUID().toString());
