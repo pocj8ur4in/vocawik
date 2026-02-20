@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,10 @@ public class AuthController {
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
     private static final String OAUTH_STATE_COOKIE = "oauth_state";
+
+    @Value("${security.cookie.secure:true}")
+    private boolean secureCookie;
+
     private final AuthService authService;
     private final OAuthStateService oAuthStateService;
 
@@ -60,7 +65,7 @@ public class AuthController {
         }
 
         String state = oAuthStateService.generate();
-        addOAuthStateCookie(response, state, request.isSecure());
+        addOAuthStateCookie(response, state);
 
         return ResponseEntity.ok(
                 Map.of(
@@ -94,12 +99,12 @@ public class AuthController {
             throw new ResponseStatusException(BAD_REQUEST, "Unsupported OAuth provider.");
         }
         if (!oAuthStateService.isValid(state, cookieState)) {
-            clearOAuthStateCookie(response, request.isSecure());
+            clearOAuthStateCookie(response);
             throw new ResponseStatusException(UNAUTHORIZED, "Invalid OAuth state.");
         }
 
         AuthTokenBundle tokenBundle = authService.authenticateGoogle(code);
-        clearOAuthStateCookie(response, request.isSecure());
+        clearOAuthStateCookie(response);
         addRefreshCookie(response, tokenBundle.refreshToken());
         return ResponseEntity.ok(
                 new AuthTokenResponse(
@@ -138,7 +143,7 @@ public class AuthController {
         ResponseCookie cookie =
                 ResponseCookie.from(REFRESH_TOKEN_COOKIE, refreshToken)
                         .httpOnly(true)
-                        .secure(true)
+                        .secure(secureCookie)
                         .sameSite("Strict")
                         .path("/api/v1/auth")
                         .maxAge(authService.getRefreshExpirationSeconds())
@@ -146,11 +151,11 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private void addOAuthStateCookie(HttpServletResponse response, String state, boolean secure) {
+    private void addOAuthStateCookie(HttpServletResponse response, String state) {
         ResponseCookie cookie =
                 ResponseCookie.from(OAUTH_STATE_COOKIE, state)
                         .httpOnly(true)
-                        .secure(secure)
+                        .secure(secureCookie)
                         .sameSite("Lax")
                         .path("/api/v1/auth/oauth")
                         .maxAge(5 * 60)
@@ -158,11 +163,11 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private void clearOAuthStateCookie(HttpServletResponse response, boolean secure) {
+    private void clearOAuthStateCookie(HttpServletResponse response) {
         ResponseCookie cookie =
                 ResponseCookie.from(OAUTH_STATE_COOKIE, "")
                         .httpOnly(true)
-                        .secure(secure)
+                        .secure(secureCookie)
                         .sameSite("Lax")
                         .path("/api/v1/auth/oauth")
                         .maxAge(0)
