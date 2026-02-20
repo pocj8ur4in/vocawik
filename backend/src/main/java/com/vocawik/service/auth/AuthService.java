@@ -7,22 +7,37 @@ import com.vocawik.repository.user.UserAuthProviderRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.jwt.JwtProvider;
 import com.vocawik.web.exception.UnauthorizedException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.HexFormat;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Authentication service for OAuth login and token issuance. */
 @Service
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "StringRedisTemplate is a Spring-managed infrastructure bean and is not exposed externally.")
 public class AuthService {
+
+    private static final String REFRESH_USED_KEY_PREFIX = "auth:refresh:used:";
+    private static final String REFRESH_REVOKED_FAMILY_KEY_PREFIX = "auth:refresh:family:revoked:";
 
     private final GoogleOAuthClient googleOAuthClient;
     private final OAuthProperties oAuthProperties;
     private final UserRepository userRepository;
     private final UserAuthProviderRepository userAuthProviderRepository;
     private final JwtProvider jwtProvider;
+    private final StringRedisTemplate stringRedisTemplate;
 
     /**
      * Builds Google OAuth authorize URL.
@@ -65,7 +80,10 @@ public class AuthService {
 
         String role = user.getRole().name();
         String accessToken = jwtProvider.generateAccessToken(user.getUuid(), role);
-        String refreshToken = jwtProvider.generateRefreshToken(user.getUuid(), role);
+        String familyId = UUID.randomUUID().toString();
+        String refreshToken =
+                jwtProvider.generateRefreshToken(
+                        user.getUuid(), role, familyId, UUID.randomUUID().toString());
 
         return new AuthTokenBundle(
                 accessToken, refreshToken, jwtProvider.getAccessExpirationSeconds());
@@ -84,8 +102,31 @@ public class AuthService {
 
         String subject = jwtProvider.getSubject(refreshToken);
         String role = jwtProvider.getRole(refreshToken);
+        String familyId = resolveRefreshFamily(refreshToken, subject);
+        String tokenId = resolveRefreshTokenId(refreshToken);
+        Duration refreshTtl = Duration.ofSeconds(jwtProvider.getRefreshExpirationSeconds());
+
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(refreshFamilyRevokedKey(familyId)))) {
+            throw new UnauthorizedException(
+                    "Refresh token family is revoked. Please sign in again.");
+        }
+
+        boolean firstUse =
+                Boolean.TRUE.equals(
+                        stringRedisTemplate
+                                .opsForValue()
+                                .setIfAbsent(REFRESH_USED_KEY_PREFIX + tokenId, "1", refreshTtl));
+        if (!firstUse) {
+            stringRedisTemplate
+                    .opsForValue()
+                    .set(refreshFamilyRevokedKey(familyId), "1", refreshTtl);
+            throw new UnauthorizedException("Refresh token reuse detected. Please sign in again.");
+        }
+
         String accessToken = jwtProvider.generateAccessToken(subject, role);
-        String nextRefreshToken = jwtProvider.generateRefreshToken(subject, role);
+        String nextRefreshToken =
+                jwtProvider.generateRefreshToken(
+                        subject, role, familyId, UUID.randomUUID().toString());
 
         return new AuthTokenBundle(
                 accessToken, nextRefreshToken, jwtProvider.getAccessExpirationSeconds());
@@ -134,5 +175,35 @@ public class AuthService {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String resolveRefreshFamily(String refreshToken, String subject) {
+        String familyId = jwtProvider.getRefreshFamily(refreshToken);
+        if (familyId == null || familyId.isBlank()) {
+            return "legacy:" + subject;
+        }
+        return familyId;
+    }
+
+    private String resolveRefreshTokenId(String refreshToken) {
+        String tokenId = jwtProvider.getTokenId(refreshToken);
+        if (tokenId == null || tokenId.isBlank()) {
+            return "legacy:" + sha256(refreshToken);
+        }
+        return tokenId;
+    }
+
+    private String refreshFamilyRevokedKey(String familyId) {
+        return REFRESH_REVOKED_FAMILY_KEY_PREFIX + familyId;
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 }
