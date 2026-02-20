@@ -24,6 +24,7 @@ public final class JwtProvider {
 
     private static final String TOKEN_TYPE_CLAIM = "typ";
     private static final String ROLE_CLAIM = "role";
+    private static final String REFRESH_FAMILY_CLAIM = "fam";
     private static final String ACCESS_TOKEN_TYPE = "ACCESS";
     private static final String REFRESH_TOKEN_TYPE = "REFRESH";
 
@@ -83,7 +84,11 @@ public final class JwtProvider {
      * @return signed JWT refresh token
      */
     public String generateRefreshToken(String subject) {
-        return generateRefreshToken(subject, "USER");
+        return generateRefreshToken(
+                subject,
+                "USER",
+                java.util.UUID.randomUUID().toString(),
+                java.util.UUID.randomUUID().toString());
     }
 
     /**
@@ -94,7 +99,26 @@ public final class JwtProvider {
      * @return signed JWT refresh token
      */
     public String generateRefreshToken(String subject, String role) {
-        return generateToken(subject, role, refreshExpiration, REFRESH_TOKEN_TYPE);
+        return generateRefreshToken(
+                subject,
+                role,
+                java.util.UUID.randomUUID().toString(),
+                java.util.UUID.randomUUID().toString());
+    }
+
+    /**
+     * Generates a refresh token with explicit token-family metadata.
+     *
+     * @param subject user identifier (UUID as string)
+     * @param role user role (e.g. USER, ADMIN)
+     * @param familyId refresh token family identifier
+     * @param tokenId unique refresh token identifier (JWT ID / jti)
+     * @return signed JWT refresh token
+     */
+    public String generateRefreshToken(
+            String subject, String role, String familyId, String tokenId) {
+        return generateToken(
+                subject, role, refreshExpiration, REFRESH_TOKEN_TYPE, tokenId, familyId);
     }
 
     /**
@@ -115,6 +139,26 @@ public final class JwtProvider {
      */
     public String getRole(String token) {
         return parseClaims(token).get(ROLE_CLAIM, String.class);
+    }
+
+    /**
+     * Extracts token ID (jti) from a token.
+     *
+     * @param token JWT token
+     * @return token ID or {@code null} when absent
+     */
+    public String getTokenId(String token) {
+        return parseClaims(token).getId();
+    }
+
+    /**
+     * Extracts refresh token family ID from a token.
+     *
+     * @param token JWT token
+     * @return refresh family ID or {@code null} when absent
+     */
+    public String getRefreshFamily(String token) {
+        return parseClaims(token).get(REFRESH_FAMILY_CLAIM, String.class);
     }
 
     /**
@@ -191,21 +235,41 @@ public final class JwtProvider {
     }
 
     private String generateToken(String subject, String role, long expirationMs, String tokenType) {
+        return generateToken(subject, role, expirationMs, tokenType, null, null);
+    }
+
+    private String generateToken(
+            String subject,
+            String role,
+            long expirationMs,
+            String tokenType,
+            String tokenId,
+            String refreshFamilyId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
-        return Jwts.builder()
-                .subject(subject)
-                .issuer(issuer)
-                .audience()
-                .add(audience)
-                .and()
-                .claim(ROLE_CLAIM, role)
-                .claim(TOKEN_TYPE_CLAIM, tokenType)
-                .issuedAt(now)
-                .expiration(expiry)
-                .signWith(secretKey)
-                .compact();
+        var builder =
+                Jwts.builder()
+                        .subject(subject)
+                        .issuer(issuer)
+                        .audience()
+                        .add(audience)
+                        .and()
+                        .claim(ROLE_CLAIM, role)
+                        .claim(TOKEN_TYPE_CLAIM, tokenType)
+                        .issuedAt(now)
+                        .expiration(expiry);
+
+        if (tokenId != null && !tokenId.isBlank()) {
+            builder.id(tokenId);
+        }
+        if (REFRESH_TOKEN_TYPE.equals(tokenType)
+                && refreshFamilyId != null
+                && !refreshFamilyId.isBlank()) {
+            builder.claim(REFRESH_FAMILY_CLAIM, refreshFamilyId);
+        }
+
+        return builder.signWith(secretKey).compact();
     }
 
     private Claims parseClaims(String token) {
