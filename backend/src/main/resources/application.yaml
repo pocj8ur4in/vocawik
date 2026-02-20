@@ -45,11 +45,16 @@ spring:
 
 server:
   port: ${SERVER_PORT}
+  forward-headers-strategy: framework
   servlet:
     encoding:
       charset: UTF-8
       enabled: true
       force: true
+
+security:
+  cookie:
+    secure: true
 
 jwt:
   secret: ${JWT_SECRET}

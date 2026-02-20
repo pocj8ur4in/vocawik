@@ -23,3 +23,7 @@ management:
     health:
       show-details: always
       show-components: always
+
+security:
+  cookie:
+    secure: false
