@@ -41,4 +41,23 @@ public class UserAuthProvider extends BaseEntity {
 
     @Column(length = 254)
     private String email;
+
+    /**
+     * Creates a provider mapping linked to a user.
+     *
+     * @param user linked user
+     * @param provider provider type
+     * @param providerUserId provider-side user identifier
+     * @param email provider email
+     * @return created provider mapping
+     */
+    public static UserAuthProvider link(
+            User user, AuthProvider provider, String providerUserId, String email) {
+        UserAuthProvider mapping = new UserAuthProvider();
+        mapping.user = user;
+        mapping.provider = provider;
+        mapping.providerUserId = providerUserId;
+        mapping.email = email;
+        return mapping;
+    }
 }

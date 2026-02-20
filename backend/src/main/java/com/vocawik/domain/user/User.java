@@ -47,4 +47,23 @@ public class User extends BaseEntity {
     @Getter(AccessLevel.NONE)
     @OneToMany(mappedBy = "user")
     private List<UserAuthProvider> authProviders = new ArrayList<>();
+
+    /**
+     * Creates a new user with required identity fields.
+     *
+     * @param email user email
+     * @param nickname display nickname
+     * @return created user instance
+     */
+    public static User create(String email, String nickname) {
+        User user = new User();
+        user.email = email;
+        user.nickname = nickname;
+        return user;
+    }
+
+    /** Updates last login timestamp. */
+    public void touchLastLoginAt() {
+        this.lastLoginAt = LocalDateTime.now();
+    }
 }
