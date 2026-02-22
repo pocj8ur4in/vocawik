@@ -18,15 +18,24 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Guest extends BaseEntity {
 
-    @Column(name = "ip_hash", nullable = false, length = 64, unique = true)
-    private String ipHash;
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private GuestStatus status = GuestStatus.ACTIVE;
 
+    @Column(name = "ip_hash", nullable = false, length = 64)
+    private String ipHash;
+
     @Column private LocalDateTime lastSeenAt;
 
+    /**
+     * Creates a new guest from client IP hash.
+     *
+     * @param ipHash hashed client IP
+     * @return created guest instance
+     */
     public static Guest create(String ipHash) {
         Guest guest = new Guest();
         guest.ipHash = ipHash;
@@ -34,6 +43,7 @@ public class Guest extends BaseEntity {
         return guest;
     }
 
+    /** Updates guest last-seen timestamp. */
     public void touchLastSeenAt() {
         this.lastSeenAt = LocalDateTime.now();
     }

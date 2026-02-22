@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /** Repository for {@link Guest} persistence access. */
 public interface GuestRepository extends JpaRepository<Guest, Long> {
 
-    Optional<Guest> findByIpHash(String ipHash);
+    Optional<Guest> findByIpHashAndIsDeletedFalse(String ipHash);
 }

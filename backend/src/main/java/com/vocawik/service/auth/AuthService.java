@@ -144,7 +144,7 @@ public class AuthService {
     private User linkOrCreateGoogleUser(GoogleUserInfo userInfo) {
         User user =
                 userRepository
-                        .findByEmail(userInfo.email())
+                        .findByEmailIgnoreCaseAndIsDeletedFalse(userInfo.email())
                         .orElseGet(
                                 () ->
                                         userRepository.save(

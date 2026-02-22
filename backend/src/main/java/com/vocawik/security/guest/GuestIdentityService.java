@@ -34,10 +34,10 @@ public class GuestIdentityService {
         try {
             guest =
                     guestRepository
-                            .findByIpHash(ipHash)
+                            .findByIpHashAndIsDeletedFalse(ipHash)
                             .orElseGet(() -> guestRepository.save(Guest.create(ipHash)));
         } catch (DataIntegrityViolationException ex) {
-            guest = guestRepository.findByIpHash(ipHash).orElseThrow(() -> ex);
+            guest = guestRepository.findByIpHashAndIsDeletedFalse(ipHash).orElseThrow(() -> ex);
         }
         guest.touchLastSeenAt();
         return guest;
