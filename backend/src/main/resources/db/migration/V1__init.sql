@@ -85,3 +85,49 @@ CREATE TABLE resources (
         resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'PLAYLIST')
     )
 );
+
+-- acls
+CREATE TABLE acls (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    resource_id BIGINT NOT NULL,
+    action VARCHAR(20) NOT NULL,
+    subject_type VARCHAR(20) NOT NULL,
+    subject_value VARCHAR(191) NOT NULL DEFAULT '',
+    effect VARCHAR(10) NOT NULL DEFAULT 'ALLOW',
+    priority INTEGER NOT NULL DEFAULT 100,
+    expires_at TIMESTAMP,
+    CONSTRAINT fk_acls_resource FOREIGN KEY (resource_id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_acls_action CHECK (
+        action IN ('READ', 'EDIT', 'EDIT_REQUEST', 'DELETE', 'DEBATE_CREATE', 'DEBATE_COMMENT', 'ACL')
+    ),
+    CONSTRAINT chk_acls_subject_type CHECK (
+        subject_type IN (
+            'ANONYMOUS',
+            'USER',
+            'USER_15',
+            'USER_VERIFIED',
+            'ADMIN',
+            'USER_ID',
+            'GUEST_ID',
+            'ACL_GROUP'
+        )
+    ),
+    CONSTRAINT chk_acls_subject_value CHECK (
+        (
+            subject_type IN ('ANONYMOUS', 'USER', 'USER_15', 'USER_VERIFIED', 'ADMIN')
+            AND subject_value = ''
+        )
+        OR (
+            subject_type IN ('USER_ID', 'GUEST_ID', 'ACL_GROUP')
+            AND subject_value <> ''
+        )
+    ),
+    CONSTRAINT chk_acls_effect CHECK (effect IN ('ALLOW', 'DENY')),
+    CONSTRAINT chk_acls_priority CHECK (priority >= 0),
+    CONSTRAINT uk_acls_resource_action_subject_priority UNIQUE (
+        resource_id, action, subject_type, subject_value, priority
+    )
+);
