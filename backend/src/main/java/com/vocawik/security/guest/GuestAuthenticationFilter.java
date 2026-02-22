@@ -75,7 +75,7 @@ public class GuestAuthenticationFilter extends OncePerRequestFilter {
         String ip = clientIpResolver.resolve(request);
         Guest guest = guestIdentityService.findOrCreateByIp(ip);
 
-        GuestPrincipal principal = new GuestPrincipal(java.util.UUID.fromString(guest.getUuid()));
+        GuestPrincipal principal = new GuestPrincipal(guest.getUuid());
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
                         principal, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST")));

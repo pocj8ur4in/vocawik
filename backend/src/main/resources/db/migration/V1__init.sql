@@ -1,7 +1,7 @@
 -- users
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
-    uuid VARCHAR(36) NOT NULL UNIQUE,
+    uuid UUID NOT NULL UNIQUE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE users (
 -- user_auth_providers
 CREATE TABLE user_auth_providers (
     id BIGSERIAL PRIMARY KEY,
-    uuid VARCHAR(36) NOT NULL UNIQUE,
+    uuid UUID NOT NULL UNIQUE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -39,7 +39,7 @@ CREATE INDEX idx_user_auth_providers_user_id ON user_auth_providers (user_id);
 -- guests
 CREATE TABLE guests (
     id BIGSERIAL PRIMARY KEY,
-    uuid VARCHAR(36) NOT NULL UNIQUE,
+    uuid UUID NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',

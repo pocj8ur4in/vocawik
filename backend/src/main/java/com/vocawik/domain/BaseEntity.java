@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,8 +30,8 @@ public abstract class BaseEntity {
     private Long id;
 
     /** Immutable external UUID identifier. */
-    @Column(nullable = false, unique = true, updatable = false, length = 36)
-    private String uuid;
+    @Column(nullable = false, unique = true, updatable = false)
+    private UUID uuid;
 
     /** Timestamp when the entity was created. */
     @CreatedDate
@@ -49,8 +50,8 @@ public abstract class BaseEntity {
      */
     @PrePersist
     protected void prePersist() {
-        if (uuid == null || uuid.isBlank()) {
-            uuid = UuidCreator.getTimeOrderedEpoch().toString();
+        if (uuid == null) {
+            uuid = UuidCreator.getTimeOrderedEpoch();
         }
     }
 }
