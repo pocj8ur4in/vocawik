@@ -68,3 +68,20 @@ CREATE TABLE guests (
 CREATE UNIQUE INDEX uk_guests_ip_hash_live
     ON guests (ip_hash)
     WHERE is_deleted = FALSE;
+
+-- resources
+CREATE TABLE resources (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    view_count BIGINT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    resource_type VARCHAR(20) NOT NULL,
+    CONSTRAINT chk_resources_view_count CHECK (view_count >= 0),
+    CONSTRAINT chk_resources_status CHECK (status IN ('ACTIVE', 'DRAFT')),
+    CONSTRAINT chk_resources_resource_type CHECK (
+        resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'PLAYLIST')
+    )
+);
