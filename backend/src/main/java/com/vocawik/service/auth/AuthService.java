@@ -79,11 +79,11 @@ public class AuthService {
         user.touchLastLoginAt();
 
         String role = user.getRole().name();
-        String accessToken = jwtProvider.generateAccessToken(user.getUuid(), role);
+        String accessToken = jwtProvider.generateAccessToken(user.getUuid().toString(), role);
         String familyId = UUID.randomUUID().toString();
         String refreshToken =
                 jwtProvider.generateRefreshToken(
-                        user.getUuid(), role, familyId, UUID.randomUUID().toString());
+                        user.getUuid().toString(), role, familyId, UUID.randomUUID().toString());
 
         return new AuthTokenBundle(
                 accessToken, refreshToken, jwtProvider.getAccessExpirationSeconds());
