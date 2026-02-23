@@ -154,3 +154,34 @@ CREATE TABLE debates (
     ),
     CONSTRAINT chk_debates_status CHECK (status IN ('OPEN', 'CLOSED', 'ARCHIVED'))
 );
+
+-- debate_comments
+CREATE TABLE debate_comments (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    debate_id BIGINT NOT NULL,
+    parent_comment_id BIGINT,
+    actor_user_id BIGINT,
+    actor_guest_id BIGINT,
+    content TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 1,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_debate_comments_debate FOREIGN KEY (debate_id) REFERENCES debates (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_debate_comments_id_debate UNIQUE (id, debate_id),
+    CONSTRAINT fk_debate_comments_parent_same_debate FOREIGN KEY (parent_comment_id, debate_id)
+        REFERENCES debate_comments (id, debate_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_debate_comments_actor_user FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_debate_comments_actor_guest FOREIGN KEY (actor_guest_id) REFERENCES guests (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_debate_comments_actor_exclusive CHECK (
+        NOT (actor_user_id IS NOT NULL AND actor_guest_id IS NOT NULL)
+    ),
+    CONSTRAINT chk_debate_comments_actor_required CHECK (
+        actor_user_id IS NOT NULL OR actor_guest_id IS NOT NULL
+    ),
+    CONSTRAINT chk_debate_comments_parent_not_self CHECK (
+        parent_comment_id IS NULL OR parent_comment_id <> id
+    ),
+    CONSTRAINT chk_debate_comments_revision CHECK (revision > 0)
+);
