@@ -131,3 +131,26 @@ CREATE TABLE acls (
         resource_id, action, subject_type, subject_value, priority
     )
 );
+-- debates
+CREATE TABLE debates (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    resource_id BIGINT NOT NULL,
+    actor_user_id BIGINT,
+    actor_guest_id BIGINT,
+    title VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_debates_resource FOREIGN KEY (resource_id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_debates_actor_user FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_debates_actor_guest FOREIGN KEY (actor_guest_id) REFERENCES guests (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_debates_actor_exclusive CHECK (
+        NOT (actor_user_id IS NOT NULL AND actor_guest_id IS NOT NULL)
+    ),
+    CONSTRAINT chk_debates_actor_required CHECK (
+        actor_user_id IS NOT NULL OR actor_guest_id IS NOT NULL
+    ),
+    CONSTRAINT chk_debates_status CHECK (status IN ('OPEN', 'CLOSED', 'ARCHIVED'))
+);
