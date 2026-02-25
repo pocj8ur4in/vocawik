@@ -86,6 +86,23 @@ CREATE TABLE resources (
     )
 );
 
+-- resource_names
+CREATE TABLE resource_names (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    resource_id BIGINT NOT NULL,
+    lang_code VARCHAR(10) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_resource_names_resource FOREIGN KEY (resource_id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_resource_names_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
+    CONSTRAINT chk_resource_names_sort_order CHECK (sort_order >= 0),
+    CONSTRAINT uk_resource_names_resource_lang_name UNIQUE (resource_id, lang_code, name)
+);
+
 -- acls
 CREATE TABLE acls (
     id BIGSERIAL PRIMARY KEY,
