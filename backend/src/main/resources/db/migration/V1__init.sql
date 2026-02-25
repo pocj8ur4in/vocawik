@@ -202,3 +202,40 @@ CREATE TABLE debate_comments (
     ),
     CONSTRAINT chk_debate_comments_revision CHECK (revision > 0)
 );
+
+-- histories
+CREATE TABLE histories (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    resource_id BIGINT NOT NULL,
+    revision INTEGER NOT NULL,
+    base_revision INTEGER NOT NULL DEFAULT 0,
+    action_type VARCHAR(20) NOT NULL,
+    actor_user_id BIGINT,
+    actor_guest_id BIGINT,
+    is_snapshot BOOLEAN NOT NULL DEFAULT FALSE,
+    patch_data JSONB,
+    snapshot_data JSONB,
+    content_hash CHAR(64) NOT NULL,
+    CONSTRAINT fk_histories_resource FOREIGN KEY (resource_id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_histories_actor_user FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_histories_actor_guest FOREIGN KEY (actor_guest_id) REFERENCES guests (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_histories_resource_revision UNIQUE (resource_id, revision),
+    CONSTRAINT chk_histories_action_type CHECK (
+        action_type IN ('CREATE', 'UPDATE', 'DELETE', 'RESTORE')
+    ),
+    CONSTRAINT chk_histories_revision CHECK (revision > 0),
+    CONSTRAINT chk_histories_base_revision CHECK (
+        base_revision >= 0 AND base_revision < revision
+    ),
+    CONSTRAINT chk_histories_actor_exclusive CHECK (
+        NOT (actor_user_id IS NOT NULL AND actor_guest_id IS NOT NULL)
+    ),
+    CONSTRAINT chk_histories_snapshot_or_patch CHECK (
+        (is_snapshot = TRUE AND snapshot_data IS NOT NULL AND patch_data IS NULL)
+        OR
+        (is_snapshot = FALSE AND patch_data IS NOT NULL)
+    )
+);
