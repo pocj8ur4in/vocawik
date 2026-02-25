@@ -1,7 +1,7 @@
 package com.vocawik.domain.user;
 
+import com.vocawik.common.i18n.Language;
 import com.vocawik.common.jpa.converter.EmailAttributeConverter;
-import com.vocawik.common.jpa.converter.LocaleAttributeConverter;
 import com.vocawik.common.jpa.converter.ZoneIdAttributeConverter;
 import com.vocawik.domain.BaseEntity;
 import com.vocawik.domain.song.SongPvProvider;
@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -41,9 +40,9 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String nickname;
 
-    @Convert(converter = LocaleAttributeConverter.class)
-    @Column(nullable = false, length = 35)
-    private Locale locale = Locale.forLanguageTag("und");
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lang_code", nullable = false, length = 10)
+    private Language langCode = Language.UNSET;
 
     @Convert(converter = ZoneIdAttributeConverter.class)
     @Column(nullable = false, length = 40)
