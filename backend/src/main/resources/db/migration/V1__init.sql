@@ -7,7 +7,7 @@ CREATE TABLE users (
     updated_at TIMESTAMP NOT NULL,
     email VARCHAR(254) NOT NULL,
     nickname VARCHAR(100) NOT NULL,
-    locale VARCHAR(35) NOT NULL DEFAULT 'und',
+    lang_code VARCHAR(10) NOT NULL DEFAULT 'UNSET',
     timezone VARCHAR(40) NOT NULL DEFAULT 'UTC',
     theme VARCHAR(20) NOT NULL DEFAULT 'UNSET',
     song_pv_provider VARCHAR(20) NOT NULL DEFAULT 'UNSET',
@@ -16,7 +16,7 @@ CREATE TABLE users (
     last_login_at TIMESTAMP,
     CONSTRAINT chk_users_role CHECK (role IN ('USER', 'ADMIN')),
     CONSTRAINT chk_users_status CHECK (status IN ('ACTIVE', 'SUSPENDED')),
-    CONSTRAINT chk_users_locale_not_blank CHECK (locale <> ''),
+    CONSTRAINT chk_users_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
     CONSTRAINT chk_users_timezone_not_blank CHECK (timezone <> ''),
     CONSTRAINT chk_users_theme CHECK (theme IN ('LIGHT', 'DARK', 'UNSET')),
     CONSTRAINT chk_users_song_pv_provider CHECK (
