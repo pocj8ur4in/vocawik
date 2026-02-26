@@ -10,7 +10,7 @@ CREATE TABLE users (
     lang_code VARCHAR(10) NOT NULL DEFAULT 'UNSET',
     timezone VARCHAR(40) NOT NULL DEFAULT 'UTC',
     theme VARCHAR(20) NOT NULL DEFAULT 'UNSET',
-    song_pv_provider VARCHAR(20) NOT NULL DEFAULT 'UNSET',
+    pv_provider VARCHAR(20) NOT NULL DEFAULT 'UNSET',
     role VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL,
     last_login_at TIMESTAMP,
@@ -19,8 +19,8 @@ CREATE TABLE users (
     CONSTRAINT chk_users_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
     CONSTRAINT chk_users_timezone_not_blank CHECK (timezone <> ''),
     CONSTRAINT chk_users_theme CHECK (theme IN ('LIGHT', 'DARK', 'UNSET')),
-    CONSTRAINT chk_users_song_pv_provider CHECK (
-        song_pv_provider IN (
+    CONSTRAINT chk_users_pv_provider CHECK (
+        pv_provider IN (
             'YOUTUBE',
             'NICONICO',
             'BILIBILI',

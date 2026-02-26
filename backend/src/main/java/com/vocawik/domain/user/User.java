@@ -4,7 +4,6 @@ import com.vocawik.common.i18n.Language;
 import com.vocawik.common.jpa.converter.EmailAttributeConverter;
 import com.vocawik.common.jpa.converter.ZoneIdAttributeConverter;
 import com.vocawik.domain.BaseEntity;
-import com.vocawik.domain.song.SongPvProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -53,8 +52,8 @@ public class User extends BaseEntity {
     private UserTheme theme = UserTheme.UNSET;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "song_pv_provider", nullable = false, length = 20)
-    private SongPvProvider songPvProvider = SongPvProvider.UNSET;
+    @Column(name = "pv_provider", nullable = false, length = 20)
+    private UserPvProvider pvProvider = UserPvProvider.UNSET;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -67,16 +66,33 @@ public class User extends BaseEntity {
     private List<UserAuthProvider> authProviders = new ArrayList<>();
 
     /**
-     * Creates a new user with required identity fields.
+     * Creates a new user.
      *
      * @param email user email
      * @param nickname display nickname
+     * @param langCode language code
+     * @param timezone timezone
+     * @param theme ui theme
+     * @param pvProvider preferred pv provider
+     * @param role user role
      * @return created user instance
      */
-    public static User create(String email, String nickname) {
+    public static User create(
+            String email,
+            String nickname,
+            Language langCode,
+            ZoneId timezone,
+            UserTheme theme,
+            UserPvProvider pvProvider,
+            UserRole role) {
         User user = new User();
         user.email = email;
         user.nickname = nickname;
+        user.langCode = langCode == null ? Language.UNSET : langCode;
+        user.timezone = timezone == null ? ZoneId.of("UTC") : timezone;
+        user.theme = theme == null ? UserTheme.UNSET : theme;
+        user.pvProvider = pvProvider == null ? UserPvProvider.UNSET : pvProvider;
+        user.role = role == null ? UserRole.USER : role;
         return user;
     }
 
