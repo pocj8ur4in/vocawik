@@ -429,3 +429,10 @@ CREATE TABLE song_artists (
     ),
     CONSTRAINT chk_song_artists_sort_order CHECK (sort_order >= 0)
 );
+
+-- vocal_characters
+CREATE TABLE vocal_characters (
+    id BIGINT PRIMARY KEY,
+    content TEXT,
+    CONSTRAINT fk_vocal_characters_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
+);
