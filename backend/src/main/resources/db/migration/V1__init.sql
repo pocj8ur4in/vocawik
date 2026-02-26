@@ -256,6 +256,30 @@ CREATE TABLE songs (
     )
 );
 
+-- song_lyrics
+CREATE TABLE song_lyrics (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    song_id BIGINT NOT NULL,
+    lang_code VARCHAR(10) NOT NULL,
+    lyrics JSONB NOT NULL,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_song_lyrics_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_song_lyrics_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
+    CONSTRAINT chk_song_lyrics_not_json_null CHECK (jsonb_typeof(lyrics) <> 'null'),
+    CONSTRAINT chk_song_lyrics_sort_order CHECK (sort_order >= 0)
+);
+
+CREATE UNIQUE INDEX uk_song_lyrics_song_lang_primary
+    ON song_lyrics (song_id, lang_code)
+    WHERE is_primary = TRUE;
+
+CREATE INDEX idx_song_lyrics_song_lang_sort_order
+    ON song_lyrics (song_id, lang_code, sort_order);
+
 -- playlists
 CREATE TABLE playlists (
     id BIGINT PRIMARY KEY,
