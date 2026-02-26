@@ -75,6 +75,8 @@ CREATE TABLE resources (
     uuid UUID NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
+    canonical_name VARCHAR(255) NOT NULL,
+    thumbnail_url TEXT,
     view_count BIGINT NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -237,5 +239,17 @@ CREATE TABLE histories (
         (is_snapshot = TRUE AND snapshot_data IS NOT NULL AND patch_data IS NULL)
         OR
         (is_snapshot = FALSE AND patch_data IS NOT NULL)
+    )
+);
+
+-- songs
+CREATE TABLE songs (
+    id BIGINT PRIMARY KEY,
+    content TEXT,
+    published_at TIMESTAMPTZ,
+    song_type VARCHAR(20) NOT NULL DEFAULT 'OTHER',
+    CONSTRAINT fk_songs_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_songs_song_type CHECK (
+        song_type IN ('ORIGINAL', 'COVER', 'REMIX', 'REMASTER', 'OTHER')
     )
 );
