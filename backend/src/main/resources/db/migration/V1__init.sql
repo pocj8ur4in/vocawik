@@ -263,22 +263,18 @@ CREATE TABLE song_lyrics (
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     song_id BIGINT NOT NULL,
-    lang_code VARCHAR(10) NOT NULL,
+    lang_codes TEXT[] NOT NULL,
     lyrics JSONB NOT NULL,
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_lyrics_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_song_lyrics_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
+    CONSTRAINT chk_song_lyrics_lang_codes_not_empty CHECK (cardinality(lang_codes) > 0),
+    CONSTRAINT chk_song_lyrics_lang_codes_valid CHECK (
+        lang_codes <@ ARRAY['KO', 'EN', 'JA', 'ZH', 'UNSET']::TEXT[]
+    ),
     CONSTRAINT chk_song_lyrics_not_json_null CHECK (jsonb_typeof(lyrics) <> 'null'),
     CONSTRAINT chk_song_lyrics_sort_order CHECK (sort_order >= 0)
 );
-
-CREATE UNIQUE INDEX uk_song_lyrics_song_lang_primary
-    ON song_lyrics (song_id, lang_code)
-    WHERE is_primary = TRUE;
-
-CREATE INDEX idx_song_lyrics_song_lang_sort_order
-    ON song_lyrics (song_id, lang_code, sort_order);
 
 -- playlists
 CREATE TABLE playlists (
@@ -395,14 +391,15 @@ CREATE TABLE song_artists (
     updated_at TIMESTAMPTZ NOT NULL,
     song_id BIGINT NOT NULL,
     artist_id BIGINT NOT NULL,
-    role VARCHAR(20) NOT NULL,
+    role TEXT[] NOT NULL,
     is_main BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_artists_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
     CONSTRAINT fk_song_artists_artist FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
     CONSTRAINT uk_song_artists_song_artist_role UNIQUE (song_id, artist_id, role),
+    CONSTRAINT chk_song_artists_role_not_empty CHECK (cardinality(role) > 0),
     CONSTRAINT chk_song_artists_role CHECK (
-        role IN ('PRODUCER', 'ARRANGER', 'COMPOSER', 'LYRICIST', 'OTHER')
+        role <@ ARRAY['PRODUCER', 'ARRANGER', 'COMPOSER', 'LYRICIST', 'OTHER']::TEXT[]
     ),
     CONSTRAINT chk_song_artists_sort_order CHECK (sort_order >= 0)
 );
