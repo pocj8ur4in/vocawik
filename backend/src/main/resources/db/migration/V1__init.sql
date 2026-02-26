@@ -253,3 +253,11 @@ CREATE TABLE songs (
         song_type IN ('ORIGINAL', 'COVER', 'REMIX', 'REMASTER', 'OTHER')
     )
 );
+
+-- playlists
+CREATE TABLE playlists (
+    id BIGINT PRIMARY KEY,
+    content TEXT,
+    is_public BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_playlists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
+);
