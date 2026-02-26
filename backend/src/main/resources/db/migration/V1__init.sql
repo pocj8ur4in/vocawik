@@ -321,3 +321,23 @@ CREATE TABLE song_pvs (
     ),
     CONSTRAINT chk_song_pvs_sort_order CHECK (sort_order >= 0)
 );
+
+-- song_links
+CREATE TABLE song_links (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    song_id BIGINT NOT NULL,
+    link_type VARCHAR(20) NOT NULL,
+    url TEXT NOT NULL,
+    title VARCHAR(255),
+    is_official BOOLEAN NOT NULL DEFAULT FALSE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_song_links_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_song_links_link_type CHECK (
+        link_type IN ('VOCADB', 'OTHER')
+    ),
+    CONSTRAINT chk_song_links_sort_order CHECK (sort_order >= 0)
+);
