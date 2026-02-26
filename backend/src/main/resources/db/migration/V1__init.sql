@@ -277,3 +277,17 @@ CREATE TABLE playlist_songs (
     CONSTRAINT uk_playlist_songs_playlist_sort_order UNIQUE (playlist_id, sort_order),
     CONSTRAINT chk_playlist_songs_sort_order CHECK (sort_order >= 0)
 );
+
+-- song_relations
+CREATE TABLE song_relations (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    source_song_id BIGINT NOT NULL,
+    target_song_id BIGINT NOT NULL,
+    CONSTRAINT fk_song_relations_source_song FOREIGN KEY (source_song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_song_relations_target_song FOREIGN KEY (target_song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_song_relations_source_target UNIQUE (source_song_id, target_song_id),
+    CONSTRAINT chk_song_relations_source_not_target CHECK (source_song_id <> target_song_id)
+);
