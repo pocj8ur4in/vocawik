@@ -84,7 +84,7 @@ CREATE TABLE resources (
     CONSTRAINT chk_resources_view_count CHECK (view_count >= 0),
     CONSTRAINT chk_resources_status CHECK (status IN ('ACTIVE', 'DRAFT')),
     CONSTRAINT chk_resources_resource_type CHECK (
-        resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'PLAYLIST')
+        resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'VOICEBANK', 'PLAYLIST')
     )
 );
 
@@ -390,4 +390,29 @@ CREATE TABLE vocal_characters (
     links JSONB,
     CONSTRAINT fk_vocal_characters_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
     CONSTRAINT chk_vocal_characters_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
+);
+
+-- vocal_voicebanks
+CREATE TABLE vocal_voicebanks (
+    id BIGINT PRIMARY KEY,
+    content TEXT,
+    links JSONB,
+    voicebank_typ VARCHAR(20) NOT NULL DEFAULT 'OTHER',
+    CONSTRAINT fk_vocal_voicebanks_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_vocal_voicebanks_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array'),
+    CONSTRAINT chk_vocal_voicebanks_voicebank_typ CHECK (
+        voicebank_typ IN (
+            'VOCALOID',
+            'UTAU',
+            'CEVIO',
+            'SYNTHESIZER_V',
+            'NEUTRINO',
+            'VOISONA',
+            'VOICEROID',
+            'VOICEVOX',
+            'ACE',
+            'AI_VOICE',
+            'OTHER'
+        )
+    )
 );
