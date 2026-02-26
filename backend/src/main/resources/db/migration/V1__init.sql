@@ -378,3 +378,34 @@ CREATE TABLE artist_groups (
     CONSTRAINT chk_artist_groups_group_not_member CHECK (group_artist_id <> member_artist_id),
     CONSTRAINT chk_artist_groups_sort_order CHECK (sort_order >= 0)
 );
+
+-- artist_links
+CREATE TABLE artist_links (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    artist_id BIGINT NOT NULL,
+    link_type VARCHAR(20) NOT NULL,
+    url TEXT NOT NULL,
+    title VARCHAR(255),
+    is_official BOOLEAN NOT NULL DEFAULT FALSE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_artist_links_artist FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_artist_links_link_type CHECK (
+        link_type IN (
+            'X',
+            'YOUTUBE',
+            'NICONICO',
+            'BILIBILI',
+            'PIAPRO',
+            'SOUNDCLOUD',
+            'VIMEO',
+            'BANDCAMP',
+            'VOCADB',
+            'OTHER'
+        )
+    ),
+    CONSTRAINT chk_artist_links_sort_order CHECK (sort_order >= 0)
+);
