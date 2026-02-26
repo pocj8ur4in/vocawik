@@ -1,5 +1,6 @@
 package com.vocawik.domain.vocal;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceType;
 import jakarta.persistence.Column;
@@ -13,6 +14,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** Vocal character detail entity using shared PK with {@link Resource}. */
 @Getter
@@ -32,19 +35,26 @@ public class VocalCharacter {
 
     @Column private String content;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "links", columnDefinition = "jsonb")
+    private JsonNode links;
+
     /**
      * Creates a new vocal character detail.
      *
      * @param canonicalName representative display name
      * @param thumbnailUrl representative thumbnail url (nullable)
      * @param content vocal character description (nullable)
+     * @param links external links payload (nullable JSON array)
      * @return created vocal character
      */
-    public static VocalCharacter create(String canonicalName, String thumbnailUrl, String content) {
+    public static VocalCharacter create(
+            String canonicalName, String thumbnailUrl, String content, JsonNode links) {
         VocalCharacter vocalCharacter = new VocalCharacter();
         vocalCharacter.resource =
                 Resource.create(ResourceType.CHARACTER, canonicalName, thumbnailUrl);
         vocalCharacter.content = content;
+        vocalCharacter.links = links;
         return vocalCharacter;
     }
 }
