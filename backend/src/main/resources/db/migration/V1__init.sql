@@ -261,3 +261,19 @@ CREATE TABLE playlists (
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT fk_playlists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
 );
+
+-- playlist_songs
+CREATE TABLE playlist_songs (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    playlist_id BIGINT NOT NULL,
+    song_id BIGINT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_playlist_songs_playlist FOREIGN KEY (playlist_id) REFERENCES playlists (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_playlist_songs_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_playlist_songs_playlist_song UNIQUE (playlist_id, song_id),
+    CONSTRAINT uk_playlist_songs_playlist_sort_order UNIQUE (playlist_id, sort_order),
+    CONSTRAINT chk_playlist_songs_sort_order CHECK (sort_order >= 0)
+);
