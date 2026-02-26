@@ -291,3 +291,33 @@ CREATE TABLE song_relations (
     CONSTRAINT uk_song_relations_source_target UNIQUE (source_song_id, target_song_id),
     CONSTRAINT chk_song_relations_source_not_target CHECK (source_song_id <> target_song_id)
 );
+
+-- song_pvs
+CREATE TABLE song_pvs (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    song_id BIGINT NOT NULL,
+    service VARCHAR(20) NOT NULL,
+    video_key VARCHAR(100) NOT NULL,
+    url TEXT NOT NULL,
+    title VARCHAR(255),
+    description TEXT,
+    thumbnail_url TEXT,
+    uploader_url TEXT,
+    uploader_key VARCHAR(100),
+    duration_seconds INTEGER,
+    is_official BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    published_at TIMESTAMPTZ,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_song_pvs_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_song_pvs_service CHECK (
+        service IN ('YOUTUBE', 'NICONICO', 'BILIBILI', 'PIAPRO', 'SOUNDCLOUD', 'VIMEO', 'BANDCAMP', 'OTHER')
+    ),
+    CONSTRAINT chk_song_pvs_duration_seconds CHECK (
+        duration_seconds IS NULL OR duration_seconds >= 0
+    ),
+    CONSTRAINT chk_song_pvs_sort_order CHECK (sort_order >= 0)
+);
