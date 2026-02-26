@@ -1,8 +1,12 @@
 package com.vocawik.service.auth;
 
 import com.vocawik.common.auth.AuthProvider;
+import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserAuthProvider;
+import com.vocawik.domain.user.UserPvProvider;
+import com.vocawik.domain.user.UserRole;
+import com.vocawik.domain.user.UserTheme;
 import com.vocawik.repository.user.UserAuthProviderRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.jwt.JwtProvider;
@@ -13,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -151,8 +156,12 @@ public class AuthService {
                                                 User.create(
                                                         userInfo.email(),
                                                         resolveNickname(
-                                                                userInfo.name(),
-                                                                userInfo.email()))));
+                                                                userInfo.name(), userInfo.email()),
+                                                        Language.UNSET,
+                                                        ZoneId.of("UTC"),
+                                                        UserTheme.UNSET,
+                                                        UserPvProvider.UNSET,
+                                                        UserRole.USER)));
 
         UserAuthProvider mapping =
                 UserAuthProvider.link(user, AuthProvider.GOOGLE, userInfo.sub(), userInfo.email());
