@@ -354,3 +354,10 @@ CREATE TABLE song_pv_views (
     CONSTRAINT uk_song_pv_views_song_pv UNIQUE (song_pv_id),
     CONSTRAINT chk_song_pv_views_view_count CHECK (view_count >= 0)
 );
+
+-- artists
+CREATE TABLE artists (
+    id BIGINT PRIMARY KEY,
+    content TEXT,
+    CONSTRAINT fk_artists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
+);
