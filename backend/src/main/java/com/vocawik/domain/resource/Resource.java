@@ -31,15 +31,33 @@ public class Resource extends BaseEntity {
     @Column(name = "resource_type", nullable = false, length = 20)
     private ResourceType resourceType;
 
+    @Column(name = "canonical_name", nullable = false, length = 255)
+    private String canonicalName;
+
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl;
+
     /**
      * Creates a new resource record.
      *
      * @param resourceType resource kind
+     * @param canonicalName representative display name
+     * @param thumbnailUrl representative thumbnail url
      * @return created resource
      */
-    public static Resource create(ResourceType resourceType) {
+    public static Resource create(
+            ResourceType resourceType, String canonicalName, String thumbnailUrl) {
+        if (resourceType == null) {
+            throw new IllegalArgumentException("resourceType is required");
+        }
+        if (canonicalName == null || canonicalName.isBlank()) {
+            throw new IllegalArgumentException("canonicalName is required");
+        }
+
         Resource resource = new Resource();
         resource.resourceType = resourceType;
+        resource.canonicalName = canonicalName;
+        resource.thumbnailUrl = thumbnailUrl;
         return resource;
     }
 
