@@ -1,5 +1,6 @@
 package com.vocawik.domain.song;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceType;
 import jakarta.persistence.Column;
@@ -16,6 +17,8 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** Song detail entity using shared PK with {@link Resource}. */
 @Getter
@@ -35,6 +38,10 @@ public class Song {
 
     @Column private String content;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "links", columnDefinition = "jsonb")
+    private JsonNode links;
+
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
@@ -48,6 +55,7 @@ public class Song {
      * @param canonicalName representative display name
      * @param thumbnailUrl representative thumbnail url (nullable)
      * @param content song description (nullable)
+     * @param links external links payload (nullable JSON array)
      * @param publishedAt published datetime (nullable)
      * @param songType classification type (nullable, defaults to OTHER)
      * @return created song
@@ -56,11 +64,13 @@ public class Song {
             String canonicalName,
             String thumbnailUrl,
             String content,
+            JsonNode links,
             LocalDateTime publishedAt,
             SongType songType) {
         Song song = new Song();
         song.resource = Resource.create(ResourceType.SONG, canonicalName, thumbnailUrl);
         song.content = content;
+        song.links = links;
         song.publishedAt = publishedAt;
         song.songType = songType == null ? SongType.OTHER : songType;
         return song;

@@ -1,5 +1,6 @@
 package com.vocawik.domain.artist;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceType;
 import jakarta.persistence.Column;
@@ -13,6 +14,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** Artist detail entity using shared PK with {@link Resource}. */
 @Getter
@@ -32,18 +35,25 @@ public class Artist {
 
     @Column private String content;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "links", columnDefinition = "jsonb")
+    private JsonNode links;
+
     /**
      * Creates a new artist detail.
      *
      * @param canonicalName representative display name
      * @param thumbnailUrl representative thumbnail url (nullable)
      * @param content artist description (nullable)
+     * @param links external links payload (nullable JSON array)
      * @return created artist
      */
-    public static Artist create(String canonicalName, String thumbnailUrl, String content) {
+    public static Artist create(
+            String canonicalName, String thumbnailUrl, String content, JsonNode links) {
         Artist artist = new Artist();
         artist.resource = Resource.create(ResourceType.ARTIST, canonicalName, thumbnailUrl);
         artist.content = content;
+        artist.links = links;
         return artist;
     }
 }
