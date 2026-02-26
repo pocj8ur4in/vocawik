@@ -409,3 +409,23 @@ CREATE TABLE artist_links (
     ),
     CONSTRAINT chk_artist_links_sort_order CHECK (sort_order >= 0)
 );
+
+-- song_artists
+CREATE TABLE song_artists (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    song_id BIGINT NOT NULL,
+    artist_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    is_main BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_song_artists_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_song_artists_artist FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_song_artists_song_artist_role UNIQUE (song_id, artist_id, role),
+    CONSTRAINT chk_song_artists_role CHECK (
+        role IN ('PRODUCER', 'ARRANGER', 'COMPOSER', 'LYRICIST', 'OTHER')
+    ),
+    CONSTRAINT chk_song_artists_sort_order CHECK (sort_order >= 0)
+);
