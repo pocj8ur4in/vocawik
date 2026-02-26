@@ -361,3 +361,20 @@ CREATE TABLE artists (
     content TEXT,
     CONSTRAINT fk_artists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
 );
+
+-- artist_groups
+CREATE TABLE artist_groups (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    group_artist_id BIGINT NOT NULL,
+    member_artist_id BIGINT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_artist_groups_group_artist FOREIGN KEY (group_artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_artist_groups_member_artist FOREIGN KEY (member_artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_artist_groups_group_member UNIQUE (group_artist_id, member_artist_id),
+    CONSTRAINT uk_artist_groups_group_sort_order UNIQUE (group_artist_id, sort_order),
+    CONSTRAINT chk_artist_groups_group_not_member CHECK (group_artist_id <> member_artist_id),
+    CONSTRAINT chk_artist_groups_sort_order CHECK (sort_order >= 0)
+);
