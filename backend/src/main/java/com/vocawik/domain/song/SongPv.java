@@ -32,20 +32,11 @@ public class SongPv extends BaseEntity {
     @Column(name = "video_key", nullable = false, length = 100)
     private String videoKey;
 
-    @Column(nullable = false)
-    private String url;
-
     @Column(length = 255)
     private String title;
 
-    @Column(name = "description")
-    private String description;
-
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
-
-    @Column(name = "uploader_url")
-    private String uploaderUrl;
 
     @Column(name = "uploader_key", length = 100)
     private String uploaderKey;
@@ -71,10 +62,9 @@ public class SongPv extends BaseEntity {
      * @param song parent song
      * @param service pv service provider
      * @param videoKey video key in service
-     * @param url video url
      * @return created song pv
      */
-    public static SongPv create(Song song, SongPvProvider service, String videoKey, String url) {
+    public static SongPv create(Song song, SongPvProvider service, String videoKey) {
         if (song == null) {
             throw new IllegalArgumentException("song is required");
         }
@@ -84,15 +74,11 @@ public class SongPv extends BaseEntity {
         if (videoKey == null || videoKey.isBlank()) {
             throw new IllegalArgumentException("videoKey is required");
         }
-        if (url == null || url.isBlank()) {
-            throw new IllegalArgumentException("url is required");
-        }
 
         SongPv songPv = new SongPv();
         songPv.song = song;
         songPv.service = service;
         songPv.videoKey = videoKey;
-        songPv.url = url;
         return songPv;
     }
 }
