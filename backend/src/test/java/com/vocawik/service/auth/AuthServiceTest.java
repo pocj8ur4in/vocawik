@@ -3,6 +3,7 @@ package com.vocawik.service.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -118,5 +119,28 @@ class AuthServiceTest {
                 .hasMessageContaining("family is revoked");
 
         verify(valueOperations, never()).setIfAbsent(any(), eq("1"), any(Duration.class));
+    }
+
+    @Test
+    @DisplayName("Logout should revoke refresh token")
+    void logout_refreshToken_shouldRevoke() {
+        String subject = UUID.randomUUID().toString();
+        String familyId = UUID.randomUUID().toString();
+        String tokenId = UUID.randomUUID().toString();
+        String refreshToken = jwtProvider.generateRefreshToken(subject, "USER", familyId, tokenId);
+        Duration ttl = Duration.ofSeconds(jwtProvider.getRefreshExpirationSeconds());
+
+        authService.logout(refreshToken);
+
+        verify(valueOperations).set("auth:refresh:family:revoked:" + familyId, "1", ttl);
+        verify(valueOperations).set("auth:refresh:used:" + tokenId, "1", ttl);
+    }
+
+    @Test
+    @DisplayName("Logout should be no-op when token is missing")
+    void logout_withMissingRefreshToken_shouldBeNoop() {
+        authService.logout(null);
+
+        verify(valueOperations, never()).set(anyString(), eq("1"), any(Duration.class));
     }
 }

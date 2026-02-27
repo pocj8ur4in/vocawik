@@ -197,6 +197,25 @@ public class AuthService {
     }
 
     /**
+     * Revokes refresh token family for logout.
+     *
+     * @param refreshToken refresh token from cookie
+     */
+    public void logout(String refreshToken) {
+        if (refreshToken == null || !jwtProvider.validateRefreshToken(refreshToken)) {
+            return;
+        }
+
+        String subject = jwtProvider.getSubject(refreshToken);
+        String familyId = resolveRefreshFamily(refreshToken, subject);
+        String tokenId = resolveRefreshTokenId(refreshToken);
+        Duration refreshTtl = Duration.ofSeconds(jwtProvider.getRefreshExpirationSeconds());
+
+        stringRedisTemplate.opsForValue().set(refreshFamilyRevokedKey(familyId), "1", refreshTtl);
+        stringRedisTemplate.opsForValue().set(REFRESH_USED_KEY_PREFIX + tokenId, "1", refreshTtl);
+    }
+
+    /**
      * Returns refresh token expiration in seconds.
      *
      * @return refresh token expiration (seconds)
