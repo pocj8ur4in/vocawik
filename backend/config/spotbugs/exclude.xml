@@ -13,4 +13,13 @@
         <Class name="com.vocawik.security.SecurityConfig" />
         <Bug pattern="EI_EXPOSE_REP2" />
     </Match>
+    <!-- JPA entity associations in domain layer intentionally expose references via getters. -->
+    <Match>
+        <Class name="~com\.vocawik\.domain\..*" />
+        <Bug pattern="EI_EXPOSE_REP" />
+    </Match>
+    <Match>
+        <Class name="~com\.vocawik\.domain\..*" />
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
 </FindBugsFilter>
