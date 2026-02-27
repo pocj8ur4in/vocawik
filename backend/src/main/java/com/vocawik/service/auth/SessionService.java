@@ -1,24 +1,16 @@
 package com.vocawik.service.auth;
 
-import com.vocawik.common.auth.AuthProvider;
-import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.user.User;
-import com.vocawik.domain.user.UserAuthProvider;
-import com.vocawik.domain.user.UserPvProvider;
-import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.user.UserStatus;
-import com.vocawik.domain.user.UserTheme;
-import com.vocawik.repository.user.UserAuthProviderRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.jwt.JwtProvider;
 import com.vocawik.web.exception.UnauthorizedException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.time.ZoneId;
+import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,14 +19,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Authentication service for OAuth login and token issuance. */
+/** Handles local session authentication and refresh-token lifecycle. */
 @Service
 @RequiredArgsConstructor
 @SuppressFBWarnings(
         value = "EI_EXPOSE_REP2",
         justification =
                 "StringRedisTemplate is a Spring-managed infrastructure bean and is not exposed externally.")
-public class AuthService {
+public class SessionService {
 
     private static final String REFRESH_USED_KEY_PREFIX = "auth:refresh:used:";
     private static final String REFRESH_REVOKED_FAMILY_KEY_PREFIX = "auth:refresh:family:revoked:";
@@ -42,63 +34,10 @@ public class AuthService {
     private static final int MAX_PASSWORD_FAILED_ATTEMPTS = 5;
     private static final Duration PASSWORD_LOCK_DURATION = Duration.ofMinutes(15);
 
-    private final GoogleOAuthClient googleOAuthClient;
-    private final OAuthProperties oAuthProperties;
     private final UserRepository userRepository;
-    private final UserAuthProviderRepository userAuthProviderRepository;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate stringRedisTemplate;
     private final PasswordEncoder passwordEncoder;
-
-    /**
-     * Builds Google OAuth authorize URL.
-     *
-     * @return provider authorize URL
-     */
-    public String buildGoogleAuthorizeUrl(String state) {
-        return oAuthProperties.getAuthUri()
-                + "?response_type=code"
-                + "&client_id="
-                + encode(oAuthProperties.getClientId())
-                + "&redirect_uri="
-                + encode(oAuthProperties.getRedirectUri())
-                + "&scope="
-                + encode("openid email profile")
-                + "&access_type=offline"
-                + "&prompt=consent"
-                + "&state="
-                + encode(state);
-    }
-
-    /**
-     * Handles Google OAuth callback and returns issued token bundle.
-     *
-     * @param code authorization code
-     * @return issued tokens
-     */
-    @Transactional
-    public AuthTokenBundle authenticateGoogle(String code) {
-        GoogleTokenResponse tokenResponse = googleOAuthClient.exchangeCode(code);
-        GoogleUserInfo userInfo = googleOAuthClient.fetchUserInfo(tokenResponse.accessToken());
-
-        User user =
-                userAuthProviderRepository
-                        .findByProviderAndProviderUserId(AuthProvider.GOOGLE, userInfo.sub())
-                        .map(UserAuthProvider::getUser)
-                        .orElseGet(() -> linkOrCreateGoogleUser(userInfo));
-
-        user.touchLastLoginAt();
-
-        String role = user.getRole().name();
-        String accessToken = jwtProvider.generateAccessToken(user.getUuid().toString(), role);
-        String familyId = UUID.randomUUID().toString();
-        String refreshToken =
-                jwtProvider.generateRefreshToken(
-                        user.getUuid().toString(), role, familyId, UUID.randomUUID().toString());
-
-        return new AuthTokenBundle(
-                accessToken, refreshToken, jwtProvider.getAccessExpirationSeconds());
-    }
 
     /**
      * Authenticates an user account by email and password.
@@ -122,7 +61,7 @@ public class AuthService {
             throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
         }
 
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
         user.clearPasswordLockIfExpired(now);
         if (user.isPasswordLocked(now)) {
             throw new UnauthorizedException(
@@ -141,16 +80,7 @@ public class AuthService {
 
         user.clearPasswordFailureState();
         user.touchLastLoginAt();
-
-        String role = user.getRole().name();
-        String accessToken = jwtProvider.generateAccessToken(user.getUuid().toString(), role);
-        String familyId = UUID.randomUUID().toString();
-        String refreshToken =
-                jwtProvider.generateRefreshToken(
-                        user.getUuid().toString(), role, familyId, UUID.randomUUID().toString());
-
-        return new AuthTokenBundle(
-                accessToken, refreshToken, jwtProvider.getAccessExpirationSeconds());
+        return issueTokenBundle(user);
     }
 
     /**
@@ -224,44 +154,24 @@ public class AuthService {
         return jwtProvider.getRefreshExpirationSeconds();
     }
 
-    private User linkOrCreateGoogleUser(GoogleUserInfo userInfo) {
-        User user =
-                userRepository
-                        .findByEmailIgnoreCaseAndIsDeletedFalse(userInfo.email())
-                        .orElseGet(
-                                () ->
-                                        userRepository.save(
-                                                User.create(
-                                                        userInfo.email(),
-                                                        resolveNickname(
-                                                                userInfo.name(), userInfo.email()),
-                                                        Language.UND,
-                                                        ZoneId.of("UTC"),
-                                                        UserTheme.UND,
-                                                        UserPvProvider.UND,
-                                                        UserRole.USER)));
+    /**
+     * Issues a new access/refresh token bundle for an authenticated user.
+     *
+     * @param user authenticated user entity
+     * @return issued token bundle
+     */
+    public AuthTokenBundle issueTokenBundle(User user) {
+        String role = user.getRole().name();
+        String subject = user.getUuid().toString();
 
-        UserAuthProvider mapping =
-                UserAuthProvider.link(user, AuthProvider.GOOGLE, userInfo.sub(), userInfo.email());
-        userAuthProviderRepository.save(mapping);
-        return user;
-    }
+        String accessToken = jwtProvider.generateAccessToken(subject, role);
+        String familyId = UUID.randomUUID().toString();
+        String refreshToken =
+                jwtProvider.generateRefreshToken(
+                        subject, role, familyId, UUID.randomUUID().toString());
 
-    private String resolveNickname(String name, String email) {
-        if (name != null && !name.isBlank()) {
-            return truncate(name.trim(), 100);
-        }
-        int at = email.indexOf('@');
-        String localPart = at > 0 ? email.substring(0, at) : email;
-        return truncate(localPart, 100);
-    }
-
-    private String truncate(String value, int max) {
-        return value.length() <= max ? value : value.substring(0, max);
-    }
-
-    private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return new AuthTokenBundle(
+                accessToken, refreshToken, jwtProvider.getAccessExpirationSeconds());
     }
 
     private String resolveRefreshFamily(String refreshToken, String subject) {

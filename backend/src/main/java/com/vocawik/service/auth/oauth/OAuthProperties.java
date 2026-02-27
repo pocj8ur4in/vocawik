@@ -1,4 +1,4 @@
-package com.vocawik.service.auth;
+package com.vocawik.service.auth.oauth;
 
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;

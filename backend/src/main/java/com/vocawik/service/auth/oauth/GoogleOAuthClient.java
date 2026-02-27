@@ -1,4 +1,4 @@
-package com.vocawik.service.auth;
+package com.vocawik.service.auth.oauth;
 
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;

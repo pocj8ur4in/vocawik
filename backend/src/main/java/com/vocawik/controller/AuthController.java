@@ -7,13 +7,15 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 import com.vocawik.common.auth.AuthProvider;
 import com.vocawik.dto.auth.AuthLoginRequest;
 import com.vocawik.dto.auth.AuthTokenResponse;
-import com.vocawik.service.auth.AuthService;
 import com.vocawik.service.auth.AuthTokenBundle;
-import com.vocawik.service.auth.OAuthStateService;
+import com.vocawik.service.auth.SessionService;
+import com.vocawik.service.auth.oauth.OAuthService;
+import com.vocawik.service.auth.oauth.OAuthStateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +47,8 @@ public class AuthController {
     @Value("${security.cookie.secure:true}")
     private boolean secureCookie;
 
-    private final AuthService authService;
+    private final SessionService sessionService;
+    private final OAuthService oAuthService;
     private final OAuthStateService oAuthStateService;
 
     /**
@@ -61,11 +64,12 @@ public class AuthController {
             description = "Authenticates credentials and creates an access/refresh session.")
     public ResponseEntity<AuthTokenResponse> login(
             @Valid @RequestBody AuthLoginRequest request, HttpServletResponse response) {
-        AuthTokenBundle tokenBundle = authService.login(request.email(), request.password());
+        AuthTokenBundle tokenBundle = sessionService.login(request.email(), request.password());
         addRefreshCookie(response, tokenBundle.refreshToken());
-        return ResponseEntity.ok(
-                new AuthTokenResponse(
-                        tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
+        return ResponseEntity.created(URI.create("/api/v1/sessions/current"))
+                .body(
+                        new AuthTokenResponse(
+                                tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
     }
 
     /**
@@ -80,7 +84,7 @@ public class AuthController {
     public ResponseEntity<AuthTokenResponse> refresh(
             @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
             HttpServletResponse response) {
-        AuthTokenBundle tokenBundle = authService.refresh(refreshToken);
+        AuthTokenBundle tokenBundle = sessionService.refresh(refreshToken);
         addRefreshCookie(response, tokenBundle.refreshToken());
 
         return ResponseEntity.ok(
@@ -102,7 +106,7 @@ public class AuthController {
     public ResponseEntity<Void> logout(
             @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
             HttpServletResponse response) {
-        authService.logout(refreshToken);
+        sessionService.logout(refreshToken);
         clearRefreshCookie(response);
         return ResponseEntity.status(NO_CONTENT).build();
     }
@@ -133,7 +137,7 @@ public class AuthController {
                         "provider",
                         authProvider.name(),
                         "authorizeUrl",
-                        authService.buildGoogleAuthorizeUrl(state)));
+                        oAuthService.buildGoogleAuthorizeUrl(state)));
     }
 
     /**
@@ -163,7 +167,7 @@ public class AuthController {
             throw new ResponseStatusException(UNAUTHORIZED, "Invalid OAuth state.");
         }
 
-        AuthTokenBundle tokenBundle = authService.authenticateGoogle(code);
+        AuthTokenBundle tokenBundle = oAuthService.authenticateGoogle(code);
         clearOAuthStateCookie(response);
         addRefreshCookie(response, tokenBundle.refreshToken());
         return ResponseEntity.ok(
@@ -186,7 +190,7 @@ public class AuthController {
                         .secure(secureCookie)
                         .sameSite("Strict")
                         .path(REFRESH_COOKIE_PATH)
-                        .maxAge(authService.getRefreshExpirationSeconds())
+                        .maxAge(sessionService.getRefreshExpirationSeconds())
                         .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
