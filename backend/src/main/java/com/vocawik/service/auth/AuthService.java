@@ -6,6 +6,7 @@ import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserAuthProvider;
 import com.vocawik.domain.user.UserPvProvider;
 import com.vocawik.domain.user.UserRole;
+import com.vocawik.domain.user.UserStatus;
 import com.vocawik.domain.user.UserTheme;
 import com.vocawik.repository.user.UserAuthProviderRepository;
 import com.vocawik.repository.user.UserRepository;
@@ -22,6 +23,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,9 @@ public class AuthService {
 
     private static final String REFRESH_USED_KEY_PREFIX = "auth:refresh:used:";
     private static final String REFRESH_REVOKED_FAMILY_KEY_PREFIX = "auth:refresh:family:revoked:";
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
+    private static final int MAX_PASSWORD_FAILED_ATTEMPTS = 5;
+    private static final Duration PASSWORD_LOCK_DURATION = Duration.ofMinutes(15);
 
     private final GoogleOAuthClient googleOAuthClient;
     private final OAuthProperties oAuthProperties;
@@ -43,6 +48,7 @@ public class AuthService {
     private final UserAuthProviderRepository userAuthProviderRepository;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate stringRedisTemplate;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Builds Google OAuth authorize URL.
@@ -81,6 +87,59 @@ public class AuthService {
                         .map(UserAuthProvider::getUser)
                         .orElseGet(() -> linkOrCreateGoogleUser(userInfo));
 
+        user.touchLastLoginAt();
+
+        String role = user.getRole().name();
+        String accessToken = jwtProvider.generateAccessToken(user.getUuid().toString(), role);
+        String familyId = UUID.randomUUID().toString();
+        String refreshToken =
+                jwtProvider.generateRefreshToken(
+                        user.getUuid().toString(), role, familyId, UUID.randomUUID().toString());
+
+        return new AuthTokenBundle(
+                accessToken, refreshToken, jwtProvider.getAccessExpirationSeconds());
+    }
+
+    /**
+     * Authenticates an user account by email and password.
+     *
+     * @param email user email
+     * @param password raw password
+     * @return issued tokens
+     */
+    @Transactional
+    public AuthTokenBundle login(String email, String password) {
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+        }
+
+        User user =
+                userRepository
+                        .findByEmailIgnoreCaseAndIsDeletedFalse(email.trim())
+                        .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE));
+
+        if (!UserStatus.ACTIVE.equals(user.getStatus())) {
+            throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        user.clearPasswordLockIfExpired(now);
+        if (user.isPasswordLocked(now)) {
+            throw new UnauthorizedException(
+                    "Account is temporarily locked due to repeated failed attempts.");
+        }
+
+        String passwordHash = user.getPasswordHash();
+        boolean invalidPassword =
+                passwordHash == null
+                        || passwordHash.isBlank()
+                        || !passwordEncoder.matches(password, passwordHash);
+        if (invalidPassword) {
+            user.recordPasswordFailure(MAX_PASSWORD_FAILED_ATTEMPTS, PASSWORD_LOCK_DURATION, now);
+            throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+        }
+
+        user.clearPasswordFailureState();
         user.touchLastLoginAt();
 
         String role = user.getRole().name();

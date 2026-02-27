@@ -11,6 +11,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -61,6 +62,18 @@ public class User extends BaseEntity {
 
     @Column private LocalDateTime lastLoginAt;
 
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    @Column(name = "password_updated_at")
+    private LocalDateTime passwordUpdatedAt;
+
+    @Column(name = "password_failed_attempts", nullable = false)
+    private int passwordFailedAttempts;
+
+    @Column(name = "password_locked_at")
+    private LocalDateTime passwordLockedAt;
+
     @Getter(AccessLevel.NONE)
     @OneToMany(mappedBy = "user")
     private List<UserAuthProvider> authProviders = new ArrayList<>();
@@ -99,5 +112,56 @@ public class User extends BaseEntity {
     /** Updates last login timestamp. */
     public void touchLastLoginAt() {
         this.lastLoginAt = LocalDateTime.now();
+    }
+
+    /**
+     * Returns whether email/password login is currently locked.
+     *
+     * @param now current timestamp
+     * @return true when lock is active
+     */
+    public boolean isPasswordLocked(LocalDateTime now) {
+        return passwordLockedAt != null && passwordLockedAt.isAfter(now);
+    }
+
+    /**
+     * Clears counters when an existing lock has already expired.
+     *
+     * @param now current timestamp
+     */
+    public void clearPasswordLockIfExpired(LocalDateTime now) {
+        if (passwordLockedAt != null && !passwordLockedAt.isAfter(now)) {
+            clearPasswordFailureState();
+        }
+    }
+
+    /**
+     * Records one failed attempt and applies lock when threshold is reached.
+     *
+     * @param maxAttempts lock threshold
+     * @param lockDuration lock duration
+     * @param now current timestamp
+     */
+    public void recordPasswordFailure(int maxAttempts, Duration lockDuration, LocalDateTime now) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts must be > 0");
+        }
+        if (lockDuration == null || lockDuration.isNegative() || lockDuration.isZero()) {
+            throw new IllegalArgumentException("lockDuration must be > 0");
+        }
+
+        int nextFailedAttempts = passwordFailedAttempts + 1;
+        if (nextFailedAttempts >= maxAttempts) {
+            passwordFailedAttempts = 0;
+            passwordLockedAt = now.plus(lockDuration);
+            return;
+        }
+        passwordFailedAttempts = nextFailedAttempts;
+    }
+
+    /** Resets counter and removes active lock metadata. */
+    public void clearPasswordFailureState() {
+        passwordFailedAttempts = 0;
+        passwordLockedAt = null;
     }
 }

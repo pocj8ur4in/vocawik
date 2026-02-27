@@ -4,6 +4,7 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.common.auth.AuthProvider;
+import com.vocawik.dto.auth.AuthLoginRequest;
 import com.vocawik.dto.auth.AuthTokenResponse;
 import com.vocawik.service.auth.AuthService;
 import com.vocawik.service.auth.AuthTokenBundle;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,6 +46,26 @@ public class AuthController {
 
     private final AuthService authService;
     private final OAuthStateService oAuthStateService;
+
+    /**
+     * Authenticates email/password credentials and issues token bundle.
+     *
+     * @param request login request body
+     * @param response servlet response for refresh token cookie
+     * @return issued access token payload
+     */
+    @PostMapping("/login")
+    @Operation(
+            summary = "Account Login",
+            description = "Authenticates credentials and issues access/refresh tokens.")
+    public ResponseEntity<AuthTokenResponse> login(
+            @Valid @RequestBody AuthLoginRequest request, HttpServletResponse response) {
+        AuthTokenBundle tokenBundle = authService.login(request.email(), request.password());
+        addRefreshCookie(response, tokenBundle.refreshToken());
+        return ResponseEntity.ok(
+                new AuthTokenResponse(
+                        tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
+    }
 
     /**
      * Starts OAuth authorization for the given provider.
