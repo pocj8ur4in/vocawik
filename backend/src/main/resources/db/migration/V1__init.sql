@@ -14,11 +14,17 @@ CREATE TABLE users (
     role VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL,
     last_login_at TIMESTAMP,
+    password_hash VARCHAR(255),
+    password_updated_at TIMESTAMP,
+    password_failed_attempts INTEGER NOT NULL DEFAULT 0,
+    password_locked_at TIMESTAMP,
     CONSTRAINT chk_users_role CHECK (role IN ('USER', 'ADMIN')),
     CONSTRAINT chk_users_status CHECK (status IN ('ACTIVE', 'SUSPENDED')),
     CONSTRAINT chk_users_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'LA', 'UND')),
     CONSTRAINT chk_users_timezone_not_blank CHECK (timezone <> ''),
     CONSTRAINT chk_users_theme CHECK (theme IN ('LIGHT', 'DARK', 'UND')),
+    CONSTRAINT chk_users_password_failed_attempts CHECK (password_failed_attempts >= 0),
+    CONSTRAINT chk_users_password_hash_not_blank CHECK (password_hash IS NULL OR BTRIM(password_hash) <> ''),
     CONSTRAINT chk_users_pv_provider CHECK (
         pv_provider IN (
             'YOUTUBE',

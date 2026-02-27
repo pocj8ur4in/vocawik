@@ -20,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 class AuthServiceTest {
 
@@ -33,6 +34,7 @@ class AuthServiceTest {
     private StringRedisTemplate stringRedisTemplate;
     private ValueOperations<String, String> valueOperations;
     private JwtProvider jwtProvider;
+    private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
     @BeforeEach
@@ -40,6 +42,7 @@ class AuthServiceTest {
         stringRedisTemplate = mock(StringRedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        passwordEncoder = mock(PasswordEncoder.class);
 
         jwtProvider =
                 new JwtProvider(SECRET, ISSUER, AUDIENCE, ACCESS_EXPIRATION, REFRESH_EXPIRATION);
@@ -51,7 +54,8 @@ class AuthServiceTest {
                         mock(UserRepository.class),
                         mock(UserAuthProviderRepository.class),
                         jwtProvider,
-                        stringRedisTemplate);
+                        stringRedisTemplate,
+                        passwordEncoder);
     }
 
     @Test
