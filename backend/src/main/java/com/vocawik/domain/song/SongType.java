@@ -6,5 +6,6 @@ public enum SongType {
     COVER,
     REMIX,
     REMASTER,
+    MASHUP,
     OTHER
 }

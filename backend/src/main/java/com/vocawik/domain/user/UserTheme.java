@@ -4,5 +4,5 @@ package com.vocawik.domain.user;
 public enum UserTheme {
     LIGHT,
     DARK,
-    UNSET
+    UND
 }

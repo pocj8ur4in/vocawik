@@ -11,7 +11,7 @@ public enum UserPvProvider {
     SOUNDCLOUD(PvProvider.SOUNDCLOUD),
     VIMEO(PvProvider.VIMEO),
     BANDCAMP(PvProvider.BANDCAMP),
-    UNSET(null);
+    UND(null);
 
     private final PvProvider common;
 
@@ -22,7 +22,7 @@ public enum UserPvProvider {
     /** Returns the common provider when this value is shared across domains. */
     public PvProvider toCommon() {
         if (common == null) {
-            throw new IllegalStateException("UNSET has no common PvProvider mapping");
+            throw new IllegalStateException("UND has no common PvProvider mapping");
         }
         return common;
     }

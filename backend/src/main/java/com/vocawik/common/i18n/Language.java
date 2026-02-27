@@ -6,5 +6,6 @@ public enum Language {
     EN,
     JA,
     ZH,
-    UNSET
+    LA,
+    UND
 }

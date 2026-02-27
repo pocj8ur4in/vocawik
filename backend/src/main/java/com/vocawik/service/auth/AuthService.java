@@ -157,10 +157,10 @@ public class AuthService {
                                                         userInfo.email(),
                                                         resolveNickname(
                                                                 userInfo.name(), userInfo.email()),
-                                                        Language.UNSET,
+                                                        Language.UND,
                                                         ZoneId.of("UTC"),
-                                                        UserTheme.UNSET,
-                                                        UserPvProvider.UNSET,
+                                                        UserTheme.UND,
+                                                        UserPvProvider.UND,
                                                         UserRole.USER)));
 
         UserAuthProvider mapping =
