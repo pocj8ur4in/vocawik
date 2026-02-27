@@ -43,6 +43,18 @@ spring:
     job:
       enabled: false
 
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_APP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS_ENABLE:true}
+
 server:
   port: ${SERVER_PORT}
   forward-headers-strategy: framework
@@ -71,6 +83,9 @@ oauth:
     token-uri: ${GOOGLE_TOKEN_URI:https://oauth2.googleapis.com/token}
     user-info-uri: ${GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}
     redirect-uri: ${GOOGLE_REDIRECT_URI:}
+
+mail:
+  from-address: ${SMTP_FROM:${SMTP_USERNAME:}}
 
 sentry:
   dsn: ${SENTRY_DSN:}
