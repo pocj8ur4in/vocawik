@@ -236,9 +236,9 @@ CREATE TABLE histories (
         NOT (actor_user_id IS NOT NULL AND actor_guest_id IS NOT NULL)
     ),
     CONSTRAINT chk_histories_snapshot_or_patch CHECK (
-        (is_snapshot = TRUE AND snapshot_data IS NOT NULL AND patch_data IS NULL)
+        (is_snapshot = TRUE AND snapshot_data IS NOT NULL AND patch_data IS NOT NULL)
         OR
-        (is_snapshot = FALSE AND patch_data IS NOT NULL)
+        (is_snapshot = FALSE AND patch_data IS NOT NULL AND snapshot_data IS NULL)
     )
 );
 
