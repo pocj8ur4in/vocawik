@@ -3,6 +3,16 @@ services:
     image: postgres:18
     container_name: postgres
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - wal_compression=lz4
+      - -c
+      - default_toast_compression=lz4
+      - -c
+      - autovacuum_vacuum_scale_factor=0.02
+      - -c
+      - autovacuum_analyze_scale_factor=0.01
     ports:
       - "${DB_PORT:-5432}:5432"
     environment:
