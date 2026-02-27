@@ -41,7 +41,7 @@ public class User extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "lang_code", nullable = false, length = 10)
-    private Language langCode = Language.UNSET;
+    private Language langCode = Language.UND;
 
     @Convert(converter = ZoneIdAttributeConverter.class)
     @Column(nullable = false, length = 40)
@@ -49,11 +49,11 @@ public class User extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private UserTheme theme = UserTheme.UNSET;
+    private UserTheme theme = UserTheme.UND;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "pv_provider", nullable = false, length = 20)
-    private UserPvProvider pvProvider = UserPvProvider.UNSET;
+    private UserPvProvider pvProvider = UserPvProvider.UND;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -88,10 +88,10 @@ public class User extends BaseEntity {
         User user = new User();
         user.email = email;
         user.nickname = nickname;
-        user.langCode = langCode == null ? Language.UNSET : langCode;
+        user.langCode = langCode == null ? Language.UND : langCode;
         user.timezone = timezone == null ? ZoneId.of("UTC") : timezone;
-        user.theme = theme == null ? UserTheme.UNSET : theme;
-        user.pvProvider = pvProvider == null ? UserPvProvider.UNSET : pvProvider;
+        user.theme = theme == null ? UserTheme.UND : theme;
+        user.pvProvider = pvProvider == null ? UserPvProvider.UND : pvProvider;
         user.role = role == null ? UserRole.USER : role;
         return user;
     }

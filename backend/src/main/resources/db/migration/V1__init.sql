@@ -7,18 +7,18 @@ CREATE TABLE users (
     updated_at TIMESTAMP NOT NULL,
     email VARCHAR(254) NOT NULL,
     nickname VARCHAR(100) NOT NULL,
-    lang_code VARCHAR(10) NOT NULL DEFAULT 'UNSET',
+    lang_code VARCHAR(10) NOT NULL DEFAULT 'UND',
     timezone VARCHAR(40) NOT NULL DEFAULT 'UTC',
-    theme VARCHAR(20) NOT NULL DEFAULT 'UNSET',
-    pv_provider VARCHAR(20) NOT NULL DEFAULT 'UNSET',
+    theme VARCHAR(20) NOT NULL DEFAULT 'UND',
+    pv_provider VARCHAR(20) NOT NULL DEFAULT 'UND',
     role VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL,
     last_login_at TIMESTAMP,
     CONSTRAINT chk_users_role CHECK (role IN ('USER', 'ADMIN')),
     CONSTRAINT chk_users_status CHECK (status IN ('ACTIVE', 'SUSPENDED')),
-    CONSTRAINT chk_users_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
+    CONSTRAINT chk_users_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'LA', 'UND')),
     CONSTRAINT chk_users_timezone_not_blank CHECK (timezone <> ''),
-    CONSTRAINT chk_users_theme CHECK (theme IN ('LIGHT', 'DARK', 'UNSET')),
+    CONSTRAINT chk_users_theme CHECK (theme IN ('LIGHT', 'DARK', 'UND')),
     CONSTRAINT chk_users_pv_provider CHECK (
         pv_provider IN (
             'YOUTUBE',
@@ -28,7 +28,7 @@ CREATE TABLE users (
             'SOUNDCLOUD',
             'VIMEO',
             'BANDCAMP',
-            'UNSET'
+            'UND'
         )
     )
 );
@@ -100,7 +100,7 @@ CREATE TABLE resource_names (
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_resource_names_resource FOREIGN KEY (resource_id) REFERENCES resources (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_resource_names_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'UNSET')),
+    CONSTRAINT chk_resource_names_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'LA', 'UND')),
     CONSTRAINT chk_resource_names_sort_order CHECK (sort_order >= 0),
     CONSTRAINT uk_resource_names_resource_lang_name UNIQUE (resource_id, lang_code, name)
 );
@@ -252,7 +252,7 @@ CREATE TABLE songs (
     CONSTRAINT fk_songs_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
     CONSTRAINT chk_songs_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array'),
     CONSTRAINT chk_songs_song_type CHECK (
-        song_type IN ('ORIGINAL', 'COVER', 'REMIX', 'REMASTER', 'OTHER')
+        song_type IN ('ORIGINAL', 'COVER', 'REMIX', 'REMASTER', 'MASHUP', 'OTHER')
     )
 );
 
@@ -270,7 +270,7 @@ CREATE TABLE song_lyrics (
     CONSTRAINT fk_song_lyrics_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
     CONSTRAINT chk_song_lyrics_lang_codes_not_empty CHECK (cardinality(lang_codes) > 0),
     CONSTRAINT chk_song_lyrics_lang_codes_valid CHECK (
-        lang_codes <@ ARRAY['KO', 'EN', 'JA', 'ZH', 'UNSET']::TEXT[]
+        lang_codes <@ ARRAY['KO', 'EN', 'JA', 'ZH', 'LA', 'UND']::TEXT[]
     ),
     CONSTRAINT chk_song_lyrics_not_json_null CHECK (jsonb_typeof(lyrics) <> 'null'),
     CONSTRAINT chk_song_lyrics_sort_order CHECK (sort_order >= 0)
