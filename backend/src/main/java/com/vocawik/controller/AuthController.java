@@ -5,8 +5,8 @@ import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.common.auth.AuthProvider;
-import com.vocawik.dto.auth.AuthLoginRequest;
-import com.vocawik.dto.auth.AuthTokenResponse;
+import com.vocawik.dto.auth.SessionCreateRequest;
+import com.vocawik.dto.auth.SessionTokenResponse;
 import com.vocawik.service.auth.AuthTokenBundle;
 import com.vocawik.service.auth.SessionService;
 import com.vocawik.service.auth.oauth.OAuthService;
@@ -62,13 +62,13 @@ public class AuthController {
     @Operation(
             summary = "Create session",
             description = "Authenticates credentials and creates an access/refresh session.")
-    public ResponseEntity<AuthTokenResponse> login(
-            @Valid @RequestBody AuthLoginRequest request, HttpServletResponse response) {
+    public ResponseEntity<SessionTokenResponse> login(
+            @Valid @RequestBody SessionCreateRequest request, HttpServletResponse response) {
         AuthTokenBundle tokenBundle = sessionService.login(request.email(), request.password());
         addRefreshCookie(response, tokenBundle.refreshToken());
         return ResponseEntity.created(URI.create("/api/v1/sessions/current"))
                 .body(
-                        new AuthTokenResponse(
+                        new SessionTokenResponse(
                                 tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
     }
 
@@ -81,14 +81,14 @@ public class AuthController {
     @Operation(
             summary = "Refresh access token",
             description = "Reissues a new access token from refresh token context.")
-    public ResponseEntity<AuthTokenResponse> refresh(
+    public ResponseEntity<SessionTokenResponse> refresh(
             @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
             HttpServletResponse response) {
         AuthTokenBundle tokenBundle = sessionService.refresh(refreshToken);
         addRefreshCookie(response, tokenBundle.refreshToken());
 
         return ResponseEntity.ok(
-                new AuthTokenResponse(
+                new SessionTokenResponse(
                         tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
     }
 
@@ -153,7 +153,7 @@ public class AuthController {
             summary = "Handle OAuth callback",
             description =
                     "Receives OAuth callback query parameters and validates provider identifier.")
-    public ResponseEntity<AuthTokenResponse> callback(
+    public ResponseEntity<SessionTokenResponse> callback(
             @PathVariable String provider,
             @RequestParam String code,
             @RequestParam(required = false) String state,
@@ -171,7 +171,7 @@ public class AuthController {
         clearOAuthStateCookie(response);
         addRefreshCookie(response, tokenBundle.refreshToken());
         return ResponseEntity.ok(
-                new AuthTokenResponse(
+                new SessionTokenResponse(
                         tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
     }
 
