@@ -10,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.vocawik.repository.user.UserAuthProviderRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.jwt.JwtProvider;
 import com.vocawik.web.exception.UnauthorizedException;
@@ -23,7 +22,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-class AuthServiceTest {
+class SessionServiceTest {
 
     private static final String SECRET =
             "dGVzdC1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLW9ubHktbXVzdC1iZS1hdC1sZWFzdC0yNTYtYml0cy1sb25n";
@@ -36,7 +35,7 @@ class AuthServiceTest {
     private ValueOperations<String, String> valueOperations;
     private JwtProvider jwtProvider;
     private PasswordEncoder passwordEncoder;
-    private AuthService authService;
+    private SessionService sessionService;
 
     @BeforeEach
     void setUp() {
@@ -48,12 +47,9 @@ class AuthServiceTest {
         jwtProvider =
                 new JwtProvider(SECRET, ISSUER, AUDIENCE, ACCESS_EXPIRATION, REFRESH_EXPIRATION);
 
-        authService =
-                new AuthService(
-                        mock(GoogleOAuthClient.class),
-                        mock(OAuthProperties.class),
+        sessionService =
+                new SessionService(
                         mock(UserRepository.class),
-                        mock(UserAuthProviderRepository.class),
                         jwtProvider,
                         stringRedisTemplate,
                         passwordEncoder);
@@ -73,7 +69,7 @@ class AuthServiceTest {
         when(valueOperations.setIfAbsent("auth:refresh:used:" + tokenId, "1", ttl))
                 .thenReturn(true);
 
-        AuthTokenBundle result = authService.refresh(refreshToken);
+        AuthTokenBundle result = sessionService.refresh(refreshToken);
 
         assertThat(jwtProvider.validateAccessToken(result.accessToken())).isTrue();
         assertThat(jwtProvider.validateRefreshToken(result.refreshToken())).isTrue();
@@ -96,7 +92,7 @@ class AuthServiceTest {
         when(valueOperations.setIfAbsent("auth:refresh:used:" + tokenId, "1", ttl))
                 .thenReturn(false);
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> sessionService.refresh(refreshToken))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("reuse detected");
 
@@ -114,7 +110,7 @@ class AuthServiceTest {
         when(stringRedisTemplate.hasKey("auth:refresh:family:revoked:" + familyId))
                 .thenReturn(true);
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> sessionService.refresh(refreshToken))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("family is revoked");
 
@@ -130,7 +126,7 @@ class AuthServiceTest {
         String refreshToken = jwtProvider.generateRefreshToken(subject, "USER", familyId, tokenId);
         Duration ttl = Duration.ofSeconds(jwtProvider.getRefreshExpirationSeconds());
 
-        authService.logout(refreshToken);
+        sessionService.logout(refreshToken);
 
         verify(valueOperations).set("auth:refresh:family:revoked:" + familyId, "1", ttl);
         verify(valueOperations).set("auth:refresh:used:" + tokenId, "1", ttl);
@@ -139,7 +135,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("Logout should be no-op when token is missing")
     void logout_withMissingRefreshToken_shouldBeNoop() {
-        authService.logout(null);
+        sessionService.logout(null);
 
         verify(valueOperations, never()).set(anyString(), eq("1"), any(Duration.class));
     }

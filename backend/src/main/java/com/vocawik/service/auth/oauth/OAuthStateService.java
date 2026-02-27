@@ -1,4 +1,4 @@
-package com.vocawik.service.auth;
+package com.vocawik.service.auth.oauth;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;

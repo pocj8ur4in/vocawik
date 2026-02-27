@@ -1,2 +1,2 @@
-/** OAuth authentication services and provider clients. */
+/** Authentication services and shared types. */
 package com.vocawik.service.auth;

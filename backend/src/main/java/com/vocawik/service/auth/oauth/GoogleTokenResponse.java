@@ -1,4 +1,4 @@
-package com.vocawik.service.auth;
+package com.vocawik.service.auth.oauth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
