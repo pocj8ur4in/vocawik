@@ -68,6 +68,25 @@ public class AuthController {
     }
 
     /**
+     * Logs out current session and clears refresh token cookie.
+     *
+     * @param refreshToken refresh token cookie value
+     * @param response servlet response for cookie cleanup
+     * @return empty object response
+     */
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Account Logout",
+            description = "Revokes refresh token family and clears refresh token cookie.")
+    public ResponseEntity<Map<String, Object>> logout(
+            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+            HttpServletResponse response) {
+        authService.logout(refreshToken);
+        clearRefreshCookie(response);
+        return ResponseEntity.ok(Map.of());
+    }
+
+    /**
      * Starts OAuth authorization for the given provider.
      *
      * @param provider provider path value (e.g. google)
@@ -170,6 +189,18 @@ public class AuthController {
                         .sameSite("Strict")
                         .path("/api/v1/auth")
                         .maxAge(authService.getRefreshExpirationSeconds())
+                        .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private void clearRefreshCookie(HttpServletResponse response) {
+        ResponseCookie cookie =
+                ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
+                        .httpOnly(true)
+                        .secure(secureCookie)
+                        .sameSite("Strict")
+                        .path("/api/v1/auth")
+                        .maxAge(0)
                         .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
