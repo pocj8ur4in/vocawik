@@ -1,6 +1,7 @@
 package com.vocawik.controller;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.common.auth.AuthProvider;
@@ -11,7 +12,6 @@ import com.vocawik.service.auth.AuthTokenBundle;
 import com.vocawik.service.auth.OAuthStateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Locale;
@@ -22,24 +22,25 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Endpoints for OAuth flows. */
+/** Endpoints for Auth flows. */
 @RestController
-@RequestMapping("/auth")
 @Tag(name = "Auth", description = "Authentication endpoints")
 @RequiredArgsConstructor
 public class AuthController {
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
     private static final String OAUTH_STATE_COOKIE = "oauth_state";
+    private static final String REFRESH_COOKIE_PATH = "/api/v1/sessions";
+    private static final String OAUTH_STATE_COOKIE_PATH = "/api/v1/oauth";
 
     @Value("${security.cookie.secure:true}")
     private boolean secureCookie;
@@ -54,14 +55,34 @@ public class AuthController {
      * @param response servlet response for refresh token cookie
      * @return issued access token payload
      */
-    @PostMapping("/login")
+    @PostMapping("/sessions")
     @Operation(
-            summary = "Account Login",
-            description = "Authenticates credentials and issues access/refresh tokens.")
+            summary = "Create session",
+            description = "Authenticates credentials and creates an access/refresh session.")
     public ResponseEntity<AuthTokenResponse> login(
             @Valid @RequestBody AuthLoginRequest request, HttpServletResponse response) {
         AuthTokenBundle tokenBundle = authService.login(request.email(), request.password());
         addRefreshCookie(response, tokenBundle.refreshToken());
+        return ResponseEntity.ok(
+                new AuthTokenResponse(
+                        tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
+    }
+
+    /**
+     * Reissues access token using refresh token context.
+     *
+     * @return placeholder refresh result
+     */
+    @PostMapping("/sessions/refresh")
+    @Operation(
+            summary = "Refresh access token",
+            description = "Reissues a new access token from refresh token context.")
+    public ResponseEntity<AuthTokenResponse> refresh(
+            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+            HttpServletResponse response) {
+        AuthTokenBundle tokenBundle = authService.refresh(refreshToken);
+        addRefreshCookie(response, tokenBundle.refreshToken());
+
         return ResponseEntity.ok(
                 new AuthTokenResponse(
                         tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
@@ -74,16 +95,16 @@ public class AuthController {
      * @param response servlet response for cookie cleanup
      * @return empty object response
      */
-    @PostMapping("/logout")
+    @DeleteMapping("/sessions/current")
     @Operation(
-            summary = "Account Logout",
+            summary = "Delete current session",
             description = "Revokes refresh token family and clears refresh token cookie.")
-    public ResponseEntity<Map<String, Object>> logout(
+    public ResponseEntity<Void> logout(
             @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
             HttpServletResponse response) {
         authService.logout(refreshToken);
         clearRefreshCookie(response);
-        return ResponseEntity.ok(Map.of());
+        return ResponseEntity.status(NO_CONTENT).build();
     }
 
     /**
@@ -92,14 +113,12 @@ public class AuthController {
      * @param provider provider path value (e.g. google)
      * @return provider metadata and placeholder authorization URL
      */
-    @GetMapping("/oauth/{provider}/authorize")
+    @GetMapping("/oauth/authorizations/{provider}")
     @Operation(
             summary = "Start OAuth authorization",
             description = "Builds authorization entry data for OAuth login flow.")
     public ResponseEntity<Map<String, String>> authorize(
-            @PathVariable String provider,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+            @PathVariable String provider, HttpServletResponse response) {
         AuthProvider authProvider = parseProvider(provider);
 
         if (!AuthProvider.GOOGLE.equals(authProvider)) {
@@ -125,7 +144,7 @@ public class AuthController {
      * @param state state value for CSRF protection
      * @return callback metadata and placeholder status
      */
-    @GetMapping("/oauth/{provider}/callback")
+    @GetMapping("/oauth/callbacks/{provider}")
     @Operation(
             summary = "Handle OAuth callback",
             description =
@@ -135,7 +154,6 @@ public class AuthController {
             @RequestParam String code,
             @RequestParam(required = false) String state,
             @CookieValue(name = OAUTH_STATE_COOKIE, required = false) String cookieState,
-            HttpServletRequest request,
             HttpServletResponse response) {
         if (!AuthProvider.GOOGLE.equals(parseProvider(provider))) {
             throw new ResponseStatusException(BAD_REQUEST, "Unsupported OAuth provider.");
@@ -148,26 +166,6 @@ public class AuthController {
         AuthTokenBundle tokenBundle = authService.authenticateGoogle(code);
         clearOAuthStateCookie(response);
         addRefreshCookie(response, tokenBundle.refreshToken());
-        return ResponseEntity.ok(
-                new AuthTokenResponse(
-                        tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
-    }
-
-    /**
-     * Reissues access token using refresh token context.
-     *
-     * @return placeholder refresh result
-     */
-    @PostMapping("/refresh")
-    @Operation(
-            summary = "Refresh access token",
-            description = "Reissues a new access token from refresh token context.")
-    public ResponseEntity<AuthTokenResponse> refresh(
-            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
-            HttpServletResponse response) {
-        AuthTokenBundle tokenBundle = authService.refresh(refreshToken);
-        addRefreshCookie(response, tokenBundle.refreshToken());
-
         return ResponseEntity.ok(
                 new AuthTokenResponse(
                         tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
@@ -187,7 +185,7 @@ public class AuthController {
                         .httpOnly(true)
                         .secure(secureCookie)
                         .sameSite("Strict")
-                        .path("/api/v1/auth")
+                        .path(REFRESH_COOKIE_PATH)
                         .maxAge(authService.getRefreshExpirationSeconds())
                         .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
@@ -199,7 +197,7 @@ public class AuthController {
                         .httpOnly(true)
                         .secure(secureCookie)
                         .sameSite("Strict")
-                        .path("/api/v1/auth")
+                        .path(REFRESH_COOKIE_PATH)
                         .maxAge(0)
                         .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
@@ -211,7 +209,7 @@ public class AuthController {
                         .httpOnly(true)
                         .secure(secureCookie)
                         .sameSite("Lax")
-                        .path("/api/v1/auth/oauth")
+                        .path(OAUTH_STATE_COOKIE_PATH)
                         .maxAge(5 * 60)
                         .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
@@ -223,7 +221,7 @@ public class AuthController {
                         .httpOnly(true)
                         .secure(secureCookie)
                         .sameSite("Lax")
-                        .path("/api/v1/auth/oauth")
+                        .path(OAUTH_STATE_COOKIE_PATH)
                         .maxAge(0)
                         .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
