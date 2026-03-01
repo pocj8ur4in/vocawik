@@ -36,6 +36,7 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final GuestAuthenticationFilter guestAuthenticationFilter;
+    private final RequestLocaleFilter requestLocaleFilter;
     private final ApiAuthenticationEntryPoint apiAuthenticationEntryPoint;
     private final ApiAccessDeniedHandler apiAccessDeniedHandler;
 
@@ -74,7 +75,8 @@ public class SecurityConfig {
                                         .authenticated())
                 .addFilterBefore(
                         guestAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(requestLocaleFilter, JwtFilter.class);
 
         return http.build();
     }
