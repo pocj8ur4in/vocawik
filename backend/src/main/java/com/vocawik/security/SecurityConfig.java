@@ -2,6 +2,7 @@ package com.vocawik.security;
 
 import com.vocawik.security.guest.GuestAuthenticationFilter;
 import com.vocawik.security.jwt.JwtFilter;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,12 +17,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Spring Security configuration.
  *
  * <ul>
  *   <li>CSRF disabled (stateless REST API)
+ *   <li>CORS enabled for frontend development
  *   <li>Session policy set to STATELESS for token-based authentication
  *   <li>{@link com.vocawik.security.jwt.JwtFilter} registered before {@link
  *       UsernamePasswordAuthenticationFilter}
@@ -33,6 +38,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final List<String> ALLOWED_ORIGINS =
+            List.of("http://localhost:5173", "http://localhost:3000");
 
     private final JwtFilter jwtFilter;
     private final GuestAuthenticationFilter guestAuthenticationFilter;
@@ -50,6 +58,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(
@@ -63,6 +72,9 @@ public class SecurityConfig {
                         authorize ->
                                 authorize
                                         .requestMatchers(
+                                                "/api/v1/registration-verification-requests",
+                                                "/api/v1/registration-verifications",
+                                                "/api/v1/registrations",
                                                 "/api/v1/sessions/**",
                                                 "/api/v1/oauth/**",
                                                 "/api/v1/status",
@@ -89,6 +101,21 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(ALLOWED_ORIGINS);
+        configuration.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     /**
