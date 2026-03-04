@@ -6,7 +6,7 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     email VARCHAR(254) NOT NULL,
-    nickname VARCHAR(100) NOT NULL,
+    nickname VARCHAR(20) NOT NULL,
     lang_code VARCHAR(10) NOT NULL DEFAULT 'UND',
     timezone VARCHAR(40) NOT NULL DEFAULT 'UTC',
     theme VARCHAR(20) NOT NULL DEFAULT 'UND',
@@ -22,6 +22,9 @@ CREATE TABLE users (
     CONSTRAINT chk_users_status CHECK (status IN ('ACTIVE', 'SUSPENDED')),
     CONSTRAINT chk_users_lang_code CHECK (lang_code IN ('KO', 'EN', 'JA', 'ZH', 'LA', 'UND')),
     CONSTRAINT chk_users_timezone_not_blank CHECK (timezone <> ''),
+    CONSTRAINT chk_users_nickname_length CHECK (
+        CHAR_LENGTH(BTRIM(nickname)) BETWEEN 2 AND 20
+    ),
     CONSTRAINT chk_users_theme CHECK (theme IN ('LIGHT', 'DARK', 'UND')),
     CONSTRAINT chk_users_password_failed_attempts CHECK (password_failed_attempts >= 0),
     CONSTRAINT chk_users_password_hash_not_blank CHECK (password_hash IS NULL OR BTRIM(password_hash) <> ''),

@@ -6,6 +6,7 @@ import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.common.auth.AuthProvider;
+import com.vocawik.dto.auth.RegistrationCreateRequest;
 import com.vocawik.dto.auth.RegistrationVerificationCreateRequest;
 import com.vocawik.dto.auth.RegistrationVerificationRequestCreateRequest;
 import com.vocawik.dto.auth.RegistrationVerificationRequestResponse;
@@ -25,6 +26,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -84,24 +86,37 @@ public class AuthController {
      * Confirms one-time email verification token.
      *
      * @param request verification request body
-     * @return verification result payload with sign-up ticket
+     * @return verification result payload with register ticket
      */
     @PostMapping("/registration-verifications")
     @Operation(
             summary = "Create registration verification result",
-            description = "Confirms verification token and issues a signup ticket.")
+            description = "Confirms verification token and issues a register ticket.")
     public ResponseEntity<RegistrationVerificationResponse> confirmEmailVerification(
             @Valid @RequestBody RegistrationVerificationCreateRequest request) {
-        String signupTicket =
+        String registerTicket =
                 verificationService.confirmEmailVerification(request.token(), request.requestId());
-        if (signupTicket.isBlank()) {
+        if (registerTicket.isBlank()) {
             return ResponseEntity.status(CREATED)
                     .body(new RegistrationVerificationResponse(null, null));
         }
         Instant expiresAt =
-                Instant.now().plusSeconds(verificationService.getSignupTicketTtlSeconds());
+                Instant.now().plusSeconds(verificationService.getRegisterTicketTtlSeconds());
         return ResponseEntity.status(CREATED)
-                .body(new RegistrationVerificationResponse(signupTicket, expiresAt));
+                .body(new RegistrationVerificationResponse(registerTicket, expiresAt));
+    }
+
+    @PostMapping("/registrations")
+    @Operation(
+            summary = "Create registration",
+            description = "Creates a user account from verified register ticket.")
+    public ResponseEntity<Void> register(@Valid @RequestBody RegistrationCreateRequest request) {
+        UUID userUuid =
+                verificationService.register(
+                        request.password(), request.nickname(), request.registerTicket());
+        return ResponseEntity.status(CREATED)
+                .location(URI.create("/api/v1/users/" + userUuid))
+                .build();
     }
 
     /**

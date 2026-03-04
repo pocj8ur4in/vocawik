@@ -37,7 +37,7 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 254)
     private String email;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 20)
     private String nickname;
 
     @Enumerated(EnumType.STRING)
@@ -112,6 +112,25 @@ public class User extends BaseEntity {
     /** Updates last login timestamp. */
     public void touchLastLoginAt() {
         this.lastLoginAt = LocalDateTime.now();
+    }
+
+    /** Marks this account as active. */
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+    }
+
+    /**
+     * Sets password hash and updates password metadata.
+     *
+     * @param passwordHash encoded password hash
+     */
+    public void setPassword(String passwordHash) {
+        if (passwordHash == null || passwordHash.isBlank()) {
+            throw new IllegalArgumentException("passwordHash is required");
+        }
+        this.passwordHash = passwordHash;
+        this.passwordUpdatedAt = LocalDateTime.now();
+        clearPasswordFailureState();
     }
 
     /**
