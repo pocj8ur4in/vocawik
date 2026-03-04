@@ -22,7 +22,11 @@ public enum ErrorCode {
 
     // OAuth
     OAUTH_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_GATEWAY, "OAuth token exchange failed."),
-    OAUTH_USERINFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "OAuth user info fetch failed.");
+    OAUTH_USERINFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "OAuth user info fetch failed."),
+
+    EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "Email is already registered."),
+    EMAIL_VERIFICATION_ALREADY_REQUESTED(
+            HttpStatus.CONFLICT, "Email verification already requested. Please check your inbox.");
 
     private final HttpStatus httpStatus;
     private final String message;

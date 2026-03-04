@@ -5,10 +5,13 @@ import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.common.auth.AuthProvider;
+import com.vocawik.dto.auth.RegistrationVerificationRequestCreateRequest;
+import com.vocawik.dto.auth.RegistrationVerificationRequestResponse;
 import com.vocawik.dto.auth.SessionCreateRequest;
 import com.vocawik.dto.auth.SessionTokenResponse;
 import com.vocawik.service.auth.AuthTokenBundle;
 import com.vocawik.service.auth.SessionService;
+import com.vocawik.service.auth.VerificationService;
 import com.vocawik.service.auth.oauth.OAuthService;
 import com.vocawik.service.auth.oauth.OAuthStateService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +53,29 @@ public class AuthController {
 
     private final SessionService sessionService;
     private final OAuthService oAuthService;
+    private final VerificationService verificationService;
     private final OAuthStateService oAuthStateService;
+
+    /**
+     * Requests email verification for register.
+     *
+     * @param request request body with email
+     * @return verification request result payload
+     */
+    @PostMapping("/registration-verification-requests")
+    @Operation(
+            summary = "Verify request for register",
+            description = "Creates an email verification request for registration.")
+    public ResponseEntity<RegistrationVerificationRequestResponse> requestEmailVerification(
+            @Valid @RequestBody RegistrationVerificationRequestCreateRequest request) {
+        String requestId = verificationService.requestEmailVerification(request.email());
+        Instant expiresAt =
+                Instant.now().plusSeconds(verificationService.getEmailVerificationTtlSeconds());
+
+        return ResponseEntity.created(
+                        URI.create("/api/v1/registration-verification-requests/" + requestId))
+                .body(new RegistrationVerificationRequestResponse(requestId, expiresAt));
+    }
 
     /**
      * Authenticates email/password credentials and issues token bundle.

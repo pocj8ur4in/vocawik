@@ -84,6 +84,12 @@ oauth:
     user-info-uri: ${GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}
     redirect-uri: ${GOOGLE_REDIRECT_URI:}
 
+auth:
+  email-verification:
+    frontend-url: ${EMAIL_VERIFICATION_FRONTEND_URL}
+    subject: ${EMAIL_VERIFICATION_SUBJECT}
+    content-template: ${EMAIL_VERIFICATION_CONTENT_TEMPLATE}
+
 mail:
   from-address: ${SMTP_FROM:${SMTP_USERNAME:}}
 
