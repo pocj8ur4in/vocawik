@@ -1,5 +1,6 @@
 package com.vocawik.service.auth;
 
+import com.vocawik.domain.user.User;
 import com.vocawik.infrastructure.mail.EmailService;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.web.error.ErrorCode;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Manages registration email verification requests.
@@ -42,9 +44,14 @@ public class VerificationService {
     private static final String EMAIL_VERIFY_KEY_PREFIX = "auth:email:verify:";
     private static final String EMAIL_VERIFY_SIGNUP_EMAIL_KEY_PREFIX =
             "auth:email:verify:signup:email:";
+    private static final String SIGNUP_TICKET_KEY_PREFIX = "auth:signup:ticket:";
     private static final String EMAIL_VERIFY_SIGNUP_VALUE_PREFIX = "signup:";
+    private static final String EMAIL_VERIFY_USER_VALUE_PREFIX = "user:";
+    private static final String INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE =
+            "Invalid or expired verification token.";
     private static final Duration EMAIL_VERIFY_TOKEN_TTL = Duration.ofMinutes(10);
     private static final Duration EMAIL_VERIFY_REQUEST_LOCK_TTL = Duration.ofMinutes(11);
+    private static final Duration SIGNUP_TICKET_TTL = Duration.ofMinutes(15);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
@@ -115,12 +122,69 @@ public class VerificationService {
     }
 
     /**
+     * Confirms a one-time email verification token.
+     *
+     * @param token verification token from email link
+     * @param requestId optional request identifier to bind token usage
+     * @return signup ticket for registration, or empty string for pending-user activation flow
+     */
+    @Transactional
+    public String confirmEmailVerification(String token, String requestId) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+        }
+        String tokenHash = sha256(token.trim());
+        String payload = stringRedisTemplate.opsForValue().getAndDelete(emailVerifyKey(tokenHash));
+        if (payload == null || payload.isBlank()) {
+            throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+        }
+
+        if (payload.startsWith(EMAIL_VERIFY_SIGNUP_VALUE_PREFIX)) {
+            String rawValue = payload.substring(EMAIL_VERIFY_SIGNUP_VALUE_PREFIX.length());
+            int separator = rawValue.indexOf(':');
+            if (separator <= 0 || separator >= rawValue.length() - 1) {
+                throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+            }
+            String tokenRequestId = rawValue.substring(0, separator);
+            String verifiedEmail = rawValue.substring(separator + 1);
+            stringRedisTemplate.delete(signupEmailVerifyKey(verifiedEmail));
+            if (requestId != null
+                    && !requestId.isBlank()
+                    && !tokenRequestId.equals(requestId.trim())) {
+                throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+            }
+            String signupTicket = generateEmailVerificationToken();
+            String signupTicketHash = sha256(signupTicket);
+            stringRedisTemplate
+                    .opsForValue()
+                    .set(signupTicketKey(signupTicketHash), verifiedEmail, SIGNUP_TICKET_TTL);
+            return signupTicket;
+        }
+
+        if (payload.startsWith(EMAIL_VERIFY_USER_VALUE_PREFIX)) {
+            activatePendingUserByPayload(payload);
+            return "";
+        }
+
+        throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+    }
+
+    /**
      * Returns the verification token lifetime in seconds.
      *
      * @return verification token TTL in seconds
      */
     public long getEmailVerificationTtlSeconds() {
         return EMAIL_VERIFY_TOKEN_TTL.toSeconds();
+    }
+
+    /**
+     * Returns the signup ticket lifetime in seconds.
+     *
+     * @return signup ticket TTL in seconds
+     */
+    public long getSignupTicketTtlSeconds() {
+        return SIGNUP_TICKET_TTL.toSeconds();
     }
 
     private void sendSignupEmailVerification(String email, String requestId) {
@@ -144,6 +208,27 @@ public class VerificationService {
             stringRedisTemplate.delete(tokenKey);
             throw ex;
         }
+    }
+
+    private void activatePendingUserByPayload(String payload) {
+        String uuidValue = payload.substring(EMAIL_VERIFY_USER_VALUE_PREFIX.length());
+        if (uuidValue.isBlank()) {
+            throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+        }
+        UUID userUuid;
+        try {
+            userUuid = UUID.fromString(uuidValue);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE, ex);
+        }
+        User user =
+                userRepository
+                        .findByUuidAndIsDeletedFalse(userUuid)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalArgumentException(
+                                                INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE));
+        user.touchLastLoginAt();
     }
 
     private String buildFrontendVerifyUrl(String rawToken) {
@@ -182,6 +267,10 @@ public class VerificationService {
 
     private String signupEmailVerifyKey(String email) {
         return EMAIL_VERIFY_SIGNUP_EMAIL_KEY_PREFIX + sha256(email.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private String signupTicketKey(String ticketHash) {
+        return SIGNUP_TICKET_KEY_PREFIX + ticketHash;
     }
 
     private String encode(String value) {
