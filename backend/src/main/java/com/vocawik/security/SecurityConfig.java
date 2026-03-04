@@ -2,6 +2,7 @@ package com.vocawik.security;
 
 import com.vocawik.security.guest.GuestAuthenticationFilter;
 import com.vocawik.security.jwt.JwtFilter;
+import com.vocawik.web.ClientIpHeaderFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -45,6 +46,7 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
     private final GuestAuthenticationFilter guestAuthenticationFilter;
     private final RequestLocaleFilter requestLocaleFilter;
+    private final ClientIpHeaderFilter clientIpHeaderFilter;
     private final ApiAuthenticationEntryPoint apiAuthenticationEntryPoint;
     private final ApiAccessDeniedHandler apiAccessDeniedHandler;
 
@@ -88,7 +90,8 @@ public class SecurityConfig {
                 .addFilterBefore(
                         guestAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(requestLocaleFilter, JwtFilter.class);
+                .addFilterAfter(requestLocaleFilter, JwtFilter.class)
+                .addFilterAfter(clientIpHeaderFilter, RequestLocaleFilter.class);
 
         return http.build();
     }
@@ -110,6 +113,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("X-Client-IP"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
