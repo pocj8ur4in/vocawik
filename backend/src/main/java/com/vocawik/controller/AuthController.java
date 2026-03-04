@@ -1,12 +1,15 @@
 package com.vocawik.controller;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CREATED;
 import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.common.auth.AuthProvider;
+import com.vocawik.dto.auth.RegistrationVerificationCreateRequest;
 import com.vocawik.dto.auth.RegistrationVerificationRequestCreateRequest;
 import com.vocawik.dto.auth.RegistrationVerificationRequestResponse;
+import com.vocawik.dto.auth.RegistrationVerificationResponse;
 import com.vocawik.dto.auth.SessionCreateRequest;
 import com.vocawik.dto.auth.SessionTokenResponse;
 import com.vocawik.service.auth.AuthTokenBundle;
@@ -75,6 +78,30 @@ public class AuthController {
         return ResponseEntity.created(
                         URI.create("/api/v1/registration-verification-requests/" + requestId))
                 .body(new RegistrationVerificationRequestResponse(requestId, expiresAt));
+    }
+
+    /**
+     * Confirms one-time email verification token.
+     *
+     * @param request verification request body
+     * @return verification result payload with sign-up ticket
+     */
+    @PostMapping("/registration-verifications")
+    @Operation(
+            summary = "Create registration verification result",
+            description = "Confirms verification token and issues a signup ticket.")
+    public ResponseEntity<RegistrationVerificationResponse> confirmEmailVerification(
+            @Valid @RequestBody RegistrationVerificationCreateRequest request) {
+        String signupTicket =
+                verificationService.confirmEmailVerification(request.token(), request.requestId());
+        if (signupTicket.isBlank()) {
+            return ResponseEntity.status(CREATED)
+                    .body(new RegistrationVerificationResponse(null, null));
+        }
+        Instant expiresAt =
+                Instant.now().plusSeconds(verificationService.getSignupTicketTtlSeconds());
+        return ResponseEntity.status(CREATED)
+                .body(new RegistrationVerificationResponse(signupTicket, expiresAt));
     }
 
     /**
