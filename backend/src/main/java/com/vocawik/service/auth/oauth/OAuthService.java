@@ -13,7 +13,10 @@ import com.vocawik.service.auth.AuthTokenBundle;
 import com.vocawik.service.auth.SessionService;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.ZoneId;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OAuthService {
 
+    private static final String OAUTH_NICKNAME_PREFIX = "user";
+    private static final int OAUTH_NICKNAME_NUMBER_DIGITS = 6;
+    private static final int OAUTH_NICKNAME_MAX_NUMBER = 1_000_000;
+    private static final int OAUTH_NICKNAME_MAX_ATTEMPTS = 1_200_000;
+
     private final GoogleOAuthClient googleOAuthClient;
     private final OAuthProperties oAuthProperties;
     private final UserRepository userRepository;
     private final UserAuthProviderRepository userAuthProviderRepository;
     private final SessionService sessionService;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     /**
      * Builds Google OAuth authorize URL.
@@ -79,8 +88,7 @@ public class OAuthService {
                                         userRepository.save(
                                                 User.create(
                                                         userInfo.email(),
-                                                        resolveNickname(
-                                                                userInfo.name(), userInfo.email()),
+                                                        generateUniqueRandomNickname(),
                                                         Language.UND,
                                                         ZoneId.of("UTC"),
                                                         UserTheme.UND,
@@ -93,17 +101,24 @@ public class OAuthService {
         return user;
     }
 
-    private String resolveNickname(String name, String email) {
-        if (name != null && !name.isBlank()) {
-            return truncate(name.trim(), 100);
+    private String generateUniqueRandomNickname() {
+        Set<String> existingNicknames =
+                new HashSet<>(userRepository.findAllNicknamesByIsDeletedFalse());
+
+        for (int attempt = 0; attempt < OAUTH_NICKNAME_MAX_ATTEMPTS; attempt++) {
+            String candidate = generateRandomNickname();
+            if (!existingNicknames.contains(candidate)) {
+                return candidate;
+            }
         }
-        int at = email.indexOf('@');
-        String localPart = at > 0 ? email.substring(0, at) : email;
-        return truncate(localPart, 100);
+
+        throw new IllegalStateException("Failed to generate a unique OAuth nickname.");
     }
 
-    private String truncate(String value, int max) {
-        return value.length() <= max ? value : value.substring(0, max);
+    private String generateRandomNickname() {
+        int number = secureRandom.nextInt(OAUTH_NICKNAME_MAX_NUMBER);
+        return OAUTH_NICKNAME_PREFIX
+                + String.format("%0" + OAUTH_NICKNAME_NUMBER_DIGITS + "d", number);
     }
 
     private String encode(String value) {
