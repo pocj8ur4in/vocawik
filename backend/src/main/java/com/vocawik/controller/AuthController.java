@@ -5,6 +5,7 @@ import static org.springframework.http.HttpStatus.CREATED;
 import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
+import com.vocawik.aop.RateLimit;
 import com.vocawik.common.auth.AuthProvider;
 import com.vocawik.dto.auth.RegistrationCreateRequest;
 import com.vocawik.dto.auth.RegistrationVerificationCreateRequest;
@@ -68,6 +69,7 @@ public class AuthController {
      * @return verification request result payload
      */
     @PostMapping("/registration-verification-requests")
+    @RateLimit(requests = 5, seconds = 600)
     @Operation(
             summary = "Verify request for register",
             description = "Creates an email verification request for registration.")
@@ -89,6 +91,7 @@ public class AuthController {
      * @return verification result payload with register ticket
      */
     @PostMapping("/registration-verifications")
+    @RateLimit(requests = 20, seconds = 600)
     @Operation(
             summary = "Create registration verification result",
             description = "Confirms verification token and issues a register ticket.")
@@ -127,6 +130,7 @@ public class AuthController {
      * @return issued access token payload
      */
     @PostMapping("/sessions")
+    @RateLimit(requests = 10, seconds = 60)
     @Operation(
             summary = "Create session",
             description = "Authenticates credentials and creates an access/refresh session.")
@@ -146,6 +150,7 @@ public class AuthController {
      * @return placeholder refresh result
      */
     @PostMapping("/sessions/refresh")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Refresh access token",
             description = "Reissues a new access token from refresh token context.")
@@ -186,6 +191,7 @@ public class AuthController {
      * @return provider metadata and placeholder authorization URL
      */
     @GetMapping("/oauth/authorizations/{provider}")
+    @RateLimit(requests = 20, seconds = 60)
     @Operation(
             summary = "Start OAuth authorization",
             description = "Builds authorization entry data for OAuth login flow.")
@@ -217,6 +223,7 @@ public class AuthController {
      * @return callback metadata and placeholder status
      */
     @GetMapping("/oauth/callbacks/{provider}")
+    @RateLimit(requests = 30, seconds = 60)
     @Operation(
             summary = "Handle OAuth callback",
             description =
