@@ -1,4 +1,4 @@
-package com.vocawik.web;
+package com.vocawik.security.ip;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

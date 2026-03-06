@@ -1,7 +1,7 @@
 package com.vocawik.security.guest;
 
 import com.vocawik.domain.guest.Guest;
-import com.vocawik.web.ClientIpResolver;
+import com.vocawik.security.ip.ClientIpResolver;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
