@@ -1,4 +1,4 @@
-package com.vocawik.web;
+package com.vocawik.security.ip;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

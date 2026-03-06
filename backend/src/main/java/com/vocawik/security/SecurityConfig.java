@@ -1,8 +1,8 @@
 package com.vocawik.security;
 
 import com.vocawik.security.guest.GuestAuthenticationFilter;
+import com.vocawik.security.ip.ClientIpHeaderFilter;
 import com.vocawik.security.jwt.JwtFilter;
-import com.vocawik.web.ClientIpHeaderFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

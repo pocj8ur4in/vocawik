@@ -7,7 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.vocawik.web.ClientIpResolver;
+import com.vocawik.security.ip.ClientIpResolver;
 import com.vocawik.web.exception.TooManyRequestsException;
 import java.util.List;
 import org.aspectj.lang.ProceedingJoinPoint;

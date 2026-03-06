@@ -1,4 +1,4 @@
-package com.vocawik.web;
+package com.vocawik.security.ip;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.InetAddress;
@@ -26,7 +26,7 @@ public class ClientIpResolver {
      */
     public ClientIpResolver(
             @Value(
-                            "${logging.http.trusted-proxy-cidrs:127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128}")
+                            "${security.client-ip.trusted-proxy-cidrs:127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128}")
                     String trustedProxyCidrs) {
         this.trustedProxyRanges = parseTrustedProxyCidrs(trustedProxyCidrs);
     }
