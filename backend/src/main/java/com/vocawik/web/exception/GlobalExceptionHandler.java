@@ -1,9 +1,6 @@
-package com.vocawik.exception;
+package com.vocawik.web.exception;
 
 import com.vocawik.web.error.ErrorResponse;
-import com.vocawik.web.exception.BusinessException;
-import com.vocawik.web.exception.TooManyRequestsException;
-import com.vocawik.web.exception.UnauthorizedException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
