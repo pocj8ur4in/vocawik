@@ -4,7 +4,7 @@ package com.vocawik.domain.resource;
 public enum ResourceType {
     SONG,
     ARTIST,
-    CHARACTER,
+    VOCAL,
     VOICEBANK,
     PLAYLIST
 }

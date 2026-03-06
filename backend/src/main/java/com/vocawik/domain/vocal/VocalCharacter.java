@@ -51,8 +51,7 @@ public class VocalCharacter {
     public static VocalCharacter create(
             String canonicalName, String thumbnailUrl, String content, JsonNode links) {
         VocalCharacter vocalCharacter = new VocalCharacter();
-        vocalCharacter.resource =
-                Resource.create(ResourceType.CHARACTER, canonicalName, thumbnailUrl);
+        vocalCharacter.resource = Resource.create(ResourceType.VOCAL, canonicalName, thumbnailUrl);
         vocalCharacter.content = content;
         vocalCharacter.links = links;
         return vocalCharacter;
