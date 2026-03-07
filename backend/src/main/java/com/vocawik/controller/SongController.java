@@ -1,0 +1,164 @@
+package com.vocawik.controller;
+
+import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.domain.song.SongType;
+import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.service.song.SongService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Endpoints for Song. */
+@RestController
+@Tag(name = "Song", description = "Song endpoints")
+@RequiredArgsConstructor
+public class SongController {
+
+    private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
+    private static final Sort.Direction DEFAULT_SORT_DIRECTION = Sort.Direction.DESC;
+    private static final Map<String, String> ALLOWED_SORT_PROPERTIES =
+            Map.of(
+                    "updatedAt", "resource.updatedAt",
+                    "createdAt", "resource.createdAt",
+                    "publishedAt", "publishedAt");
+
+    private final SongService songService;
+
+    /**
+     * Searches songs with optional filters.
+     *
+     * @param status optional resource status filter
+     * @param songType optional song type filter
+     * @param query optional canonical name keyword
+     * @param artistUuids optional artist resource UUID filter
+     * @param vocalUuids optional vocal resource UUID filter
+     * @param publishedFrom optional published-at start datetime (inclusive)
+     * @param publishedTo optional published-at end datetime (inclusive)
+     * @param pageable page and sort options
+     * @return paged song summaries
+     */
+    @GetMapping("/songs")
+    @Operation(
+            summary = "Search songs",
+            description = "Returns active songs with optional filters.")
+    @Parameters({
+        @Parameter(
+                name = "page",
+                in = ParameterIn.QUERY,
+                description = "Page index",
+                example = "0",
+                schema = @Schema(type = "integer", defaultValue = "0", minimum = "0")),
+        @Parameter(
+                name = "size",
+                in = ParameterIn.QUERY,
+                description = "Page size",
+                example = "20",
+                schema = @Schema(type = "integer", defaultValue = "20", minimum = "1")),
+        @Parameter(
+                name = "sort",
+                in = ParameterIn.QUERY,
+                description = "Sort (format: {property},{asc|desc})",
+                example = "updatedAt,desc",
+                schema =
+                        @Schema(
+                                type = "string",
+                                defaultValue = "updatedAt,desc",
+                                allowableValues = {
+                                    "updatedAt,asc",
+                                    "updatedAt,desc",
+                                    "createdAt,asc",
+                                    "createdAt,desc",
+                                    "publishedAt,asc",
+                                    "publishedAt,desc"
+                                }))
+    })
+    public ResponseEntity<SongListResponse> searchSongs(
+            @Parameter(description = "Resource status filter")
+                    @RequestParam(name = "status", required = false)
+                    ResourceStatus status,
+            @Parameter(description = "Song type filter")
+                    @RequestParam(name = "songType", required = false)
+                    SongType songType,
+            @Parameter(description = "Canonical name keyword")
+                    @RequestParam(name = "query", required = false)
+                    String query,
+            @Parameter(description = "Artist resource UUID filter")
+                    @RequestParam(name = "artistUuids", required = false)
+                    List<UUID> artistUuids,
+            @Parameter(description = "Vocal resource UUID filter")
+                    @RequestParam(name = "vocalUuids", required = false)
+                    List<UUID> vocalUuids,
+            @Parameter(description = "Published-at start datetime, e.g. 2026-03-01T00:00:00")
+                    @RequestParam(name = "publishedFrom", required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                    LocalDateTime publishedFrom,
+            @Parameter(description = "Published-at end datetime, e.g. 2026-03-31T23:59:59")
+                    @RequestParam(name = "publishedTo", required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                    LocalDateTime publishedTo,
+            @Parameter(hidden = true)
+                    @PageableDefault(
+                            size = 20,
+                            sort = DEFAULT_SORT_PROPERTY,
+                            direction = Sort.Direction.DESC)
+                    Pageable pageable) {
+        validatePublishedRange(publishedFrom, publishedTo);
+
+        return ResponseEntity.ok(
+                songService.search(
+                        status,
+                        songType,
+                        query,
+                        artistUuids,
+                        vocalUuids,
+                        publishedFrom,
+                        publishedTo,
+                        PageRequest.of(
+                                pageable.getPageNumber(),
+                                pageable.getPageSize(),
+                                sanitizeSort(pageable.getSort()))));
+    }
+
+    private void validatePublishedRange(LocalDateTime publishedFrom, LocalDateTime publishedTo) {
+        if (publishedFrom != null && publishedTo != null && publishedFrom.isAfter(publishedTo)) {
+            throw new IllegalArgumentException(
+                    "publishedFrom must be earlier than or equal to publishedTo");
+        }
+    }
+
+    private Sort sanitizeSort(Sort requestedSort) {
+        Sort sort =
+                (requestedSort == null || requestedSort.isUnsorted())
+                        ? Sort.by(DEFAULT_SORT_DIRECTION, DEFAULT_SORT_PROPERTY)
+                        : requestedSort;
+
+        ArrayList<Sort.Order> allowedOrders = new ArrayList<>();
+        for (Sort.Order order : sort) {
+            String internalProperty = ALLOWED_SORT_PROPERTIES.get(order.getProperty());
+            if (internalProperty == null) {
+                throw new IllegalArgumentException(
+                        "Unsupported sort property: " + order.getProperty());
+            }
+            allowedOrders.add(new Sort.Order(order.getDirection(), internalProperty));
+        }
+        return Sort.by(allowedOrders);
+    }
+}
