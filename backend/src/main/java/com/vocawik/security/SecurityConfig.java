@@ -84,7 +84,8 @@ public class SecurityConfig {
                                                 "/v3/api-docs/**",
                                                 "/actuator/health",
                                                 "/actuator/info",
-                                                "/api/v1/resources")
+                                                "/api/v1/resources",
+                                                "/api/v1/songs")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
