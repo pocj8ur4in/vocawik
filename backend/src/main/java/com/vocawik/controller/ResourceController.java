@@ -1,16 +1,25 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.resource.ArtistResourceDetailResponse;
+import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
+import com.vocawik.dto.resource.SongResourceDetailResponse;
+import com.vocawik.dto.resource.VocalResourceDetailResponse;
+import com.vocawik.dto.resource.VoicebankResourceDetailResponse;
 import com.vocawik.service.resource.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -95,6 +105,38 @@ public class ResourceController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /**
+     * Gets denormalized resource detail from resource data.
+     *
+     * @param resourceUuid resource UUID
+     * @return resource detail payload
+     */
+    @GetMapping("/resources/{resourceUuid}")
+    @Operation(summary = "Get resource detail", description = "Returns resource detail.")
+    @ApiResponses(
+            value = {
+                @ApiResponse(
+                        responseCode = "200",
+                        description = "Resource detail by type",
+                        content =
+                                @Content(
+                                        mediaType = "application/json",
+                                        schema =
+                                                @Schema(
+                                                        oneOf = {
+                                                            SongResourceDetailResponse.class,
+                                                            ArtistResourceDetailResponse.class,
+                                                            VocalResourceDetailResponse.class,
+                                                            VoicebankResourceDetailResponse.class,
+                                                            PlaylistResourceDetailResponse.class
+                                                        })))
+            })
+    public ResponseEntity<Object> getResource(
+            @Parameter(description = "Resource UUID") @PathVariable("resourceUuid")
+                    UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getByResourceUuid(resourceUuid));
     }
 
     private Sort sanitizeSort(Sort requestedSort) {
