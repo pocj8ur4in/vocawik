@@ -5,14 +5,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
 /** Custom search repository for {@link Artist}. */
-public interface ArtistSearchRepository {
+public interface ArtistCriteriaRepository {
 
     /**
      * Searches artists with optional filters.
      *
-     * @param condition search condition
+     * @param criteria search criteria
      * @param pageable page/sort options
      * @return sliced artists
      */
-    Slice<Artist> search(ArtistSearchCondition condition, Pageable pageable);
+    Slice<Artist> search(ArtistCriteria criteria, Pageable pageable);
 }

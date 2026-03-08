@@ -5,14 +5,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
 /** Custom search repository for {@link Resource}. */
-public interface ResourceSearchRepository {
+public interface ResourceCriteriaRepository {
 
     /**
      * Searches resources with optional filters.
      *
-     * @param condition search condition
+     * @param criteria search criteria
      * @param pageable page/sort options
      * @return sliced resources
      */
-    Slice<Resource> search(ResourceSearchCondition condition, Pageable pageable);
+    Slice<Resource> search(ResourceCriteria criteria, Pageable pageable);
 }

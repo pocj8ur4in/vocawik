@@ -6,8 +6,8 @@ import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.dto.song.SongElementResponse;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.repository.song.SongCriteria;
 import com.vocawik.repository.song.SongRepository;
-import com.vocawik.repository.song.SongSearchCondition;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -54,7 +54,7 @@ public class SongService {
 
         Slice<Song> resultSlice =
                 songRepository.search(
-                        new SongSearchCondition(
+                        new SongCriteria(
                                 status,
                                 songType,
                                 normalizedQuery,

@@ -8,4 +8,4 @@ import com.vocawik.domain.resource.ResourceStatus;
  * @param status optional resource status filter
  * @param query optional canonical-name keyword
  */
-public record ResourceSearchCondition(ResourceStatus status, String query) {}
+public record ResourceCriteria(ResourceStatus status, String query) {}

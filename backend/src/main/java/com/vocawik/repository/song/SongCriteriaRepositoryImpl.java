@@ -30,48 +30,47 @@ import org.springframework.stereotype.Repository;
 @SuppressFBWarnings(
         value = "EI_EXPOSE_REP2",
         justification = "EntityManager is a container-managed dependency provided by Spring")
-public class SongSearchRepositoryImpl implements SongSearchRepository {
+public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
 
     private final EntityManager entityManager;
 
     @Override
-    public Slice<Song> search(SongSearchCondition condition, Pageable pageable) {
+    public Slice<Song> search(SongCriteria criteria, Pageable pageable) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Song> criteriaQuery = criteriaBuilder.createQuery(Song.class);
         Root<Song> root = criteriaQuery.from(Song.class);
 
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(criteriaBuilder.isFalse(root.get("resource").get("isDeleted")));
-        if (condition.status() != null) {
+        if (criteria.status() != null) {
             predicates.add(
-                    criteriaBuilder.equal(root.get("resource").get("status"), condition.status()));
+                    criteriaBuilder.equal(root.get("resource").get("status"), criteria.status()));
         }
-        if (condition.songType() != null) {
-            predicates.add(criteriaBuilder.equal(root.get("songType"), condition.songType()));
+        if (criteria.songType() != null) {
+            predicates.add(criteriaBuilder.equal(root.get("songType"), criteria.songType()));
         }
-        if (condition.query() != null) {
-            String keywordPattern = "%" + condition.query().toLowerCase() + "%";
+        if (criteria.query() != null) {
+            String keywordPattern = "%" + criteria.query().toLowerCase() + "%";
             predicates.add(
                     hasAnyResourceNameLike(keywordPattern, criteriaQuery, root, criteriaBuilder));
         }
-        if (condition.publishedFrom() != null) {
+        if (criteria.publishedFrom() != null) {
             predicates.add(
                     criteriaBuilder.greaterThanOrEqualTo(
-                            root.get("publishedAt"), condition.publishedFrom()));
+                            root.get("publishedAt"), criteria.publishedFrom()));
         }
-        if (condition.publishedTo() != null) {
+        if (criteria.publishedTo() != null) {
             predicates.add(
                     criteriaBuilder.lessThanOrEqualTo(
-                            root.get("publishedAt"), condition.publishedTo()));
+                            root.get("publishedAt"), criteria.publishedTo()));
         }
-        if (condition.artistUuids() != null && !condition.artistUuids().isEmpty()) {
+        if (criteria.artistUuids() != null && !criteria.artistUuids().isEmpty()) {
             predicates.add(
-                    hasAnyArtistUuid(
-                            condition.artistUuids(), criteriaQuery, root, criteriaBuilder));
+                    hasAnyArtistUuid(criteria.artistUuids(), criteriaQuery, root, criteriaBuilder));
         }
-        if (condition.vocalUuids() != null && !condition.vocalUuids().isEmpty()) {
+        if (criteria.vocalUuids() != null && !criteria.vocalUuids().isEmpty()) {
             predicates.add(
-                    hasAnyVocalUuid(condition.vocalUuids(), criteriaQuery, root, criteriaBuilder));
+                    hasAnyVocalUuid(criteria.vocalUuids(), criteriaQuery, root, criteriaBuilder));
         }
 
         criteriaQuery.where(predicates.toArray(Predicate[]::new));
