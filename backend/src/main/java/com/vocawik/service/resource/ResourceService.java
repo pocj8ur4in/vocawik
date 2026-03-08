@@ -4,8 +4,8 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.resource.ResourceElementResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
+import com.vocawik.repository.resource.ResourceCriteria;
 import com.vocawik.repository.resource.ResourceRepository;
-import com.vocawik.repository.resource.ResourceSearchCondition;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -32,8 +32,7 @@ public class ResourceService {
     public ResourceListResponse search(ResourceStatus status, String query, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
         Slice<Resource> resultSlice =
-                resourceRepository.search(
-                        new ResourceSearchCondition(status, normalizedQuery), pageable);
+                resourceRepository.search(new ResourceCriteria(status, normalizedQuery), pageable);
 
         List<ResourceElementResponse> items =
                 resultSlice.getContent().stream().map(this::toSummary).toList();

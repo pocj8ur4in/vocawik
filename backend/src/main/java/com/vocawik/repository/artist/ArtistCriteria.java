@@ -13,14 +13,14 @@ import java.util.UUID;
  * @param groupArtistUuids optional group artist resource UUID filters
  * @param memberArtistUuids optional member artist resource UUID filters
  */
-public record ArtistSearchCondition(
+public record ArtistCriteria(
         ResourceStatus status,
         String query,
         List<UUID> songUuids,
         List<UUID> groupArtistUuids,
         List<UUID> memberArtistUuids) {
 
-    public ArtistSearchCondition {
+    public ArtistCriteria {
         songUuids = songUuids == null ? List.of() : List.copyOf(songUuids);
         groupArtistUuids = groupArtistUuids == null ? List.of() : List.copyOf(groupArtistUuids);
         memberArtistUuids = memberArtistUuids == null ? List.of() : List.copyOf(memberArtistUuids);

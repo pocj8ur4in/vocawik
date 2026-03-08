@@ -27,23 +27,23 @@ import org.springframework.stereotype.Repository;
 @SuppressFBWarnings(
         value = "EI_EXPOSE_REP2",
         justification = "EntityManager is a container-managed dependency provided by Spring")
-public class ResourceSearchRepositoryImpl implements ResourceSearchRepository {
+public class ResourceCriteriaRepositoryImpl implements ResourceCriteriaRepository {
 
     private final EntityManager entityManager;
 
     @Override
-    public Slice<Resource> search(ResourceSearchCondition condition, Pageable pageable) {
+    public Slice<Resource> search(ResourceCriteria criteria, Pageable pageable) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Resource> criteriaQuery = criteriaBuilder.createQuery(Resource.class);
         Root<Resource> root = criteriaQuery.from(Resource.class);
 
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(criteriaBuilder.isFalse(root.get("isDeleted")));
-        if (condition.status() != null) {
-            predicates.add(criteriaBuilder.equal(root.get("status"), condition.status()));
+        if (criteria.status() != null) {
+            predicates.add(criteriaBuilder.equal(root.get("status"), criteria.status()));
         }
-        if (condition.query() != null) {
-            String keywordPattern = "%" + condition.query().toLowerCase() + "%";
+        if (criteria.query() != null) {
+            String keywordPattern = "%" + criteria.query().toLowerCase() + "%";
             predicates.add(
                     hasAnyResourceNameLike(keywordPattern, criteriaQuery, root, criteriaBuilder));
         }

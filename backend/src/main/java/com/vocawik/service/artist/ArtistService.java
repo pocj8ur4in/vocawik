@@ -5,8 +5,8 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistElementResponse;
 import com.vocawik.dto.artist.ArtistListResponse;
+import com.vocawik.repository.artist.ArtistCriteria;
 import com.vocawik.repository.artist.ArtistRepository;
-import com.vocawik.repository.artist.ArtistSearchCondition;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
@@ -49,7 +49,7 @@ public class ArtistService {
 
         Slice<Artist> resultSlice =
                 artistRepository.search(
-                        new ArtistSearchCondition(
+                        new ArtistCriteria(
                                 status,
                                 normalizedQuery,
                                 normalizedSongUuids,

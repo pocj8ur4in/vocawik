@@ -17,7 +17,7 @@ import java.util.UUID;
  * @param publishedFrom optional published-at start datetime (inclusive)
  * @param publishedTo optional published-at end datetime (inclusive)
  */
-public record SongSearchCondition(
+public record SongCriteria(
         ResourceStatus status,
         SongType songType,
         String query,
@@ -26,7 +26,7 @@ public record SongSearchCondition(
         LocalDateTime publishedFrom,
         LocalDateTime publishedTo) {
 
-    public SongSearchCondition {
+    public SongCriteria {
         artistUuids = artistUuids == null ? List.of() : List.copyOf(artistUuids);
         vocalUuids = vocalUuids == null ? List.of() : List.copyOf(vocalUuids);
     }

@@ -5,4 +5,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 /** Repository for {@link Resource} persistence access. */
 public interface ResourceRepository
-        extends JpaRepository<Resource, Long>, ResourceSearchRepository {}
+        extends JpaRepository<Resource, Long>, ResourceCriteriaRepository {}

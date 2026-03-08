@@ -31,12 +31,12 @@ import org.springframework.stereotype.Repository;
 @SuppressFBWarnings(
         value = "EI_EXPOSE_REP2",
         justification = "EntityManager is a container-managed dependency provided by Spring")
-public class ArtistSearchRepositoryImpl implements ArtistSearchRepository {
+public class ArtistCriteriaRepositoryImpl implements ArtistCriteriaRepository {
 
     private final EntityManager entityManager;
 
     @Override
-    public Slice<Artist> search(ArtistSearchCondition condition, Pageable pageable) {
+    public Slice<Artist> search(ArtistCriteria criteria, Pageable pageable) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Artist> criteriaQuery = criteriaBuilder.createQuery(Artist.class);
         Root<Artist> root = criteriaQuery.from(Artist.class);
@@ -44,28 +44,28 @@ public class ArtistSearchRepositoryImpl implements ArtistSearchRepository {
 
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(criteriaBuilder.isFalse(root.get("resource").get("isDeleted")));
-        if (condition.status() != null) {
+        if (criteria.status() != null) {
             predicates.add(
-                    criteriaBuilder.equal(root.get("resource").get("status"), condition.status()));
+                    criteriaBuilder.equal(root.get("resource").get("status"), criteria.status()));
         }
-        if (condition.query() != null) {
-            String keywordPattern = "%" + condition.query().toLowerCase() + "%";
+        if (criteria.query() != null) {
+            String keywordPattern = "%" + criteria.query().toLowerCase() + "%";
             predicates.add(
                     hasAnyResourceNameLike(keywordPattern, criteriaQuery, root, criteriaBuilder));
         }
-        if (!condition.songUuids().isEmpty()) {
+        if (!criteria.songUuids().isEmpty()) {
             predicates.add(
-                    hasAnySongUuid(condition.songUuids(), criteriaQuery, root, criteriaBuilder));
+                    hasAnySongUuid(criteria.songUuids(), criteriaQuery, root, criteriaBuilder));
         }
-        if (!condition.groupArtistUuids().isEmpty()) {
+        if (!criteria.groupArtistUuids().isEmpty()) {
             predicates.add(
                     hasAnyGroupArtistUuid(
-                            condition.groupArtistUuids(), criteriaQuery, root, criteriaBuilder));
+                            criteria.groupArtistUuids(), criteriaQuery, root, criteriaBuilder));
         }
-        if (!condition.memberArtistUuids().isEmpty()) {
+        if (!criteria.memberArtistUuids().isEmpty()) {
             predicates.add(
                     hasAnyMemberArtistUuid(
-                            condition.memberArtistUuids(), criteriaQuery, root, criteriaBuilder));
+                            criteria.memberArtistUuids(), criteriaQuery, root, criteriaBuilder));
         }
 
         criteriaQuery.where(predicates.toArray(Predicate[]::new));
