@@ -86,7 +86,8 @@ public class SecurityConfig {
                                                 "/actuator/info",
                                                 "/api/v1/resources",
                                                 "/api/v1/songs",
-                                                "/api/v1/artists")
+                                                "/api/v1/artists",
+                                                "/api/v1/vocals")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
