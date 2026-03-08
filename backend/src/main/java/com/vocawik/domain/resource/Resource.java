@@ -1,5 +1,6 @@
 package com.vocawik.domain.resource;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.vocawik.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,6 +10,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** Resource root entity supported on polymorphic. */
 @Getter
@@ -37,6 +40,10 @@ public class Resource extends BaseEntity {
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "data", columnDefinition = "jsonb")
+    private JsonNode data;
+
     /**
      * Creates a new resource record.
      *
@@ -64,5 +71,14 @@ public class Resource extends BaseEntity {
     /** Soft deletes this resource. */
     public void softDelete() {
         this.isDeleted = true;
+    }
+
+    /**
+     * Updates json payload for read-model.
+     *
+     * @param data denormalized json payload
+     */
+    public void updateData(JsonNode data) {
+        this.data = data;
     }
 }

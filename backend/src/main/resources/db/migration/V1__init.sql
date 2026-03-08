@@ -86,11 +86,13 @@ CREATE TABLE resources (
     updated_at TIMESTAMP NOT NULL,
     canonical_name VARCHAR(255) NOT NULL,
     thumbnail_url TEXT,
+    data JSONB,
     view_count BIGINT NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     resource_type VARCHAR(20) NOT NULL,
     CONSTRAINT chk_resources_view_count CHECK (view_count >= 0),
+    CONSTRAINT chk_resources_data_object CHECK (data IS NULL OR jsonb_typeof(data) = 'object'),
     CONSTRAINT chk_resources_status CHECK (status IN ('ACTIVE', 'DRAFT')),
     CONSTRAINT chk_resources_resource_type CHECK (
         resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'VOICEBANK', 'PLAYLIST')
