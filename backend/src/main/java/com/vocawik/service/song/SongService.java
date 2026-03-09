@@ -21,6 +21,7 @@ import com.vocawik.domain.song.SongPvProvider;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.domain.song.SongVocal;
+import com.vocawik.domain.song.SongVoicebank;
 import com.vocawik.domain.vocal.VocalCharacter;
 import com.vocawik.domain.vocal.VocalVoicebank;
 import com.vocawik.dto.song.SongCreateRequest;
@@ -40,6 +41,7 @@ import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
+import com.vocawik.repository.song.SongVoicebankRepository;
 import com.vocawik.repository.vocal.VocalCharacterRepository;
 import com.vocawik.repository.vocal.VocalVoicebankRepository;
 import com.vocawik.web.error.ErrorCode;
@@ -78,6 +80,7 @@ public class SongService {
     private final SongPvViewRepository songPvViewRepository;
     private final SongArtistRepository songArtistRepository;
     private final SongVocalRepository songVocalRepository;
+    private final SongVoicebankRepository songVoicebankRepository;
     private final SongRelationRepository songRelationRepository;
     private final ArtistRepository artistRepository;
     private final VocalCharacterRepository vocalCharacterRepository;
@@ -93,6 +96,7 @@ public class SongService {
      * @param query optional canonical-name query
      * @param artistUuids optional artist resource UUIDs
      * @param vocalUuids optional vocal resource UUIDs
+     * @param voicebankUuids optional voicebank resource UUIDs
      * @param publishedFrom optional published-at start datetime (inclusive)
      * @param publishedTo optional published-at end datetime (inclusive)
      * @param pageable page/sort options
@@ -105,12 +109,14 @@ public class SongService {
             String query,
             List<UUID> artistUuids,
             List<UUID> vocalUuids,
+            List<UUID> voicebankUuids,
             LocalDateTime publishedFrom,
             LocalDateTime publishedTo,
             Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
         List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
+        List<UUID> normalizedVoicebankUuids = normalizeUuids(voicebankUuids);
 
         Slice<Song> resultSlice =
                 songRepository.search(
@@ -120,6 +126,7 @@ public class SongService {
                                 normalizedQuery,
                                 normalizedArtistUuids,
                                 normalizedVocalUuids,
+                                normalizedVoicebankUuids,
                                 publishedFrom,
                                 publishedTo),
                         pageable);
@@ -160,7 +167,9 @@ public class SongService {
         List<SongPv> pvs = saveSongPvs(song, request.pvs());
         List<SongArtist> artists = saveSongArtists(song, request.artists());
         List<SongVocal> vocals = saveSongVocals(song, request.vocals());
+        List<SongVoicebank> voicebanks = saveSongVoicebanks(song, request.voicebanks());
         List<SongRelation> relations = saveSongRelations(song, request.relations());
+        validateSongParticipationPresent(vocals, voicebanks);
 
         resource.updateData(
                 buildSongProjection(
@@ -172,6 +181,7 @@ public class SongService {
                         pvs,
                         artists,
                         vocals,
+                        voicebanks,
                         relations));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
@@ -219,10 +229,17 @@ public class SongService {
                 request.vocals() == null
                         ? songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
                         : replaceSongVocals(song, toCreateVocals(request.vocals()));
+        List<SongVoicebank> voicebanks =
+                request.voicebanks() == null
+                        ? songVoicebankRepository.findAllBySongIdOrderBySortOrderAscIdAsc(
+                                song.getId())
+                        : replaceSongVoicebanks(song, toCreateVoicebanks(request.voicebanks()));
         List<SongRelation> relations =
                 request.relations() == null
                         ? songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId())
                         : replaceSongRelations(song, toCreateRelations(request.relations()));
+
+        validateSongParticipationPresent(vocals, voicebanks);
 
         resource.updateData(
                 buildSongProjection(
@@ -234,6 +251,7 @@ public class SongService {
                         pvs,
                         artists,
                         vocals,
+                        voicebanks,
                         relations));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
@@ -362,6 +380,12 @@ public class SongService {
         return saveSongVocals(song, vocals);
     }
 
+    private List<SongVoicebank> replaceSongVoicebanks(
+            Song song, List<SongCreateRequest.SongVoicebankCreateRequest> voicebanks) {
+        songVoicebankRepository.deleteBySongId(song.getId());
+        return saveSongVoicebanks(song, voicebanks);
+    }
+
     private List<SongRelation> replaceSongRelations(
             Song song, List<SongCreateRequest.SongRelationCreateRequest> relations) {
         songRelationRepository.deleteBySourceSongId(song.getId());
@@ -446,7 +470,16 @@ public class SongService {
                 .map(
                         item ->
                                 new SongCreateRequest.SongVocalCreateRequest(
-                                        item.vocalResourceUuid(),
+                                        item.vocalResourceUuid(), item.isMain(), item.sortOrder()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.SongVoicebankCreateRequest> toCreateVoicebanks(
+            List<SongUpdateRequest.SongVoicebankUpdateRequest> voicebanks) {
+        return voicebanks.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.SongVoicebankCreateRequest(
                                         item.voicebankResourceUuid(),
                                         item.isMain(),
                                         item.sortOrder()))
@@ -663,14 +696,6 @@ public class SongService {
                         .toList();
         Map<UUID, Long> vocalIdsByUuid = fetchVocalIdsByResourceUuid(vocalUuids);
 
-        List<UUID> voicebankUuids =
-                vocals.stream()
-                        .map(SongCreateRequest.SongVocalCreateRequest::voicebankResourceUuid)
-                        .filter(java.util.Objects::nonNull)
-                        .distinct()
-                        .toList();
-        Map<UUID, Long> voicebankIdsByUuid = fetchVoicebankIdsByResourceUuid(voicebankUuids);
-
         List<SongVocal> entities =
                 vocals.stream()
                         .map(
@@ -689,25 +714,9 @@ public class SongService {
                                             entityManager.getReference(
                                                     VocalCharacter.class, vocalId);
 
-                                    VocalVoicebank voicebank = null;
-                                    if (item.voicebankResourceUuid() != null) {
-                                        Long voicebankId =
-                                                voicebankIdsByUuid.get(
-                                                        item.voicebankResourceUuid());
-                                        if (voicebankId == null) {
-                                            throw new IllegalArgumentException(
-                                                    "Unknown voicebankResourceUuid: "
-                                                            + item.voicebankResourceUuid());
-                                        }
-                                        voicebank =
-                                                entityManager.getReference(
-                                                        VocalVoicebank.class, voicebankId);
-                                    }
-
                                     return SongVocal.create(
                                             song,
                                             vocal,
-                                            voicebank,
                                             item.isMain(),
                                             item.sortOrder() == null ? 0 : item.sortOrder());
                                 })
@@ -717,6 +726,49 @@ public class SongService {
                 .sorted(
                         Comparator.comparingInt(SongVocal::getSortOrder)
                                 .thenComparing(SongVocal::getId))
+                .toList();
+    }
+
+    private List<SongVoicebank> saveSongVoicebanks(
+            Song song, List<SongCreateRequest.SongVoicebankCreateRequest> voicebanks) {
+        if (voicebanks == null || voicebanks.isEmpty()) {
+            return List.of();
+        }
+        validateNoNullItems("voicebanks", voicebanks);
+
+        List<UUID> voicebankUuids =
+                voicebanks.stream()
+                        .map(SongCreateRequest.SongVoicebankCreateRequest::voicebankResourceUuid)
+                        .distinct()
+                        .toList();
+        Map<UUID, Long> voicebankIdsByUuid = fetchVoicebankIdsByResourceUuid(voicebankUuids);
+
+        List<SongVoicebank> entities =
+                voicebanks.stream()
+                        .map(
+                                item -> {
+                                    Long voicebankId =
+                                            voicebankIdsByUuid.get(item.voicebankResourceUuid());
+                                    if (voicebankId == null) {
+                                        throw new IllegalArgumentException(
+                                                "Unknown voicebankResourceUuid: "
+                                                        + item.voicebankResourceUuid());
+                                    }
+                                    VocalVoicebank voicebank =
+                                            entityManager.getReference(
+                                                    VocalVoicebank.class, voicebankId);
+                                    return SongVoicebank.create(
+                                            song,
+                                            voicebank,
+                                            item.isMain(),
+                                            item.sortOrder() == null ? 0 : item.sortOrder());
+                                })
+                        .toList();
+
+        return songVoicebankRepository.saveAllAndFlush(entities).stream()
+                .sorted(
+                        Comparator.comparingInt(SongVoicebank::getSortOrder)
+                                .thenComparing(SongVoicebank::getId))
                 .toList();
     }
 
@@ -915,6 +967,7 @@ public class SongService {
             List<SongPv> pvs,
             List<SongArtist> artists,
             List<SongVocal> vocals,
+            List<SongVoicebank> voicebanks,
             List<SongRelation> relations) {
         ObjectNode data = objectMapper.createObjectNode();
         data.put("resourceUuid", resource.getUuid().toString());
@@ -937,6 +990,7 @@ public class SongService {
         data.set("pvs", buildSongPvsProjection(pvs));
         data.set("artists", buildSongArtistsProjection(artists));
         data.set("vocals", buildSongVocalsProjection(vocals));
+        data.set("voicebanks", buildSongVoicebanksProjection(voicebanks));
         data.set("relations", buildSongRelationsProjection(relations));
         data.set("incomingRelations", objectMapper.createArrayNode());
         data.set("playlists", objectMapper.createArrayNode());
@@ -1059,24 +1113,51 @@ public class SongService {
             ObjectNode item = objectMapper.createObjectNode();
             item.put("vocalResourceUuid", songVocal.getVocal().getResource().getUuid().toString());
             item.put("vocalCanonicalName", songVocal.getVocal().getResource().getCanonicalName());
-            if (songVocal.getVoicebank() == null) {
-                item.putNull("voicebankResourceUuid");
-                item.putNull("voicebankCanonicalName");
-                item.putNull("voicebankType");
-            } else {
-                item.put(
-                        "voicebankResourceUuid",
-                        songVocal.getVoicebank().getResource().getUuid().toString());
-                item.put(
-                        "voicebankCanonicalName",
-                        songVocal.getVoicebank().getResource().getCanonicalName());
-                item.put("voicebankType", songVocal.getVoicebank().getVoicebankType().name());
-            }
             item.put("isMain", songVocal.isMain());
             item.put("sortOrder", songVocal.getSortOrder());
             items.add(item);
         }
         return items;
+    }
+
+    private ArrayNode buildSongVoicebanksProjection(List<SongVoicebank> voicebanks) {
+        ArrayNode items = objectMapper.createArrayNode();
+        for (SongVoicebank songVoicebank : voicebanks) {
+            ObjectNode item = objectMapper.createObjectNode();
+            item.put(
+                    "voicebankResourceUuid",
+                    songVoicebank.getVoicebank().getResource().getUuid().toString());
+            item.put(
+                    "voicebankCanonicalName",
+                    songVoicebank.getVoicebank().getResource().getCanonicalName());
+            item.put(
+                    "vocalResourceUuid",
+                    songVoicebank
+                            .getVoicebank()
+                            .getVocalCharacter()
+                            .getResource()
+                            .getUuid()
+                            .toString());
+            item.put(
+                    "vocalCanonicalName",
+                    songVoicebank
+                            .getVoicebank()
+                            .getVocalCharacter()
+                            .getResource()
+                            .getCanonicalName());
+            item.put("voicebankType", songVoicebank.getVoicebank().getVoicebankType().name());
+            item.put("isMain", songVoicebank.isMain());
+            item.put("sortOrder", songVoicebank.getSortOrder());
+            items.add(item);
+        }
+        return items;
+    }
+
+    private void validateSongParticipationPresent(
+            List<SongVocal> vocals, List<SongVoicebank> voicebanks) {
+        if ((vocals == null || vocals.isEmpty()) && (voicebanks == null || voicebanks.isEmpty())) {
+            throw new IllegalArgumentException("At least one of vocals or voicebanks is required");
+        }
     }
 
     private ArrayNode buildSongRelationsProjection(List<SongRelation> relations) {

@@ -1,7 +1,7 @@
 package com.vocawik.repository.vocal;
 
 import com.vocawik.domain.resource.ResourceName;
-import com.vocawik.domain.song.SongVocal;
+import com.vocawik.domain.song.SongVoicebank;
 import com.vocawik.domain.vocal.VocalVoicebank;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
@@ -101,11 +101,11 @@ public class VoicebankCriteriaRepositoryImpl implements VoicebankCriteriaReposit
             Root<VocalVoicebank> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
-        Root<SongVocal> songVocal = subquery.from(SongVocal.class);
+        Root<SongVoicebank> songVoicebank = subquery.from(SongVoicebank.class);
         subquery.select(criteriaBuilder.literal(1L));
         subquery.where(
-                criteriaBuilder.equal(songVocal.get("voicebank"), root),
-                songVocal.get("song").get("resource").get("uuid").in(songUuids));
+                criteriaBuilder.equal(songVoicebank.get("voicebank"), root),
+                songVoicebank.get("song").get("resource").get("uuid").in(songUuids));
         return criteriaBuilder.exists(subquery);
     }
 

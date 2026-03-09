@@ -26,6 +26,7 @@ public record SongUpdateRequest(
         @Valid List<SongPvUpdateRequest> pvs,
         @Valid List<SongArtistUpdateRequest> artists,
         @Valid List<SongVocalUpdateRequest> vocals,
+        @Valid List<SongVoicebankUpdateRequest> voicebanks,
         @Valid List<SongRelationUpdateRequest> relations) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
@@ -36,6 +37,7 @@ public record SongUpdateRequest(
         pvs = pvs == null ? null : List.copyOf(pvs);
         artists = artists == null ? null : List.copyOf(artists);
         vocals = vocals == null ? null : List.copyOf(vocals);
+        voicebanks = voicebanks == null ? null : List.copyOf(voicebanks);
         relations = relations == null ? null : List.copyOf(relations);
     }
 
@@ -95,10 +97,11 @@ public record SongUpdateRequest(
 
     /** Song-vocal mapping input. */
     public record SongVocalUpdateRequest(
-            @NotNull UUID vocalResourceUuid,
-            UUID voicebankResourceUuid,
-            boolean isMain,
-            @Min(0) Integer sortOrder) {}
+            @NotNull UUID vocalResourceUuid, boolean isMain, @Min(0) Integer sortOrder) {}
+
+    /** Song-voicebank mapping input. */
+    public record SongVoicebankUpdateRequest(
+            @NotNull UUID voicebankResourceUuid, boolean isMain, @Min(0) Integer sortOrder) {}
 
     /** Song relation input. */
     public record SongRelationUpdateRequest(@NotNull UUID targetSongResourceUuid) {}

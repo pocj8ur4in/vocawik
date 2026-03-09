@@ -33,9 +33,6 @@ public record VocalResourceDetailResponse(
             String songThumbnailUrl,
             String songType,
             LocalDateTime publishedAt,
-            UUID voicebankResourceUuid,
-            String voicebankCanonicalName,
-            String voicebankType,
             boolean isMain,
             int sortOrder) {}
 }
