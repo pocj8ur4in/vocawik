@@ -77,4 +77,23 @@ public class VocalVoicebank {
         vocalVoicebank.voicebankType = voicebankType == null ? VoicebankType.OTHER : voicebankType;
         return vocalVoicebank;
     }
+
+    /**
+     * Updates voicebank detail fields.
+     *
+     * @param vocalCharacter parent vocal character
+     * @param voicebankType updated voicebank type
+     * @param content updated description
+     * @param links updated links
+     */
+    public void update(
+            VocalCharacter vocalCharacter,
+            VoicebankType voicebankType,
+            String content,
+            JsonNode links) {
+        this.vocalCharacter = vocalCharacter;
+        this.voicebankType = voicebankType == null ? VoicebankType.OTHER : voicebankType;
+        this.content = content;
+        this.links = links;
+    }
 }
