@@ -4,6 +4,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalListResponse;
+import com.vocawik.dto.vocal.VocalUpdateRequest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.vocal.VocalService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -72,6 +74,23 @@ public class VocalController {
     @Operation(summary = "Get vocal", description = "Returns vocal character detail.")
     public ResponseEntity<VocalResourceDetailResponse> getVocal(@PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(resourceService.getVocalByResourceUuid(resourceUuid));
+    }
+
+    /**
+     * Updates an existing vocal character resource.
+     *
+     * @param resourceUuid vocal resource UUID
+     * @param request vocal update payload
+     * @return updated vocal resource detail
+     */
+    @PatchMapping("/vocals/{resourceUuid}")
+    @Operation(summary = "Update vocal", description = "Updates a vocal character.")
+    public ResponseEntity<VocalResourceDetailResponse> updateVocal(
+            @PathVariable UUID resourceUuid, @Valid @RequestBody VocalUpdateRequest request) {
+        UUID updatedResourceUuid = vocalService.update(resourceUuid, request);
+        VocalResourceDetailResponse detail =
+                resourceService.getVocalByResourceUuid(updatedResourceUuid);
+        return ResponseEntity.ok(detail);
     }
 
     /**

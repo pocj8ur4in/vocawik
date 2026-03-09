@@ -15,11 +15,14 @@ import com.vocawik.domain.vocal.VocalCharacter;
 import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalElementResponse;
 import com.vocawik.dto.vocal.VocalListResponse;
+import com.vocawik.dto.vocal.VocalUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.vocal.VocalCharacterRepository;
 import com.vocawik.repository.vocal.VocalCriteria;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -71,6 +74,34 @@ public class VocalService {
 
         saveResourceNames(resource, request.names());
         saveAcls(resource, request.acls());
+
+        resourceRepository.saveAndFlush(resource);
+        return resource.getUuid();
+    }
+
+    /**
+     * Updates a vocal character and optionally replaces child collections.
+     *
+     * @param resourceUuid vocal resource UUID
+     * @param request update payload
+     * @return updated vocal resource UUID
+     */
+    @Transactional
+    public UUID update(UUID resourceUuid, VocalUpdateRequest request) {
+        VocalCharacter vocalCharacter =
+                vocalCharacterRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = vocalCharacter.getResource();
+        updateVocalFields(vocalCharacter, resource, request);
+
+        if (request.names() != null) {
+            replaceResourceNames(resource, toCreateNames(request.names()));
+        }
+        if (request.acls() != null) {
+            replaceAcls(resource, toCreateAcls(request.acls()));
+        }
 
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
@@ -237,6 +268,69 @@ public class VocalService {
 
         return aclRepository.saveAllAndFlush(entities).stream()
                 .sorted(Comparator.comparingInt(Acl::getPriority).thenComparing(Acl::getId))
+                .toList();
+    }
+
+    private void updateVocalFields(
+            VocalCharacter vocalCharacter, Resource resource, VocalUpdateRequest request) {
+        String canonicalName =
+                request.canonicalName() == null
+                        ? resource.getCanonicalName()
+                        : normalizeCanonicalName(request.canonicalName());
+        String thumbnailUrl =
+                request.thumbnailUrl() == null
+                        ? resource.getThumbnailUrl()
+                        : normalizeNullable(request.thumbnailUrl());
+        String content =
+                request.content() == null
+                        ? vocalCharacter.getContent()
+                        : normalizeNullable(request.content());
+        JsonNode links =
+                request.links() == null ? vocalCharacter.getLinks() : toJsonNode(request.links());
+        validateLinks(links);
+
+        resource.updateCanonicalName(canonicalName);
+        resource.updateThumbnailUrl(thumbnailUrl);
+        vocalCharacter.update(content, links);
+    }
+
+    private List<ResourceName> replaceResourceNames(
+            Resource resource, List<VocalCreateRequest.ResourceNameCreateRequest> names) {
+        resourceNameRepository.deleteByResourceId(resource.getId());
+        return saveResourceNames(resource, names);
+    }
+
+    private List<Acl> replaceAcls(
+            Resource resource, List<VocalCreateRequest.ResourceAclCreateRequest> acls) {
+        aclRepository.deleteByResourceId(resource.getId());
+        return saveAcls(resource, acls);
+    }
+
+    private List<VocalCreateRequest.ResourceNameCreateRequest> toCreateNames(
+            List<VocalUpdateRequest.ResourceNameUpdateRequest> names) {
+        return names.stream()
+                .map(
+                        item ->
+                                new VocalCreateRequest.ResourceNameCreateRequest(
+                                        item.langCode(),
+                                        item.name(),
+                                        item.isPrimary(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<VocalCreateRequest.ResourceAclCreateRequest> toCreateAcls(
+            List<VocalUpdateRequest.ResourceAclUpdateRequest> acls) {
+        return acls.stream()
+                .map(
+                        item ->
+                                new VocalCreateRequest.ResourceAclCreateRequest(
+                                        item.action(),
+                                        item.subjectType(),
+                                        item.subjectValue(),
+                                        item.effect(),
+                                        item.priority(),
+                                        item.expiresAt()))
                 .toList();
     }
 
