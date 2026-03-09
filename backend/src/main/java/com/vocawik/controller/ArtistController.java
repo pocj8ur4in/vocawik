@@ -1,14 +1,20 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.artist.ArtistCreateRequest;
 import com.vocawik.dto.artist.ArtistListResponse;
+import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.service.artist.ArtistService;
+import com.vocawik.service.resource.ResourceService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +26,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,6 +35,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Artist", description = "Artist endpoints")
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "ArtistService is a Spring-managed bean reference and is not exposed externally.")
 public class ArtistController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
@@ -37,6 +49,22 @@ public class ArtistController {
                     "createdAt", "resource.createdAt");
 
     private final ArtistService artistService;
+    private final ResourceService resourceService;
+
+    /**
+     * Creates a new artist resource.
+     *
+     * @param request artist create payload
+     * @return created artist resource detail
+     */
+    @PostMapping("/artists")
+    @Operation(summary = "Create artist", description = "Creates an artist.")
+    public ResponseEntity<ArtistResourceDetailResponse> createArtist(
+            @Valid @RequestBody ArtistCreateRequest request) {
+        UUID resourceUuid = artistService.create(request);
+        ArtistResourceDetailResponse detail = resourceService.getArtistByResourceUuid(resourceUuid);
+        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+    }
 
     /**
      * Searches artists with optional filters.

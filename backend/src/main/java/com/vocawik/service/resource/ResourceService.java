@@ -99,6 +99,21 @@ public class ResourceService {
         throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
+    /**
+     * Finds artist detail from {@code resources.data}.
+     *
+     * @param resourceUuid artist resource UUID
+     * @return denormalized artist detail payload
+     */
+    @Transactional(readOnly = true)
+    public ArtistResourceDetailResponse getArtistByResourceUuid(UUID resourceUuid) {
+        Object detail = getByResourceUuid(resourceUuid);
+        if (detail instanceof ArtistResourceDetailResponse artistDetail) {
+            return artistDetail;
+        }
+        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
