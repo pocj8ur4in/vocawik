@@ -4,12 +4,22 @@ import com.vocawik.domain.song.Song;
 import com.vocawik.repository.common.ResourceRefProjection;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /** Repository for {@link Song} persistence access. */
 public interface SongRepository extends JpaRepository<Song, Long>, SongCriteriaRepository {
+
+    /**
+     * Finds an active song by resource UUID.
+     *
+     * @param resourceUuid song resource UUID
+     * @return matching song when found
+     */
+    Optional<Song> findByResourceUuidAndResourceIsDeletedFalse(UUID resourceUuid);
 
     /**
      * Finds active songs by resource UUIDs.

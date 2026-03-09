@@ -75,4 +75,20 @@ public class Song {
         song.songType = songType == null ? SongType.OTHER : songType;
         return song;
     }
+
+    /**
+     * Updates song detail fields.
+     *
+     * @param content updated content
+     * @param links updated links
+     * @param publishedAt updated published datetime
+     * @param songType updated song type
+     */
+    public void update(
+            String content, JsonNode links, LocalDateTime publishedAt, SongType songType) {
+        this.content = content;
+        this.links = links;
+        this.publishedAt = publishedAt;
+        this.songType = songType == null ? SongType.OTHER : songType;
+    }
 }
