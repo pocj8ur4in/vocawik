@@ -1,14 +1,20 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.resource.VocalResourceDetailResponse;
+import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalListResponse;
+import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.vocal.VocalService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +26,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,6 +35,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Vocal", description = "Vocal character endpoints")
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "VocalService is a Spring-managed bean reference and is not exposed externally.")
 public class VocalController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
@@ -37,6 +49,22 @@ public class VocalController {
                     "createdAt", "resource.createdAt");
 
     private final VocalService vocalService;
+    private final ResourceService resourceService;
+
+    /**
+     * Creates a new vocal character resource.
+     *
+     * @param request vocal create payload
+     * @return created vocal resource detail
+     */
+    @PostMapping("/vocals")
+    @Operation(summary = "Create vocal", description = "Creates a vocal character.")
+    public ResponseEntity<VocalResourceDetailResponse> createVocal(
+            @Valid @RequestBody VocalCreateRequest request) {
+        UUID resourceUuid = vocalService.create(request);
+        VocalResourceDetailResponse detail = resourceService.getVocalByResourceUuid(resourceUuid);
+        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+    }
 
     /**
      * Searches vocal characters with optional filters.
