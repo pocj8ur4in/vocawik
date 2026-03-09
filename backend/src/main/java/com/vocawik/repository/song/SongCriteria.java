@@ -14,6 +14,7 @@ import java.util.UUID;
  * @param query optional canonical-name keyword
  * @param artistUuids optional artist resource UUID filters
  * @param vocalUuids optional vocal resource UUID filters
+ * @param voicebankUuids optional voicebank resource UUID filters
  * @param publishedFrom optional published-at start datetime (inclusive)
  * @param publishedTo optional published-at end datetime (inclusive)
  */
@@ -23,11 +24,13 @@ public record SongCriteria(
         String query,
         List<UUID> artistUuids,
         List<UUID> vocalUuids,
+        List<UUID> voicebankUuids,
         LocalDateTime publishedFrom,
         LocalDateTime publishedTo) {
 
     public SongCriteria {
         artistUuids = artistUuids == null ? List.of() : List.copyOf(artistUuids);
         vocalUuids = vocalUuids == null ? List.of() : List.copyOf(vocalUuids);
+        voicebankUuids = voicebankUuids == null ? List.of() : List.copyOf(voicebankUuids);
     }
 }

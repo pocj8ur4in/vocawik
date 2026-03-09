@@ -184,6 +184,7 @@ public class ResourceService {
                 mapArray(data.get("pvs"), this::toSongPv),
                 mapArray(data.get("artists"), this::toSongArtist),
                 mapArray(data.get("vocals"), this::toSongVocal),
+                mapArray(data.get("voicebanks"), this::toSongVoicebank),
                 mapArray(extractSongRelations(data.get("relations")), this::toSongRelation),
                 mapArray(data.get("incomingRelations"), this::toSongIncomingRelation),
                 mapArray(data.get("playlists"), this::toSongPlaylist));
@@ -305,8 +306,16 @@ public class ResourceService {
         return new SongResourceDetailResponse.SongVocal(
                 asUuid(node.get("vocalResourceUuid"), null),
                 asText(node.get("vocalCanonicalName"), null),
+                asBoolean(node.get("isMain"), false),
+                asInt(node.get("sortOrder"), 0));
+    }
+
+    private SongResourceDetailResponse.SongVoicebank toSongVoicebank(JsonNode node) {
+        return new SongResourceDetailResponse.SongVoicebank(
                 asUuid(node.get("voicebankResourceUuid"), null),
                 asText(node.get("voicebankCanonicalName"), null),
+                asUuid(node.get("vocalResourceUuid"), null),
+                asText(node.get("vocalCanonicalName"), null),
                 asText(node.get("voicebankType"), null),
                 asBoolean(node.get("isMain"), false),
                 asInt(node.get("sortOrder"), 0));
@@ -368,9 +377,6 @@ public class ResourceService {
                 asText(node.get("songThumbnailUrl"), null),
                 asText(node.get("songType"), null),
                 asDateTime(node.get("publishedAt"), null),
-                asUuid(node.get("voicebankResourceUuid"), null),
-                asText(node.get("voicebankCanonicalName"), null),
-                asText(node.get("voicebankType"), null),
                 asBoolean(node.get("isMain"), false),
                 asInt(node.get("sortOrder"), 0));
     }

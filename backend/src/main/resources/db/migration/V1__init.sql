@@ -456,14 +456,26 @@ CREATE TABLE song_vocals (
     updated_at TIMESTAMPTZ NOT NULL,
     song_id BIGINT NOT NULL,
     vocal_id BIGINT NOT NULL,
-    voicebank_id BIGINT,
     is_main BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_vocals_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
     CONSTRAINT fk_song_vocals_vocal FOREIGN KEY (vocal_id) REFERENCES vocal_characters (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_song_vocals_voicebank FOREIGN KEY (voicebank_id) REFERENCES vocal_voicebanks (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_song_vocals_song_vocal UNIQUE (song_id, vocal_id),
     CONSTRAINT chk_song_vocals_sort_order CHECK (sort_order >= 0)
 );
 
-CREATE INDEX idx_vocal_voicebanks_vocal_character
-    ON vocal_voicebanks (vocal_character_id, id);
+-- song_voicebanks
+CREATE TABLE song_voicebanks (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    song_id BIGINT NOT NULL,
+    voicebank_id BIGINT NOT NULL,
+    is_main BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_song_voicebanks_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_song_voicebanks_voicebank FOREIGN KEY (voicebank_id) REFERENCES vocal_voicebanks (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_song_voicebanks_song_voicebank UNIQUE (song_id, voicebank_id),
+    CONSTRAINT chk_song_voicebanks_sort_order CHECK (sort_order >= 0)
+);
