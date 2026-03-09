@@ -16,8 +16,17 @@ public interface ArtistGroupRepository extends JpaRepository<ArtistGroup, Long> 
     /** Finds all membership rows by member artist id in display order. */
     List<ArtistGroup> findAllByMemberArtistIdOrderBySortOrderAscIdAsc(Long memberArtistId);
 
+    /** Finds all group rows for the given group artist ids in display order. */
+    List<ArtistGroup> findAllByGroupArtistIdInOrderByGroupArtistIdAscSortOrderAscIdAsc(
+            List<Long> groupArtistIds);
+
     /** Deletes all group rows by group artist id. */
     @Modifying(flushAutomatically = true)
     @Query("delete from ArtistGroup ag where ag.groupArtist.id = :groupArtistId")
     void deleteByGroupArtistId(@Param("groupArtistId") Long groupArtistId);
+
+    /** Deletes all membership rows by member artist id. */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from ArtistGroup ag where ag.memberArtist.id = :memberArtistId")
+    void deleteByMemberArtistId(@Param("memberArtistId") Long memberArtistId);
 }
