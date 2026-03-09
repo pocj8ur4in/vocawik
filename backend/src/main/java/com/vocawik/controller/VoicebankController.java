@@ -2,14 +2,20 @@ package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.vocal.VoicebankType;
+import com.vocawik.dto.resource.VoicebankResourceDetailResponse;
+import com.vocawik.dto.voicebank.VoicebankCreateRequest;
 import com.vocawik.dto.voicebank.VoicebankListResponse;
+import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.vocal.VoicebankService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +27,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,6 +36,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Voicebank", description = "Voicebank endpoints")
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "VoicebankService is a Spring-managed bean reference and is not exposed externally.")
 public class VoicebankController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
@@ -38,6 +50,23 @@ public class VoicebankController {
                     "createdAt", "resource.createdAt");
 
     private final VoicebankService voicebankService;
+    private final ResourceService resourceService;
+
+    /**
+     * Creates a new voicebank resource.
+     *
+     * @param request voicebank create payload
+     * @return created voicebank resource detail
+     */
+    @PostMapping("/voicebanks")
+    @Operation(summary = "Create voicebank", description = "Creates a voicebank.")
+    public ResponseEntity<VoicebankResourceDetailResponse> createVoicebank(
+            @Valid @RequestBody VoicebankCreateRequest request) {
+        UUID resourceUuid = voicebankService.create(request);
+        VoicebankResourceDetailResponse detail =
+                resourceService.getVoicebankByResourceUuid(resourceUuid);
+        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+    }
 
     /**
      * Searches voicebanks with optional filters.
