@@ -114,6 +114,21 @@ public class ResourceService {
         throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
+    /**
+     * Finds voicebank detail from {@code resources.data}.
+     *
+     * @param resourceUuid voicebank resource UUID
+     * @return denormalized voicebank detail payload
+     */
+    @Transactional(readOnly = true)
+    public VoicebankResourceDetailResponse getVoicebankByResourceUuid(UUID resourceUuid) {
+        Object detail = getByResourceUuid(resourceUuid);
+        if (detail instanceof VoicebankResourceDetailResponse voicebankDetail) {
+            return voicebankDetail;
+        }
+        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
@@ -203,6 +218,8 @@ public class ResourceService {
                 asText(data.get("status"), resource.getStatus().name()),
                 asLong(data.get("viewCount"), resource.getViewCount()),
                 asText(data.get("thumbnailUrl"), resource.getThumbnailUrl()),
+                asUuid(data.get("vocalResourceUuid"), null),
+                asText(data.get("vocalCanonicalName"), null),
                 asText(data.get("voicebankType"), null),
                 asText(data.get("content"), null),
                 asJson(data.get("links"), List.of()),

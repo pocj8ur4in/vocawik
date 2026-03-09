@@ -11,6 +11,8 @@ public record VoicebankResourceDetailResponse(
         String status,
         long viewCount,
         String thumbnailUrl,
+        UUID vocalResourceUuid,
+        String vocalCanonicalName,
         String voicebankType,
         String content,
         Object links,
