@@ -5,6 +5,7 @@ import com.vocawik.domain.vocal.VoicebankType;
 import com.vocawik.dto.resource.VoicebankResourceDetailResponse;
 import com.vocawik.dto.voicebank.VoicebankCreateRequest;
 import com.vocawik.dto.voicebank.VoicebankListResponse;
+import com.vocawik.dto.voicebank.VoicebankUpdateRequest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.vocal.VoicebankService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -27,6 +28,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -75,6 +77,23 @@ public class VoicebankController {
     public ResponseEntity<VoicebankResourceDetailResponse> getVoicebank(
             @PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(resourceService.getVoicebankByResourceUuid(resourceUuid));
+    }
+
+    /**
+     * Updates an existing voicebank resource.
+     *
+     * @param resourceUuid voicebank resource UUID
+     * @param request update payload
+     * @return updated voicebank resource detail
+     */
+    @PatchMapping("/voicebanks/{resourceUuid}")
+    @Operation(summary = "Update voicebank", description = "Updates a voicebank.")
+    public ResponseEntity<VoicebankResourceDetailResponse> updateVoicebank(
+            @PathVariable UUID resourceUuid, @Valid @RequestBody VoicebankUpdateRequest request) {
+        UUID updatedResourceUuid = voicebankService.update(resourceUuid, request);
+        VoicebankResourceDetailResponse detail =
+                resourceService.getVoicebankByResourceUuid(updatedResourceUuid);
+        return ResponseEntity.ok(detail);
     }
 
     /**

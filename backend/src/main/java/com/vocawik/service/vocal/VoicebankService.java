@@ -17,13 +17,17 @@ import com.vocawik.domain.vocal.VoicebankType;
 import com.vocawik.dto.voicebank.VoicebankCreateRequest;
 import com.vocawik.dto.voicebank.VoicebankElementResponse;
 import com.vocawik.dto.voicebank.VoicebankListResponse;
+import com.vocawik.dto.voicebank.VoicebankUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalCharacterRepository;
 import com.vocawik.repository.vocal.VocalVoicebankRepository;
 import com.vocawik.repository.vocal.VoicebankCriteria;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
@@ -52,6 +56,7 @@ public class VoicebankService {
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
+    private final SongVocalRepository songVocalRepository;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
 
@@ -84,6 +89,34 @@ public class VoicebankService {
 
         saveResourceNames(resource, request.names());
         saveAcls(resource, request.acls());
+
+        resourceRepository.saveAndFlush(resource);
+        return resource.getUuid();
+    }
+
+    /**
+     * Updates a voicebank and optionally replaces child collections.
+     *
+     * @param resourceUuid voicebank resource UUID
+     * @param request update payload
+     * @return updated voicebank resource UUID
+     */
+    @Transactional
+    public UUID update(UUID resourceUuid, VoicebankUpdateRequest request) {
+        VocalVoicebank voicebank =
+                vocalVoicebankRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = voicebank.getResource();
+        updateVoicebankFields(voicebank, resource, request);
+
+        if (request.names() != null) {
+            replaceResourceNames(resource, toCreateNames(request.names()));
+        }
+        if (request.acls() != null) {
+            replaceAcls(resource, toCreateAcls(request.acls()));
+        }
 
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
@@ -236,6 +269,45 @@ public class VoicebankService {
                 .toList();
     }
 
+    private VocalCharacter updateVoicebankFields(
+            VocalVoicebank voicebank, Resource resource, VoicebankUpdateRequest request) {
+        String canonicalName =
+                request.canonicalName() == null
+                        ? resource.getCanonicalName()
+                        : normalizeCanonicalName(request.canonicalName());
+        String thumbnailUrl =
+                request.thumbnailUrl() == null
+                        ? resource.getThumbnailUrl()
+                        : normalizeNullable(request.thumbnailUrl());
+        String content =
+                request.content() == null
+                        ? voicebank.getContent()
+                        : normalizeNullable(request.content());
+        JsonNode links =
+                request.links() == null ? voicebank.getLinks() : toJsonNode(request.links());
+        validateLinks(links);
+
+        VocalCharacter vocalCharacter = voicebank.getVocalCharacter();
+        if (request.vocalCharacterResourceUuid() != null) {
+            UUID currentVocalResourceUuid = vocalCharacter.getResource().getUuid();
+            if (!currentVocalResourceUuid.equals(request.vocalCharacterResourceUuid())) {
+                ensureParentVocalChangeAllowed(voicebank);
+                Long vocalCharacterId = fetchVocalCharacterId(request.vocalCharacterResourceUuid());
+                vocalCharacter = entityManager.getReference(VocalCharacter.class, vocalCharacterId);
+            }
+        }
+
+        VoicebankType voicebankType =
+                request.voicebankType() == null
+                        ? voicebank.getVoicebankType()
+                        : parseVoicebankType(request.voicebankType());
+
+        resource.updateCanonicalName(canonicalName);
+        resource.updateThumbnailUrl(thumbnailUrl);
+        voicebank.update(vocalCharacter, voicebankType, content, links);
+        return vocalCharacter;
+    }
+
     private List<Acl> saveAcls(
             Resource resource, List<VoicebankCreateRequest.ResourceAclCreateRequest> acls) {
         if (acls == null || acls.isEmpty()) {
@@ -271,6 +343,46 @@ public class VoicebankService {
                 .toList();
     }
 
+    private List<ResourceName> replaceResourceNames(
+            Resource resource, List<VoicebankCreateRequest.ResourceNameCreateRequest> names) {
+        resourceNameRepository.deleteByResourceId(resource.getId());
+        return saveResourceNames(resource, names);
+    }
+
+    private List<Acl> replaceAcls(
+            Resource resource, List<VoicebankCreateRequest.ResourceAclCreateRequest> acls) {
+        aclRepository.deleteByResourceId(resource.getId());
+        return saveAcls(resource, acls);
+    }
+
+    private List<VoicebankCreateRequest.ResourceNameCreateRequest> toCreateNames(
+            List<VoicebankUpdateRequest.ResourceNameUpdateRequest> names) {
+        return names.stream()
+                .map(
+                        item ->
+                                new VoicebankCreateRequest.ResourceNameCreateRequest(
+                                        item.langCode(),
+                                        item.name(),
+                                        item.isPrimary(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<VoicebankCreateRequest.ResourceAclCreateRequest> toCreateAcls(
+            List<VoicebankUpdateRequest.ResourceAclUpdateRequest> acls) {
+        return acls.stream()
+                .map(
+                        item ->
+                                new VoicebankCreateRequest.ResourceAclCreateRequest(
+                                        item.action(),
+                                        item.subjectType(),
+                                        item.subjectValue(),
+                                        item.effect(),
+                                        item.priority(),
+                                        item.expiresAt()))
+                .toList();
+    }
+
     private Long fetchVocalCharacterId(UUID vocalCharacterResourceUuid) {
         List<ResourceRefProjection> refs =
                 vocalCharacterRepository.findResourceRefsByResourceUuids(
@@ -280,6 +392,13 @@ public class VoicebankService {
                     "Unknown vocalCharacterResourceUuid: " + vocalCharacterResourceUuid);
         }
         return refs.getFirst().getId();
+    }
+
+    private void ensureParentVocalChangeAllowed(VocalVoicebank voicebank) {
+        if (songVocalRepository.existsByVoicebankId(voicebank.getId())) {
+            throw new IllegalArgumentException(
+                    "voicebank parent vocal cannot be changed while song vocal mappings exist");
+        }
     }
 
     private VoicebankType parseVoicebankType(String value) {
