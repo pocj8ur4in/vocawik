@@ -1,6 +1,5 @@
 package com.vocawik.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.web.error.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Handles authentication failures and writes a standardized JSON response. (401)
@@ -29,7 +29,7 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
      * @param objectMapper base mapper used to serialize {@link ErrorResponse}
      */
     public ApiAuthenticationEntryPoint(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper.copy();
+        this.objectMapper = objectMapper.rebuild().build();
     }
 
     /**
