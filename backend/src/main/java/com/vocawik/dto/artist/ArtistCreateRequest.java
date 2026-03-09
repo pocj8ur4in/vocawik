@@ -18,13 +18,13 @@ public record ArtistCreateRequest(
         Object links,
         @Valid List<ResourceNameCreateRequest> names,
         @Valid List<ResourceAclCreateRequest> acls,
-        @Valid List<ArtistGroupCreateRequest> groups) {
+        @Valid List<ArtistMemberCreateRequest> members) {
 
     /** Defensive copy for mutable request fields. */
     public ArtistCreateRequest {
         names = names == null ? List.of() : List.copyOf(names);
         acls = acls == null ? List.of() : List.copyOf(acls);
-        groups = groups == null ? List.of() : List.copyOf(groups);
+        members = members == null ? List.of() : List.copyOf(members);
     }
 
     /** Localized resource name input. */
@@ -43,7 +43,7 @@ public record ArtistCreateRequest(
             @Min(0) Integer priority,
             LocalDateTime expiresAt) {}
 
-    /** Artist-group mapping input where the created artist is the group owner. */
-    public record ArtistGroupCreateRequest(
-            @NotNull UUID memberArtistResourceUuid, @Min(0) Integer sortOrder) {}
+    /** Artist membership input where the created artist is a member of group artists. */
+    public record ArtistMemberCreateRequest(
+            @NotNull UUID groupArtistResourceUuid, @Min(0) Integer sortOrder) {}
 }
