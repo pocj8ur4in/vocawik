@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
@@ -35,6 +36,10 @@ public class VocalVoicebank {
     @JoinColumn(name = "id", nullable = false)
     private Resource resource;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vocal_character_id")
+    private VocalCharacter vocalCharacter;
+
     @Column private String content;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -52,6 +57,7 @@ public class VocalVoicebank {
      * @param thumbnailUrl representative thumbnail url (nullable)
      * @param content voicebank description (nullable)
      * @param links external links payload (nullable JSON array)
+     * @param vocalCharacter parent vocal character (nullable)
      * @param voicebankType voicebank type (nullable, defaults to OTHER)
      * @return created vocal voicebank
      */
@@ -60,12 +66,14 @@ public class VocalVoicebank {
             String thumbnailUrl,
             String content,
             JsonNode links,
+            VocalCharacter vocalCharacter,
             VoicebankType voicebankType) {
         VocalVoicebank vocalVoicebank = new VocalVoicebank();
         vocalVoicebank.resource =
                 Resource.create(ResourceType.VOICEBANK, canonicalName, thumbnailUrl);
         vocalVoicebank.content = content;
         vocalVoicebank.links = links;
+        vocalVoicebank.vocalCharacter = vocalCharacter;
         vocalVoicebank.voicebankType = voicebankType == null ? VoicebankType.OTHER : voicebankType;
         return vocalVoicebank;
     }

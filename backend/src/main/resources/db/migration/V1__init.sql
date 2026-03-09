@@ -426,8 +426,10 @@ CREATE TABLE vocal_voicebanks (
     id BIGINT PRIMARY KEY,
     content TEXT,
     links JSONB,
+    vocal_character_id BIGINT,
     voicebank_typ VARCHAR(20) NOT NULL DEFAULT 'OTHER',
     CONSTRAINT fk_vocal_voicebanks_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_vocal_voicebanks_vocal_character FOREIGN KEY (vocal_character_id) REFERENCES vocal_characters (id) ON DELETE RESTRICT,
     CONSTRAINT chk_vocal_voicebanks_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array'),
     CONSTRAINT chk_vocal_voicebanks_voicebank_typ CHECK (
         voicebank_typ IN (
@@ -462,3 +464,6 @@ CREATE TABLE song_vocals (
     CONSTRAINT fk_song_vocals_voicebank FOREIGN KEY (voicebank_id) REFERENCES vocal_voicebanks (id) ON DELETE RESTRICT,
     CONSTRAINT chk_song_vocals_sort_order CHECK (sort_order >= 0)
 );
+
+CREATE INDEX idx_vocal_voicebanks_vocal_character
+    ON vocal_voicebanks (vocal_character_id, id);

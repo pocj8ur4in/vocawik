@@ -114,13 +114,7 @@ public class VoicebankCriteriaRepositoryImpl implements VoicebankCriteriaReposit
             CriteriaQuery<VocalVoicebank> criteriaQuery,
             Root<VocalVoicebank> root,
             CriteriaBuilder criteriaBuilder) {
-        Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
-        Root<SongVocal> songVocal = subquery.from(SongVocal.class);
-        subquery.select(criteriaBuilder.literal(1L));
-        subquery.where(
-                criteriaBuilder.equal(songVocal.get("voicebank"), root),
-                songVocal.get("vocal").get("resource").get("uuid").in(vocalUuids));
-        return criteriaBuilder.exists(subquery);
+        return root.get("vocalCharacter").get("resource").get("uuid").in(vocalUuids);
     }
 
     private List<Order> toOrders(
