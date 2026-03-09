@@ -69,10 +69,9 @@ public class VocalService {
         Resource resource = resourceRepository.save(vocalCharacter.getResource());
         vocalCharacterRepository.save(vocalCharacter);
 
-        List<ResourceName> resourceNames = saveResourceNames(resource, request.names());
-        List<Acl> acls = saveAcls(resource, request.acls());
+        saveResourceNames(resource, request.names());
+        saveAcls(resource, request.acls());
 
-        resource.updateData(buildVocalProjection(vocalCharacter, resource, resourceNames, acls));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }

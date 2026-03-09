@@ -12,6 +12,10 @@ import org.springframework.data.repository.query.Param;
 public interface VocalCharacterRepository
         extends JpaRepository<VocalCharacter, Long>, VocalCriteriaRepository {
 
+    /** Finds an active vocal character by resource UUID. */
+    java.util.Optional<VocalCharacter> findByResourceUuidAndResourceIsDeletedFalse(
+            java.util.UUID resourceUuid);
+
     /**
      * Finds active vocal characters by resource UUIDs.
      *

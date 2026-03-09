@@ -26,6 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -63,7 +64,14 @@ public class VocalController {
             @Valid @RequestBody VocalCreateRequest request) {
         UUID resourceUuid = vocalService.create(request);
         VocalResourceDetailResponse detail = resourceService.getVocalByResourceUuid(resourceUuid);
-        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+        return ResponseEntity.created(URI.create("/vocals/" + resourceUuid)).body(detail);
+    }
+
+    /** Gets a vocal character detail. */
+    @GetMapping("/vocals/{resourceUuid}")
+    @Operation(summary = "Get vocal", description = "Returns vocal character detail.")
+    public ResponseEntity<VocalResourceDetailResponse> getVocal(@PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getVocalByResourceUuid(resourceUuid));
     }
 
     /**
@@ -78,7 +86,7 @@ public class VocalController {
      */
     @GetMapping("/vocals")
     @Operation(
-            summary = "Search vocal characters",
+            summary = "Search vocal",
             description = "Returns active vocal characters with optional filters.")
     @Parameters({
         @Parameter(

@@ -82,11 +82,9 @@ public class VoicebankService {
         Resource resource = resourceRepository.save(voicebank.getResource());
         vocalVoicebankRepository.save(voicebank);
 
-        List<ResourceName> resourceNames = saveResourceNames(resource, request.names());
-        List<Acl> acls = saveAcls(resource, request.acls());
+        saveResourceNames(resource, request.names());
+        saveAcls(resource, request.acls());
 
-        resource.updateData(
-                buildVoicebankProjection(voicebank, resource, resourceNames, acls, vocalCharacter));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
