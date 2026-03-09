@@ -56,4 +56,15 @@ public class VocalCharacter {
         vocalCharacter.links = links;
         return vocalCharacter;
     }
+
+    /**
+     * Updates vocal character detail fields.
+     *
+     * @param content updated description
+     * @param links updated external links
+     */
+    public void update(String content, JsonNode links) {
+        this.content = content;
+        this.links = links;
+    }
 }
