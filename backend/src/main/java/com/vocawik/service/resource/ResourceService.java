@@ -129,6 +129,21 @@ public class ResourceService {
         throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
+    /**
+     * Finds vocal detail from {@code resources.data}.
+     *
+     * @param resourceUuid vocal resource UUID
+     * @return denormalized vocal detail payload
+     */
+    @Transactional(readOnly = true)
+    public VocalResourceDetailResponse getVocalByResourceUuid(UUID resourceUuid) {
+        Object detail = getByResourceUuid(resourceUuid);
+        if (detail instanceof VocalResourceDetailResponse vocalDetail) {
+            return vocalDetail;
+        }
+        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
