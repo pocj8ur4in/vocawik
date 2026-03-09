@@ -161,28 +161,16 @@ public class SongService {
         Resource resource = resourceRepository.save(song.getResource());
         songRepository.save(song);
 
-        List<ResourceName> resourceNames = saveResourceNames(resource, request.names());
-        List<Acl> acls = saveAcls(resource, request.acls());
-        List<SongLyric> lyrics = saveSongLyrics(song, request.lyrics());
-        List<SongPv> pvs = saveSongPvs(song, request.pvs());
-        List<SongArtist> artists = saveSongArtists(song, request.artists());
+        saveResourceNames(resource, request.names());
+        saveAcls(resource, request.acls());
+        saveSongLyrics(song, request.lyrics());
+        saveSongPvs(song, request.pvs());
+        saveSongArtists(song, request.artists());
         List<SongVocal> vocals = saveSongVocals(song, request.vocals());
         List<SongVoicebank> voicebanks = saveSongVoicebanks(song, request.voicebanks());
-        List<SongRelation> relations = saveSongRelations(song, request.relations());
+        saveSongRelations(song, request.relations());
         validateSongParticipationPresent(vocals, voicebanks);
 
-        resource.updateData(
-                buildSongProjection(
-                        song,
-                        resource,
-                        resourceNames,
-                        acls,
-                        lyrics,
-                        pvs,
-                        artists,
-                        vocals,
-                        voicebanks,
-                        relations));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -204,27 +192,21 @@ public class SongService {
         Resource resource = song.getResource();
         updateSongFields(song, resource, request);
 
-        List<ResourceName> resourceNames =
-                request.names() == null
-                        ? resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
-                                resource.getId())
-                        : replaceResourceNames(resource, toCreateNames(request.names()));
-        List<Acl> acls =
-                request.acls() == null
-                        ? aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId())
-                        : replaceAcls(resource, toCreateAcls(request.acls()));
-        List<SongLyric> lyrics =
-                request.lyrics() == null
-                        ? songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
-                        : replaceSongLyrics(song, toCreateLyrics(request.lyrics()));
-        List<SongPv> pvs =
-                request.pvs() == null
-                        ? songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
-                        : replaceSongPvs(song, toCreatePvs(request.pvs()));
-        List<SongArtist> artists =
-                request.artists() == null
-                        ? songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
-                        : replaceSongArtists(song, toCreateArtists(request.artists()));
+        if (request.names() != null) {
+            replaceResourceNames(resource, toCreateNames(request.names()));
+        }
+        if (request.acls() != null) {
+            replaceAcls(resource, toCreateAcls(request.acls()));
+        }
+        if (request.lyrics() != null) {
+            replaceSongLyrics(song, toCreateLyrics(request.lyrics()));
+        }
+        if (request.pvs() != null) {
+            replaceSongPvs(song, toCreatePvs(request.pvs()));
+        }
+        if (request.artists() != null) {
+            replaceSongArtists(song, toCreateArtists(request.artists()));
+        }
         List<SongVocal> vocals =
                 request.vocals() == null
                         ? songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
@@ -234,25 +216,11 @@ public class SongService {
                         ? songVoicebankRepository.findAllBySongIdOrderBySortOrderAscIdAsc(
                                 song.getId())
                         : replaceSongVoicebanks(song, toCreateVoicebanks(request.voicebanks()));
-        List<SongRelation> relations =
-                request.relations() == null
-                        ? songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId())
-                        : replaceSongRelations(song, toCreateRelations(request.relations()));
-
+        if (request.relations() != null) {
+            replaceSongRelations(song, toCreateRelations(request.relations()));
+        }
         validateSongParticipationPresent(vocals, voicebanks);
 
-        resource.updateData(
-                buildSongProjection(
-                        song,
-                        resource,
-                        resourceNames,
-                        acls,
-                        lyrics,
-                        pvs,
-                        artists,
-                        vocals,
-                        voicebanks,
-                        relations));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -713,7 +681,6 @@ public class SongService {
                                     VocalCharacter vocal =
                                             entityManager.getReference(
                                                     VocalCharacter.class, vocalId);
-
                                     return SongVocal.create(
                                             song,
                                             vocal,

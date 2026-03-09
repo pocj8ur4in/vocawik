@@ -12,6 +12,10 @@ import org.springframework.data.repository.query.Param;
 public interface VocalVoicebankRepository
         extends JpaRepository<VocalVoicebank, Long>, VoicebankCriteriaRepository {
 
+    /** Finds an active voicebank by resource UUID. */
+    java.util.Optional<VocalVoicebank> findByResourceUuidAndResourceIsDeletedFalse(
+            java.util.UUID resourceUuid);
+
     /**
      * Finds active voicebanks by resource UUIDs.
      *

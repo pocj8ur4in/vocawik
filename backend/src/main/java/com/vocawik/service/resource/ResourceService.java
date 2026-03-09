@@ -1,10 +1,23 @@
 package com.vocawik.service.resource;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vocawik.domain.artist.Artist;
+import com.vocawik.domain.artist.ArtistGroup;
+import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.domain.song.Song;
+import com.vocawik.domain.song.SongArtist;
+import com.vocawik.domain.song.SongLyric;
+import com.vocawik.domain.song.SongPv;
+import com.vocawik.domain.song.SongPvView;
+import com.vocawik.domain.song.SongRelation;
+import com.vocawik.domain.song.SongVocal;
+import com.vocawik.domain.song.SongVoicebank;
+import com.vocawik.domain.vocal.VocalCharacter;
+import com.vocawik.domain.vocal.VocalVoicebank;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
-import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
 import com.vocawik.dto.resource.ResourceElementResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
@@ -12,39 +25,63 @@ import com.vocawik.dto.resource.ResourceNameDetailResponse;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.dto.resource.VoicebankResourceDetailResponse;
+import com.vocawik.repository.acl.AclRepository;
+import com.vocawik.repository.artist.ArtistGroupRepository;
+import com.vocawik.repository.artist.ArtistRepository;
+import com.vocawik.repository.playlist.PlaylistSongRepository;
 import com.vocawik.repository.resource.ResourceCriteria;
+import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.repository.song.SongArtistRepository;
+import com.vocawik.repository.song.SongLyricRepository;
+import com.vocawik.repository.song.SongPvRepository;
+import com.vocawik.repository.song.SongPvViewRepository;
+import com.vocawik.repository.song.SongRelationRepository;
+import com.vocawik.repository.song.SongRepository;
+import com.vocawik.repository.song.SongVocalRepository;
+import com.vocawik.repository.song.SongVoicebankRepository;
+import com.vocawik.repository.vocal.VocalCharacterRepository;
+import com.vocawik.repository.vocal.VocalVoicebankRepository;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.StreamSupport;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Service for searching resources. */
+/** Service for searching resources and loading typed resource details. */
 @Service
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification = "Repositories and ObjectMapper are Spring-managed dependencies.")
 public class ResourceService {
 
     private final ResourceRepository resourceRepository;
+    private final ResourceNameRepository resourceNameRepository;
+    private final AclRepository aclRepository;
+    private final SongRepository songRepository;
+    private final SongLyricRepository songLyricRepository;
+    private final SongPvRepository songPvRepository;
+    private final SongPvViewRepository songPvViewRepository;
+    private final SongArtistRepository songArtistRepository;
+    private final SongVocalRepository songVocalRepository;
+    private final SongVoicebankRepository songVoicebankRepository;
+    private final SongRelationRepository songRelationRepository;
+    private final PlaylistSongRepository playlistSongRepository;
+    private final ArtistRepository artistRepository;
+    private final ArtistGroupRepository artistGroupRepository;
+    private final VocalCharacterRepository vocalCharacterRepository;
+    private final VocalVoicebankRepository vocalVoicebankRepository;
+    private final ObjectMapper objectMapper;
 
-    /**
-     * Searches active resources with optional filters.
-     *
-     * @param status optional resource status filter
-     * @param query optional canonical-name query
-     * @param pageable page/sort options
-     * @return paged resource list response
-     */
     @Transactional(readOnly = true)
     public ResourceListResponse search(ResourceStatus status, String query, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
@@ -58,90 +95,147 @@ public class ResourceService {
                 items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
     }
 
-    /**
-     * Finds resource detail from {@code resources.data}.
-     *
-     * @param resourceUuid resource UUID
-     * @return denormalized resource detail payload
-     */
-    @Transactional(readOnly = true)
-    public Object getByResourceUuid(UUID resourceUuid) {
-        Resource resource =
-                resourceRepository
-                        .findByUuidAndIsDeletedFalse(resourceUuid)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-
-        if (resource.getData() == null || resource.getData().isNull()) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
-        return switch (resource.getResourceType()) {
-            case SONG -> toSongResourceDetail(resource);
-            case ARTIST -> toArtistResourceDetail(resource);
-            case VOCAL -> toVocalResourceDetail(resource);
-            case VOICEBANK -> toVoicebankResourceDetail(resource);
-            case PLAYLIST -> toPlaylistResourceDetail(resource);
-            default -> toJsonValue(resource.getData());
-        };
-    }
-
-    /**
-     * Finds song detail from {@code resources.data}.
-     *
-     * @param resourceUuid song resource UUID
-     * @return denormalized song detail payload
-     */
     @Transactional(readOnly = true)
     public SongResourceDetailResponse getSongByResourceUuid(UUID resourceUuid) {
-        Object detail = getByResourceUuid(resourceUuid);
-        if (detail instanceof SongResourceDetailResponse songDetail) {
-            return songDetail;
-        }
-        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        Song song =
+                songRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = song.getResource();
+
+        List<ResourceNameDetailResponse> names = loadResourceNames(resource.getId());
+        List<ResourceAclDetailResponse> acls = loadResourceAcls(resource.getId());
+        List<SongLyric> lyrics =
+                songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        List<SongPv> pvs = songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        Map<Long, SongPvView> pvViewsBySongPvId = loadSongPvViews(pvs);
+        List<SongArtist> artists =
+                songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        List<SongVocal> vocals =
+                songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        List<SongVoicebank> voicebanks =
+                songVoicebankRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        List<SongRelation> outgoingRelations =
+                songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
+        List<SongRelation> incomingRelations =
+                songRelationRepository.findAllByTargetSongIdOrderByIdAsc(song.getId());
+        List<PlaylistSong> playlists =
+                playlistSongRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+
+        return new SongResourceDetailResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                resource.getStatus().name(),
+                song.getSongType().name(),
+                resource.getViewCount(),
+                resource.getThumbnailUrl(),
+                song.getContent(),
+                toJsonValue(song.getLinks()),
+                song.getPublishedAt(),
+                resource.getCreatedAt(),
+                resource.getUpdatedAt(),
+                names,
+                acls,
+                lyrics.stream().map(this::toSongLyric).toList(),
+                pvs.stream().map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()))).toList(),
+                artists.stream().map(this::toSongArtist).toList(),
+                vocals.stream().map(this::toSongVocal).toList(),
+                voicebanks.stream().map(this::toSongVoicebank).toList(),
+                outgoingRelations.stream().map(this::toSongRelation).toList(),
+                incomingRelations.stream().map(this::toSongIncomingRelation).toList(),
+                playlists.stream().map(this::toSongPlaylist).toList());
     }
 
-    /**
-     * Finds artist detail from {@code resources.data}.
-     *
-     * @param resourceUuid artist resource UUID
-     * @return denormalized artist detail payload
-     */
     @Transactional(readOnly = true)
     public ArtistResourceDetailResponse getArtistByResourceUuid(UUID resourceUuid) {
-        Object detail = getByResourceUuid(resourceUuid);
-        if (detail instanceof ArtistResourceDetailResponse artistDetail) {
-            return artistDetail;
-        }
-        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        Artist artist =
+                artistRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = artist.getResource();
+
+        return new ArtistResourceDetailResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                resource.getStatus().name(),
+                resource.getViewCount(),
+                resource.getThumbnailUrl(),
+                artist.getContent(),
+                toJsonValue(artist.getLinks()),
+                resource.getCreatedAt(),
+                resource.getUpdatedAt(),
+                loadResourceNames(resource.getId()),
+                loadResourceAcls(resource.getId()),
+                songArtistRepository
+                        .findAllByArtistIdOrderBySortOrderAscIdAsc(artist.getId())
+                        .stream()
+                        .map(this::toArtistSong)
+                        .toList(),
+                artistGroupRepository
+                        .findAllByGroupArtistIdOrderBySortOrderAscIdAsc(artist.getId())
+                        .stream()
+                        .map(this::toArtistGroup)
+                        .toList(),
+                artistGroupRepository
+                        .findAllByMemberArtistIdOrderBySortOrderAscIdAsc(artist.getId())
+                        .stream()
+                        .map(this::toArtistMember)
+                        .toList());
     }
 
-    /**
-     * Finds voicebank detail from {@code resources.data}.
-     *
-     * @param resourceUuid voicebank resource UUID
-     * @return denormalized voicebank detail payload
-     */
-    @Transactional(readOnly = true)
-    public VoicebankResourceDetailResponse getVoicebankByResourceUuid(UUID resourceUuid) {
-        Object detail = getByResourceUuid(resourceUuid);
-        if (detail instanceof VoicebankResourceDetailResponse voicebankDetail) {
-            return voicebankDetail;
-        }
-        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
-    }
-
-    /**
-     * Finds vocal detail from {@code resources.data}.
-     *
-     * @param resourceUuid vocal resource UUID
-     * @return denormalized vocal detail payload
-     */
     @Transactional(readOnly = true)
     public VocalResourceDetailResponse getVocalByResourceUuid(UUID resourceUuid) {
-        Object detail = getByResourceUuid(resourceUuid);
-        if (detail instanceof VocalResourceDetailResponse vocalDetail) {
-            return vocalDetail;
-        }
-        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        VocalCharacter vocal =
+                vocalCharacterRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = vocal.getResource();
+
+        return new VocalResourceDetailResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                resource.getStatus().name(),
+                resource.getViewCount(),
+                resource.getThumbnailUrl(),
+                vocal.getContent(),
+                toJsonValue(vocal.getLinks()),
+                resource.getCreatedAt(),
+                resource.getUpdatedAt(),
+                loadResourceNames(resource.getId()),
+                loadResourceAcls(resource.getId()),
+                songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
+                        .map(this::toVocalSong)
+                        .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public VoicebankResourceDetailResponse getVoicebankByResourceUuid(UUID resourceUuid) {
+        VocalVoicebank voicebank =
+                vocalVoicebankRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = voicebank.getResource();
+
+        return new VoicebankResourceDetailResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                resource.getStatus().name(),
+                resource.getViewCount(),
+                resource.getThumbnailUrl(),
+                voicebank.getVocalCharacter().getResource().getUuid(),
+                voicebank.getVocalCharacter().getResource().getCanonicalName(),
+                voicebank.getVoicebankType().name(),
+                voicebank.getContent(),
+                toJsonValue(voicebank.getLinks()),
+                resource.getCreatedAt(),
+                resource.getUpdatedAt(),
+                loadResourceNames(resource.getId()),
+                loadResourceAcls(resource.getId()),
+                songVoicebankRepository
+                        .findAllByVoicebankIdOrderBySortOrderAscIdAsc(voicebank.getId())
+                        .stream()
+                        .map(this::toVoicebankSong)
+                        .toList());
     }
 
     private String normalizeQuery(String query) {
@@ -164,429 +258,189 @@ public class ResourceService {
                 resource.getUpdatedAt());
     }
 
-    private SongResourceDetailResponse toSongResourceDetail(Resource resource) {
-        JsonNode data = resource.getData();
-        return new SongResourceDetailResponse(
-                asUuid(data.get("resourceUuid"), resource.getUuid()),
-                asText(data.get("canonicalName"), resource.getCanonicalName()),
-                asText(data.get("status"), resource.getStatus().name()),
-                asText(data.get("songType"), null),
-                asLong(data.get("viewCount"), resource.getViewCount()),
-                asText(data.get("thumbnailUrl"), resource.getThumbnailUrl()),
-                asText(data.get("content"), null),
-                asJson(data.get("links"), List.of()),
-                asDateTime(data.get("publishedAt"), null),
-                asDateTime(data.get("createdAt"), resource.getCreatedAt()),
-                asDateTime(data.get("updatedAt"), resource.getUpdatedAt()),
-                mapArray(data.get("names"), this::toResourceName),
-                mapArray(data.get("acls"), this::toResourceAcl),
-                mapArray(data.get("lyrics"), this::toSongLyric),
-                mapArray(data.get("pvs"), this::toSongPv),
-                mapArray(data.get("artists"), this::toSongArtist),
-                mapArray(data.get("vocals"), this::toSongVocal),
-                mapArray(data.get("voicebanks"), this::toSongVoicebank),
-                mapArray(extractSongRelations(data.get("relations")), this::toSongRelation),
-                mapArray(data.get("incomingRelations"), this::toSongIncomingRelation),
-                mapArray(data.get("playlists"), this::toSongPlaylist));
+    private List<ResourceNameDetailResponse> loadResourceNames(Long resourceId) {
+        return resourceNameRepository
+                .findAllByResourceIdOrderBySortOrderAscIdAsc(resourceId)
+                .stream()
+                .map(
+                        name ->
+                                new ResourceNameDetailResponse(
+                                        name.getUuid(),
+                                        name.getLangCode().name(),
+                                        name.getName(),
+                                        name.isPrimary(),
+                                        name.getSortOrder(),
+                                        name.getCreatedAt(),
+                                        name.getUpdatedAt()))
+                .toList();
     }
 
-    private ArtistResourceDetailResponse toArtistResourceDetail(Resource resource) {
-        JsonNode data = resource.getData();
-        return new ArtistResourceDetailResponse(
-                asUuid(data.get("resourceUuid"), resource.getUuid()),
-                asText(data.get("canonicalName"), resource.getCanonicalName()),
-                asText(data.get("status"), resource.getStatus().name()),
-                asLong(data.get("viewCount"), resource.getViewCount()),
-                asText(data.get("thumbnailUrl"), resource.getThumbnailUrl()),
-                asText(data.get("content"), null),
-                asJson(data.get("links"), List.of()),
-                asDateTime(data.get("createdAt"), resource.getCreatedAt()),
-                asDateTime(data.get("updatedAt"), resource.getUpdatedAt()),
-                mapArray(data.get("names"), this::toResourceName),
-                mapArray(data.get("acls"), this::toResourceAcl),
-                mapArray(data.get("songs"), this::toArtistSong),
-                mapArray(data.get("groups"), this::toArtistGroup),
-                mapArray(extractArtistMembers(data), this::toArtistMember));
+    private List<ResourceAclDetailResponse> loadResourceAcls(Long resourceId) {
+        return aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resourceId).stream()
+                .map(
+                        acl ->
+                                new ResourceAclDetailResponse(
+                                        acl.getUuid(),
+                                        acl.getAction().name(),
+                                        acl.getSubjectType().name(),
+                                        acl.getSubjectValue(),
+                                        acl.getEffect().name(),
+                                        acl.getPriority(),
+                                        acl.getExpiresAt(),
+                                        acl.getCreatedAt(),
+                                        acl.getUpdatedAt()))
+                .toList();
     }
 
-    private VocalResourceDetailResponse toVocalResourceDetail(Resource resource) {
-        JsonNode data = resource.getData();
-        return new VocalResourceDetailResponse(
-                asUuid(data.get("resourceUuid"), resource.getUuid()),
-                asText(data.get("canonicalName"), resource.getCanonicalName()),
-                asText(data.get("status"), resource.getStatus().name()),
-                asLong(data.get("viewCount"), resource.getViewCount()),
-                asText(data.get("thumbnailUrl"), resource.getThumbnailUrl()),
-                asText(data.get("content"), null),
-                asJson(data.get("links"), List.of()),
-                asDateTime(data.get("createdAt"), resource.getCreatedAt()),
-                asDateTime(data.get("updatedAt"), resource.getUpdatedAt()),
-                mapArray(data.get("names"), this::toResourceName),
-                mapArray(data.get("acls"), this::toResourceAcl),
-                mapArray(data.get("songs"), this::toVocalSong));
+    private Map<Long, SongPvView> loadSongPvViews(List<SongPv> pvs) {
+        if (pvs.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> songPvIds = pvs.stream().map(SongPv::getId).toList();
+        return songPvViewRepository.findAllBySongPvIdIn(songPvIds).stream()
+                .collect(Collectors.toMap(view -> view.getSongPv().getId(), Function.identity()));
     }
 
-    private VoicebankResourceDetailResponse toVoicebankResourceDetail(Resource resource) {
-        JsonNode data = resource.getData();
-        return new VoicebankResourceDetailResponse(
-                asUuid(data.get("resourceUuid"), resource.getUuid()),
-                asText(data.get("canonicalName"), resource.getCanonicalName()),
-                asText(data.get("status"), resource.getStatus().name()),
-                asLong(data.get("viewCount"), resource.getViewCount()),
-                asText(data.get("thumbnailUrl"), resource.getThumbnailUrl()),
-                asUuid(data.get("vocalResourceUuid"), null),
-                asText(data.get("vocalCanonicalName"), null),
-                asText(data.get("voicebankType"), null),
-                asText(data.get("content"), null),
-                asJson(data.get("links"), List.of()),
-                asDateTime(data.get("createdAt"), resource.getCreatedAt()),
-                asDateTime(data.get("updatedAt"), resource.getUpdatedAt()),
-                mapArray(data.get("names"), this::toResourceName),
-                mapArray(data.get("acls"), this::toResourceAcl),
-                mapArray(data.get("songs"), this::toVoicebankSong));
-    }
-
-    private PlaylistResourceDetailResponse toPlaylistResourceDetail(Resource resource) {
-        JsonNode data = resource.getData();
-        return new PlaylistResourceDetailResponse(
-                asUuid(data.get("resourceUuid"), resource.getUuid()),
-                asText(data.get("canonicalName"), resource.getCanonicalName()),
-                asText(data.get("status"), resource.getStatus().name()),
-                asLong(data.get("viewCount"), resource.getViewCount()),
-                asText(data.get("thumbnailUrl"), resource.getThumbnailUrl()),
-                asText(data.get("content"), null),
-                asBoolean(data.get("isPublic"), false),
-                asDateTime(data.get("createdAt"), resource.getCreatedAt()),
-                asDateTime(data.get("updatedAt"), resource.getUpdatedAt()),
-                mapArray(data.get("names"), this::toResourceName),
-                mapArray(data.get("acls"), this::toResourceAcl),
-                mapArray(data.get("songs"), this::toPlaylistSong));
-    }
-
-    private SongResourceDetailResponse.SongLyric toSongLyric(JsonNode node) {
+    private SongResourceDetailResponse.SongLyric toSongLyric(SongLyric lyric) {
         return new SongResourceDetailResponse.SongLyric(
-                asUuid(node.get("lyricUuid"), null),
-                asStringList(node.get("langCodes")),
-                asJson(node.get("lyrics"), List.of()),
-                asBoolean(node.get("isPrimary"), false),
-                asInt(node.get("sortOrder"), 0),
-                asDateTime(node.get("createdAt"), null),
-                asDateTime(node.get("updatedAt"), null));
+                lyric.getUuid(),
+                lyric.getLangCodes().stream().map(Enum::name).sorted().toList(),
+                toJsonValue(lyric.getLyrics()),
+                lyric.isPrimary(),
+                lyric.getSortOrder(),
+                lyric.getCreatedAt(),
+                lyric.getUpdatedAt());
     }
 
-    private SongResourceDetailResponse.SongPv toSongPv(JsonNode node) {
+    private Object toJsonValue(JsonNode jsonNode) {
+        if (jsonNode == null || jsonNode.isNull()) {
+            return null;
+        }
+        return objectMapper.convertValue(jsonNode, Object.class);
+    }
+
+    private SongResourceDetailResponse.SongPv toSongPv(SongPv pv, SongPvView view) {
         return new SongResourceDetailResponse.SongPv(
-                asUuid(node.get("pvUuid"), null),
-                asUuid(node.get("pvViewUuid"), null),
-                asText(node.get("service"), null),
-                asText(node.get("videoKey"), null),
-                asText(node.get("title"), null),
-                asText(node.get("thumbnailUrl"), null),
-                asText(node.get("uploaderKey"), null),
-                asIntNullable(node.get("durationSeconds")),
-                asBoolean(node.get("isOfficial"), false),
-                asDateTime(node.get("publishedAt"), null),
-                asInt(node.get("sortOrder"), 0),
-                asLong(node.get("viewCount"), 0L),
-                asDateTime(node.get("createdAt"), null),
-                asDateTime(node.get("updatedAt"), null));
+                pv.getUuid(),
+                view == null ? null : view.getUuid(),
+                pv.getService().name(),
+                pv.getVideoKey(),
+                pv.getTitle(),
+                pv.getThumbnailUrl(),
+                pv.getUploaderKey(),
+                pv.getDurationSeconds(),
+                pv.isOfficial(),
+                pv.getPublishedAt(),
+                pv.getSortOrder(),
+                view == null ? 0L : view.getViewCount(),
+                pv.getCreatedAt(),
+                pv.getUpdatedAt());
     }
 
-    private SongResourceDetailResponse.SongArtist toSongArtist(JsonNode node) {
+    private SongResourceDetailResponse.SongArtist toSongArtist(SongArtist songArtist) {
         return new SongResourceDetailResponse.SongArtist(
-                asUuid(node.get("artistResourceUuid"), null),
-                asText(node.get("canonicalName"), null),
-                asText(node.get("thumbnailUrl"), null),
-                asBoolean(node.get("isMain"), false),
-                asInt(node.get("sortOrder"), 0),
-                asStringList(node.get("roles")));
+                songArtist.getArtist().getResource().getUuid(),
+                songArtist.getArtist().getResource().getCanonicalName(),
+                songArtist.getArtist().getResource().getThumbnailUrl(),
+                songArtist.isMain(),
+                songArtist.getSortOrder(),
+                songArtist.getRoles().stream().map(Enum::name).sorted().toList());
     }
 
-    private SongResourceDetailResponse.SongVocal toSongVocal(JsonNode node) {
+    private SongResourceDetailResponse.SongVocal toSongVocal(SongVocal songVocal) {
         return new SongResourceDetailResponse.SongVocal(
-                asUuid(node.get("vocalResourceUuid"), null),
-                asText(node.get("vocalCanonicalName"), null),
-                asBoolean(node.get("isMain"), false),
-                asInt(node.get("sortOrder"), 0));
+                songVocal.getVocal().getResource().getUuid(),
+                songVocal.getVocal().getResource().getCanonicalName(),
+                songVocal.isMain(),
+                songVocal.getSortOrder());
     }
 
-    private SongResourceDetailResponse.SongVoicebank toSongVoicebank(JsonNode node) {
+    private SongResourceDetailResponse.SongVoicebank toSongVoicebank(SongVoicebank songVoicebank) {
         return new SongResourceDetailResponse.SongVoicebank(
-                asUuid(node.get("voicebankResourceUuid"), null),
-                asText(node.get("voicebankCanonicalName"), null),
-                asUuid(node.get("vocalResourceUuid"), null),
-                asText(node.get("vocalCanonicalName"), null),
-                asText(node.get("voicebankType"), null),
-                asBoolean(node.get("isMain"), false),
-                asInt(node.get("sortOrder"), 0));
+                songVoicebank.getVoicebank().getResource().getUuid(),
+                songVoicebank.getVoicebank().getResource().getCanonicalName(),
+                songVoicebank.getVoicebank().getVocalCharacter().getResource().getUuid(),
+                songVoicebank.getVoicebank().getVocalCharacter().getResource().getCanonicalName(),
+                songVoicebank.getVoicebank().getVoicebankType().name(),
+                songVoicebank.isMain(),
+                songVoicebank.getSortOrder());
     }
 
-    private SongResourceDetailResponse.SongRelation toSongRelation(JsonNode node) {
+    private SongResourceDetailResponse.SongRelation toSongRelation(SongRelation relation) {
         return new SongResourceDetailResponse.SongRelation(
-                asUuid(node.get("targetSongResourceUuid"), null),
-                asText(node.get("targetSongCanonicalName"), null),
-                asText(node.get("targetSongType"), null));
+                relation.getTargetSong().getResource().getUuid(),
+                relation.getTargetSong().getResource().getCanonicalName(),
+                relation.getTargetSong().getSongType().name());
     }
 
-    private SongResourceDetailResponse.SongIncomingRelation toSongIncomingRelation(JsonNode node) {
+    private SongResourceDetailResponse.SongIncomingRelation toSongIncomingRelation(
+            SongRelation relation) {
         return new SongResourceDetailResponse.SongIncomingRelation(
-                asUuid(node.get("sourceSongResourceUuid"), null),
-                asText(node.get("sourceSongCanonicalName"), null),
-                asText(node.get("sourceSongType"), null));
+                relation.getSourceSong().getResource().getUuid(),
+                relation.getSourceSong().getResource().getCanonicalName(),
+                relation.getSourceSong().getSongType().name());
     }
 
-    private SongResourceDetailResponse.SongPlaylist toSongPlaylist(JsonNode node) {
+    private SongResourceDetailResponse.SongPlaylist toSongPlaylist(PlaylistSong playlistSong) {
         return new SongResourceDetailResponse.SongPlaylist(
-                asUuid(node.get("playlistResourceUuid"), null),
-                asText(node.get("playlistCanonicalName"), null),
-                asInt(node.get("sortOrder"), 0));
+                playlistSong.getPlaylist().getResource().getUuid(),
+                playlistSong.getPlaylist().getResource().getCanonicalName(),
+                playlistSong.getSortOrder());
     }
 
-    private ArtistResourceDetailResponse.ArtistSong toArtistSong(JsonNode node) {
+    private ArtistResourceDetailResponse.ArtistSong toArtistSong(SongArtist songArtist) {
         return new ArtistResourceDetailResponse.ArtistSong(
-                asUuid(node.get("songResourceUuid"), null),
-                asText(node.get("songCanonicalName"), null),
-                asText(node.get("songThumbnailUrl"), null),
-                asText(node.get("songType"), null),
-                asDateTime(node.get("publishedAt"), null),
-                asBoolean(node.get("isMain"), false),
-                asInt(node.get("sortOrder"), 0),
-                asStringList(node.get("roles")));
+                songArtist.getSong().getResource().getUuid(),
+                songArtist.getSong().getResource().getCanonicalName(),
+                songArtist.getSong().getResource().getThumbnailUrl(),
+                songArtist.getSong().getSongType().name(),
+                songArtist.getSong().getPublishedAt(),
+                songArtist.isMain(),
+                songArtist.getSortOrder(),
+                songArtist.getRoles().stream().map(Enum::name).sorted().toList());
     }
 
-    private ArtistResourceDetailResponse.ArtistGroup toArtistGroup(JsonNode node) {
+    private ArtistResourceDetailResponse.ArtistGroup toArtistGroup(ArtistGroup artistGroup) {
         return new ArtistResourceDetailResponse.ArtistGroup(
-                asUuid(node.get("memberArtistResourceUuid"), null),
-                asText(node.get("memberArtistCanonicalName"), null),
-                asText(node.get("memberArtistThumbnailUrl"), null),
-                asInt(node.get("sortOrder"), 0));
+                artistGroup.getMemberArtist().getResource().getUuid(),
+                artistGroup.getMemberArtist().getResource().getCanonicalName(),
+                artistGroup.getMemberArtist().getResource().getThumbnailUrl(),
+                artistGroup.getSortOrder());
     }
 
-    private ArtistResourceDetailResponse.ArtistMember toArtistMember(JsonNode node) {
+    private ArtistResourceDetailResponse.ArtistMember toArtistMember(ArtistGroup artistGroup) {
         return new ArtistResourceDetailResponse.ArtistMember(
-                asUuid(node.get("groupArtistResourceUuid"), null),
-                asText(node.get("groupArtistCanonicalName"), null),
-                asText(node.get("groupArtistThumbnailUrl"), null),
-                asInt(node.get("sortOrder"), 0));
+                artistGroup.getGroupArtist().getResource().getUuid(),
+                artistGroup.getGroupArtist().getResource().getCanonicalName(),
+                artistGroup.getGroupArtist().getResource().getThumbnailUrl(),
+                artistGroup.getSortOrder());
     }
 
-    private VocalResourceDetailResponse.VocalSong toVocalSong(JsonNode node) {
+    private VocalResourceDetailResponse.VocalSong toVocalSong(SongVocal songVocal) {
+        Song song = songVocal.getSong();
         return new VocalResourceDetailResponse.VocalSong(
-                asUuid(node.get("songResourceUuid"), null),
-                asText(node.get("songCanonicalName"), null),
-                asText(node.get("songThumbnailUrl"), null),
-                asText(node.get("songType"), null),
-                asDateTime(node.get("publishedAt"), null),
-                asBoolean(node.get("isMain"), false),
-                asInt(node.get("sortOrder"), 0));
+                song.getResource().getUuid(),
+                song.getResource().getCanonicalName(),
+                song.getResource().getThumbnailUrl(),
+                song.getSongType().name(),
+                song.getPublishedAt(),
+                songVocal.isMain(),
+                songVocal.getSortOrder());
     }
 
-    private VoicebankResourceDetailResponse.VoicebankSong toVoicebankSong(JsonNode node) {
+    private VoicebankResourceDetailResponse.VoicebankSong toVoicebankSong(
+            SongVoicebank songVoicebank) {
+        Song song = songVoicebank.getSong();
+        VocalCharacter vocal = songVoicebank.getVoicebank().getVocalCharacter();
         return new VoicebankResourceDetailResponse.VoicebankSong(
-                asUuid(node.get("songResourceUuid"), null),
-                asText(node.get("songCanonicalName"), null),
-                asText(node.get("songThumbnailUrl"), null),
-                asText(node.get("songType"), null),
-                asDateTime(node.get("publishedAt"), null),
-                asUuid(node.get("vocalResourceUuid"), null),
-                asText(node.get("vocalCanonicalName"), null),
-                asBoolean(node.get("isMain"), false),
-                asInt(node.get("sortOrder"), 0));
-    }
-
-    private PlaylistResourceDetailResponse.PlaylistSong toPlaylistSong(JsonNode node) {
-        return new PlaylistResourceDetailResponse.PlaylistSong(
-                asUuid(node.get("songResourceUuid"), null),
-                asText(node.get("songCanonicalName"), null),
-                asText(node.get("songThumbnailUrl"), null),
-                asText(node.get("songType"), null),
-                asDateTime(node.get("publishedAt"), null),
-                asInt(node.get("sortOrder"), 0));
-    }
-
-    private ResourceNameDetailResponse toResourceName(JsonNode node) {
-        return new ResourceNameDetailResponse(
-                asUuid(node.get("nameUuid"), null),
-                asText(node.get("langCode"), null),
-                asText(node.get("name"), null),
-                asBoolean(node.get("isPrimary"), false),
-                asInt(node.get("sortOrder"), 0),
-                asDateTime(node.get("createdAt"), null),
-                asDateTime(node.get("updatedAt"), null));
-    }
-
-    private ResourceAclDetailResponse toResourceAcl(JsonNode node) {
-        return new ResourceAclDetailResponse(
-                asUuid(node.get("aclUuid"), null),
-                asText(node.get("action"), null),
-                asText(node.get("subjectType"), null),
-                asText(node.get("subjectValue"), null),
-                asText(node.get("effect"), null),
-                asInt(node.get("priority"), 0),
-                asDateTime(node.get("expiresAt"), null),
-                asDateTime(node.get("createdAt"), null),
-                asDateTime(node.get("updatedAt"), null));
-    }
-
-    private JsonNode extractSongRelations(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        if (node.isArray()) {
-            return node;
-        }
-        if (node.isObject() && node.has("outgoing") && node.get("outgoing").isArray()) {
-            return node.get("outgoing");
-        }
-        return null;
-    }
-
-    private JsonNode extractArtistMembers(JsonNode data) {
-        JsonNode members = data.get("members");
-        if (members != null && members.isArray()) {
-            return members;
-        }
-        JsonNode memberships = data.get("memberships");
-        if (memberships != null && memberships.isArray()) {
-            return memberships;
-        }
-        return null;
-    }
-
-    private <T> List<T> mapArray(JsonNode node, Function<JsonNode, T> mapper) {
-        if (node == null || !node.isArray()) {
-            return List.of();
-        }
-        return StreamSupport.stream(node.spliterator(), false)
-                .filter(JsonNode::isObject)
-                .map(mapper)
-                .toList();
-    }
-
-    private String asText(JsonNode node, String fallback) {
-        if (node == null || node.isNull()) {
-            return fallback;
-        }
-        return node.asText();
-    }
-
-    private UUID asUuid(JsonNode node, UUID fallback) {
-        String value = asText(node, null);
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException ignored) {
-            return fallback;
-        }
-    }
-
-    private long asLong(JsonNode node, long fallback) {
-        if (node == null || node.isNull()) {
-            return fallback;
-        }
-        if (node.isNumber()) {
-            return node.longValue();
-        }
-        try {
-            return Long.parseLong(node.asText());
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
-    }
-
-    private int asInt(JsonNode node, int fallback) {
-        if (node == null || node.isNull()) {
-            return fallback;
-        }
-        if (node.isNumber()) {
-            return node.intValue();
-        }
-        try {
-            return Integer.parseInt(node.asText());
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
-    }
-
-    private Integer asIntNullable(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            return node.intValue();
-        }
-        try {
-            return Integer.valueOf(node.asText());
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private boolean asBoolean(JsonNode node, boolean fallback) {
-        if (node == null || node.isNull()) {
-            return fallback;
-        }
-        if (node.isBoolean()) {
-            return node.booleanValue();
-        }
-        return Boolean.parseBoolean(node.asText());
-    }
-
-    private LocalDateTime asDateTime(JsonNode node, LocalDateTime fallback) {
-        String value = asText(node, null);
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        try {
-            return LocalDateTime.parse(value);
-        } catch (DateTimeParseException ignored) {
-            return fallback;
-        }
-    }
-
-    private Object asJson(JsonNode node, Object fallback) {
-        Object value = toJsonValue(node);
-        return value == null ? fallback : value;
-    }
-
-    private List<String> asStringList(JsonNode node) {
-        if (node == null || !node.isArray()) {
-            return List.of();
-        }
-        return StreamSupport.stream(node.spliterator(), false)
-                .map(item -> asText(item, null))
-                .filter(text -> text != null && !text.isBlank())
-                .toList();
-    }
-
-    private Object toJsonValue(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        if (node.isArray()) {
-            ArrayList<Object> values = new ArrayList<>();
-            for (JsonNode child : node) {
-                values.add(toJsonValue(child));
-            }
-            return values;
-        }
-        if (node.isObject()) {
-            LinkedHashMap<String, Object> values = new LinkedHashMap<>();
-            node.properties()
-                    .forEach(entry -> values.put(entry.getKey(), toJsonValue(entry.getValue())));
-            return values;
-        }
-        if (node.isTextual()) {
-            return node.textValue();
-        }
-        if (node.isBoolean()) {
-            return node.booleanValue();
-        }
-        if (node.isNumber()) {
-            return node.numberValue();
-        }
-        return node.asText();
+                song.getResource().getUuid(),
+                song.getResource().getCanonicalName(),
+                song.getResource().getThumbnailUrl(),
+                song.getSongType().name(),
+                song.getPublishedAt(),
+                vocal.getResource().getUuid(),
+                vocal.getResource().getCanonicalName(),
+                songVoicebank.isMain(),
+                songVoicebank.getSortOrder());
     }
 }

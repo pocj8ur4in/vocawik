@@ -10,6 +10,9 @@ import org.springframework.data.repository.query.Param;
 /** Repository for {@link SongPvView} persistence access. */
 public interface SongPvViewRepository extends JpaRepository<SongPvView, Long> {
 
+    /** Finds all PV view rows by PV ids. */
+    java.util.List<SongPvView> findAllBySongPvIdIn(Collection<Long> songPvIds);
+
     /** Deletes all PV view rows by PV ids. */
     @Modifying(flushAutomatically = true)
     @Query("delete from SongPvView spv where spv.songPv.id in :songPvIds")

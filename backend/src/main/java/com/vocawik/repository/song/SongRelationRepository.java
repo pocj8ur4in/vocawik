@@ -12,6 +12,9 @@ public interface SongRelationRepository extends JpaRepository<SongRelation, Long
     /** Finds all outgoing relations by source song id. */
     java.util.List<SongRelation> findAllBySourceSongIdOrderByIdAsc(Long songId);
 
+    /** Finds all incoming relations by target song id. */
+    java.util.List<SongRelation> findAllByTargetSongIdOrderByIdAsc(Long songId);
+
     /** Deletes all outgoing relations by source song id. */
     @Modifying(flushAutomatically = true)
     @Query("delete from SongRelation sr where sr.sourceSong.id = :songId")

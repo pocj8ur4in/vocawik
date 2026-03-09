@@ -27,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -65,7 +66,15 @@ public class VoicebankController {
         UUID resourceUuid = voicebankService.create(request);
         VoicebankResourceDetailResponse detail =
                 resourceService.getVoicebankByResourceUuid(resourceUuid);
-        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+        return ResponseEntity.created(URI.create("/voicebanks/" + resourceUuid)).body(detail);
+    }
+
+    /** Gets a voicebank detail. */
+    @GetMapping("/voicebanks/{resourceUuid}")
+    @Operation(summary = "Get voicebank", description = "Returns voicebank detail.")
+    public ResponseEntity<VoicebankResourceDetailResponse> getVoicebank(
+            @PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getVoicebankByResourceUuid(resourceUuid));
     }
 
     /**

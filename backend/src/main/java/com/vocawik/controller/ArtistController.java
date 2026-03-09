@@ -66,7 +66,14 @@ public class ArtistController {
             @Valid @RequestBody ArtistCreateRequest request) {
         UUID resourceUuid = artistService.create(request);
         ArtistResourceDetailResponse detail = resourceService.getArtistByResourceUuid(resourceUuid);
-        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+        return ResponseEntity.created(URI.create("/artists/" + resourceUuid)).body(detail);
+    }
+
+    /** Gets an artist detail. */
+    @GetMapping("/artists/{resourceUuid}")
+    @Operation(summary = "Get artist", description = "Returns artist detail.")
+    public ResponseEntity<ArtistResourceDetailResponse> getArtist(@PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getArtistByResourceUuid(resourceUuid));
     }
 
     /**

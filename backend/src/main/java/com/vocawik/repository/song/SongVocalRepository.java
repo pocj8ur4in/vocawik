@@ -1,6 +1,7 @@
 package com.vocawik.repository.song;
 
 import com.vocawik.domain.song.SongVocal;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,7 +11,10 @@ import org.springframework.data.repository.query.Param;
 public interface SongVocalRepository extends JpaRepository<SongVocal, Long> {
 
     /** Finds all song-vocal rows by song id in display order. */
-    java.util.List<SongVocal> findAllBySongIdOrderBySortOrderAscIdAsc(Long songId);
+    List<SongVocal> findAllBySongIdOrderBySortOrderAscIdAsc(Long songId);
+
+    /** Finds all song-vocal rows by vocal id in display order. */
+    List<SongVocal> findAllByVocalIdOrderBySortOrderAscIdAsc(Long vocalId);
 
     /** Deletes all song-vocal rows by song id. */
     @Modifying(flushAutomatically = true)

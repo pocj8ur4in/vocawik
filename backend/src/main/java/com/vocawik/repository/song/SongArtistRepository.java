@@ -12,6 +12,9 @@ public interface SongArtistRepository extends JpaRepository<SongArtist, Long> {
     /** Finds all song-artist rows by song id in display order. */
     java.util.List<SongArtist> findAllBySongIdOrderBySortOrderAscIdAsc(Long songId);
 
+    /** Finds all song-artist rows by artist id in display order. */
+    java.util.List<SongArtist> findAllByArtistIdOrderBySortOrderAscIdAsc(Long artistId);
+
     /** Deletes all song-artist rows by song id. */
     @Modifying(flushAutomatically = true)
     @Query("delete from SongArtist sa where sa.song.id = :songId")

@@ -70,7 +70,14 @@ public class SongController {
             @Valid @RequestBody SongCreateRequest request) {
         UUID resourceUuid = songService.create(request);
         SongResourceDetailResponse detail = resourceService.getSongByResourceUuid(resourceUuid);
-        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+        return ResponseEntity.created(URI.create("/songs/" + resourceUuid)).body(detail);
+    }
+
+    /** Gets a song detail. */
+    @GetMapping("/songs/{resourceUuid}")
+    @Operation(summary = "Get song", description = "Returns song detail.")
+    public ResponseEntity<SongResourceDetailResponse> getSong(@PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getSongByResourceUuid(resourceUuid));
     }
 
     /**

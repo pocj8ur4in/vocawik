@@ -82,16 +82,10 @@ public class ArtistService {
         Resource resource = resourceRepository.save(artist.getResource());
         artistRepository.saveAndFlush(artist);
 
-        List<ResourceName> resourceNames = saveResourceNames(resource, request.names());
-        List<Acl> acls = saveAcls(resource, request.acls());
-        List<ArtistGroup> memberships = saveArtistMemberships(artist, request.members());
-        List<ArtistGroup> groups =
-                artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
-                        artist.getId());
+        saveResourceNames(resource, request.names());
+        saveAcls(resource, request.acls());
+        saveArtistMemberships(artist, request.members());
 
-        resource.updateData(
-                buildArtistProjection(artist, resource, resourceNames, acls, groups, memberships));
-        updateAffectedParentProjections(List.of(), memberships);
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -111,31 +105,18 @@ public class ArtistService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = artist.getResource();
-        List<ArtistGroup> previousMemberships =
-                artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
-                        artist.getId());
-
         updateArtistFields(artist, resource, request);
 
-        List<ResourceName> resourceNames =
-                request.names() == null
-                        ? resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
-                                resource.getId())
-                        : replaceResourceNames(resource, toCreateNames(request.names()));
-        List<Acl> acls =
-                request.acls() == null
-                        ? aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId())
-                        : replaceAcls(resource, toCreateAcls(request.acls()));
-        List<ArtistGroup> memberships =
-                request.members() == null
-                        ? previousMemberships
-                        : replaceArtistMemberships(artist, toCreateMembers(request.members()));
-        List<ArtistGroup> groups =
-                artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
-                        artist.getId());
+        if (request.names() != null) {
+            replaceResourceNames(resource, toCreateNames(request.names()));
+        }
+        if (request.acls() != null) {
+            replaceAcls(resource, toCreateAcls(request.acls()));
+        }
+        if (request.members() != null) {
+            replaceArtistMemberships(artist, toCreateMembers(request.members()));
+        }
 
-        updateArtistProjection(artist, resource, resourceNames, acls, groups, memberships);
-        updateAffectedParentProjections(previousMemberships, memberships);
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -588,7 +569,7 @@ public class ArtistService {
         putNullableText(data, "updatedAt", formatDateTime(resource.getUpdatedAt()));
         data.set("names", buildNamesProjection(names));
         data.set("acls", buildAclsProjection(acls));
-        data.set("songs", extractExistingArray(resource.getData(), "songs"));
+        data.set("songs", objectMapper.createArrayNode());
         data.set("groups", buildArtistGroupsProjection(groups));
         data.set("members", buildArtistMembersProjection(memberships));
         return data;
@@ -674,50 +655,6 @@ public class ArtistService {
         }
         JsonNode node = data.get(fieldName);
         return node != null && node.isArray() ? node.deepCopy() : objectMapper.createArrayNode();
-    }
-
-    private void updateArtistProjection(
-            Artist artist,
-            Resource resource,
-            List<ResourceName> resourceNames,
-            List<Acl> acls,
-            List<ArtistGroup> groups,
-            List<ArtistGroup> memberships) {
-        resource.updateData(
-                buildArtistProjection(artist, resource, resourceNames, acls, groups, memberships));
-    }
-
-    private void updateAffectedParentProjections(
-            List<ArtistGroup> previousMemberships, List<ArtistGroup> updatedMemberships) {
-        LinkedHashSet<Long> affectedArtistIds = new LinkedHashSet<>();
-        previousMemberships.stream()
-                .map(group -> group.getGroupArtist().getId())
-                .forEach(affectedArtistIds::add);
-        updatedMemberships.stream()
-                .map(group -> group.getGroupArtist().getId())
-                .forEach(affectedArtistIds::add);
-        if (affectedArtistIds.isEmpty()) {
-            return;
-        }
-
-        for (Artist affectedArtist : artistRepository.findAllById(affectedArtistIds)) {
-            Resource affectedResource = affectedArtist.getResource();
-            List<ResourceName> names =
-                    resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
-                            affectedResource.getId());
-            List<Acl> acls =
-                    aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(
-                            affectedResource.getId());
-            List<ArtistGroup> groups =
-                    artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
-                            affectedArtist.getId());
-            List<ArtistGroup> memberships =
-                    artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
-                            affectedArtist.getId());
-            affectedResource.updateData(
-                    buildArtistProjection(
-                            affectedArtist, affectedResource, names, acls, groups, memberships));
-        }
     }
 
     private void putNullableText(ObjectNode node, String fieldName, String value) {
