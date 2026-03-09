@@ -26,6 +26,7 @@ import com.vocawik.domain.vocal.VocalVoicebank;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongElementResponse;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
@@ -35,11 +36,14 @@ import com.vocawik.repository.song.SongArtistRepository;
 import com.vocawik.repository.song.SongCriteria;
 import com.vocawik.repository.song.SongLyricRepository;
 import com.vocawik.repository.song.SongPvRepository;
+import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalCharacterRepository;
 import com.vocawik.repository.vocal.VocalVoicebankRepository;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
@@ -71,6 +75,7 @@ public class SongService {
     private final AclRepository aclRepository;
     private final SongLyricRepository songLyricRepository;
     private final SongPvRepository songPvRepository;
+    private final SongPvViewRepository songPvViewRepository;
     private final SongArtistRepository songArtistRepository;
     private final SongVocalRepository songVocalRepository;
     private final SongRelationRepository songRelationRepository;
@@ -172,6 +177,68 @@ public class SongService {
         return resource.getUuid();
     }
 
+    /**
+     * Updates a song and optionally replaces child collections.
+     *
+     * @param resourceUuid song resource UUID
+     * @param request update payload
+     * @return updated song resource UUID
+     */
+    @Transactional
+    public UUID update(UUID resourceUuid, SongUpdateRequest request) {
+        Song song =
+                songRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = song.getResource();
+        updateSongFields(song, resource, request);
+
+        List<ResourceName> resourceNames =
+                request.names() == null
+                        ? resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                                resource.getId())
+                        : replaceResourceNames(resource, toCreateNames(request.names()));
+        List<Acl> acls =
+                request.acls() == null
+                        ? aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId())
+                        : replaceAcls(resource, toCreateAcls(request.acls()));
+        List<SongLyric> lyrics =
+                request.lyrics() == null
+                        ? songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
+                        : replaceSongLyrics(song, toCreateLyrics(request.lyrics()));
+        List<SongPv> pvs =
+                request.pvs() == null
+                        ? songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
+                        : replaceSongPvs(song, toCreatePvs(request.pvs()));
+        List<SongArtist> artists =
+                request.artists() == null
+                        ? songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
+                        : replaceSongArtists(song, toCreateArtists(request.artists()));
+        List<SongVocal> vocals =
+                request.vocals() == null
+                        ? songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
+                        : replaceSongVocals(song, toCreateVocals(request.vocals()));
+        List<SongRelation> relations =
+                request.relations() == null
+                        ? songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId())
+                        : replaceSongRelations(song, toCreateRelations(request.relations()));
+
+        resource.updateData(
+                buildSongProjection(
+                        song,
+                        resource,
+                        resourceNames,
+                        acls,
+                        lyrics,
+                        pvs,
+                        artists,
+                        vocals,
+                        relations));
+        resourceRepository.saveAndFlush(resource);
+        return resource.getUuid();
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
@@ -228,6 +295,172 @@ public class SongService {
         if (links != null && !links.isArray()) {
             throw new IllegalArgumentException("links must be a JSON array");
         }
+    }
+
+    private void updateSongFields(Song song, Resource resource, SongUpdateRequest request) {
+        String canonicalName =
+                request.canonicalName() == null
+                        ? resource.getCanonicalName()
+                        : normalizeCanonicalName(request.canonicalName());
+        String thumbnailUrl =
+                request.thumbnailUrl() == null
+                        ? resource.getThumbnailUrl()
+                        : normalizeNullable(request.thumbnailUrl());
+        String content =
+                request.content() == null
+                        ? song.getContent()
+                        : normalizeNullable(request.content());
+        JsonNode links = request.links() == null ? song.getLinks() : toJsonNode(request.links());
+        validateLinks(links);
+        LocalDateTime publishedAt =
+                request.publishedAt() == null ? song.getPublishedAt() : request.publishedAt();
+        SongType songType =
+                request.songType() == null ? song.getSongType() : parseSongType(request.songType());
+
+        resource.updateCanonicalName(canonicalName);
+        resource.updateThumbnailUrl(thumbnailUrl);
+        song.update(content, links, publishedAt, songType);
+    }
+
+    private List<ResourceName> replaceResourceNames(
+            Resource resource, List<SongCreateRequest.ResourceNameCreateRequest> names) {
+        resourceNameRepository.deleteByResourceId(resource.getId());
+        return saveResourceNames(resource, names);
+    }
+
+    private List<Acl> replaceAcls(
+            Resource resource, List<SongCreateRequest.ResourceAclCreateRequest> acls) {
+        aclRepository.deleteByResourceId(resource.getId());
+        return saveAcls(resource, acls);
+    }
+
+    private List<SongLyric> replaceSongLyrics(
+            Song song, List<SongCreateRequest.SongLyricCreateRequest> lyrics) {
+        songLyricRepository.deleteBySongId(song.getId());
+        return saveSongLyrics(song, lyrics);
+    }
+
+    private List<SongPv> replaceSongPvs(
+            Song song, List<SongCreateRequest.SongPvCreateRequest> pvs) {
+        List<Long> existingSongPvIds = songPvRepository.findIdsBySongId(song.getId());
+        if (!existingSongPvIds.isEmpty()) {
+            songPvViewRepository.deleteBySongPvIds(existingSongPvIds);
+        }
+        songPvRepository.deleteBySongId(song.getId());
+        return saveSongPvs(song, pvs);
+    }
+
+    private List<SongArtist> replaceSongArtists(
+            Song song, List<SongCreateRequest.SongArtistCreateRequest> artists) {
+        songArtistRepository.deleteBySongId(song.getId());
+        return saveSongArtists(song, artists);
+    }
+
+    private List<SongVocal> replaceSongVocals(
+            Song song, List<SongCreateRequest.SongVocalCreateRequest> vocals) {
+        songVocalRepository.deleteBySongId(song.getId());
+        return saveSongVocals(song, vocals);
+    }
+
+    private List<SongRelation> replaceSongRelations(
+            Song song, List<SongCreateRequest.SongRelationCreateRequest> relations) {
+        songRelationRepository.deleteBySourceSongId(song.getId());
+        return saveSongRelations(song, relations);
+    }
+
+    private List<SongCreateRequest.ResourceNameCreateRequest> toCreateNames(
+            List<SongUpdateRequest.ResourceNameUpdateRequest> names) {
+        return names.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.ResourceNameCreateRequest(
+                                        item.langCode(),
+                                        item.name(),
+                                        item.isPrimary(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.ResourceAclCreateRequest> toCreateAcls(
+            List<SongUpdateRequest.ResourceAclUpdateRequest> acls) {
+        return acls.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.ResourceAclCreateRequest(
+                                        item.action(),
+                                        item.subjectType(),
+                                        item.subjectValue(),
+                                        item.effect(),
+                                        item.priority(),
+                                        item.expiresAt()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.SongLyricCreateRequest> toCreateLyrics(
+            List<SongUpdateRequest.SongLyricUpdateRequest> lyrics) {
+        return lyrics.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.SongLyricCreateRequest(
+                                        item.langCodes(),
+                                        item.lyrics(),
+                                        item.isPrimary(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.SongPvCreateRequest> toCreatePvs(
+            List<SongUpdateRequest.SongPvUpdateRequest> pvs) {
+        return pvs.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.SongPvCreateRequest(
+                                        item.service(),
+                                        item.videoKey(),
+                                        item.title(),
+                                        item.thumbnailUrl(),
+                                        item.uploaderKey(),
+                                        item.durationSeconds(),
+                                        item.isOfficial(),
+                                        item.publishedAt(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.SongArtistCreateRequest> toCreateArtists(
+            List<SongUpdateRequest.SongArtistUpdateRequest> artists) {
+        return artists.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.SongArtistCreateRequest(
+                                        item.artistResourceUuid(),
+                                        item.roles(),
+                                        item.isMain(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.SongVocalCreateRequest> toCreateVocals(
+            List<SongUpdateRequest.SongVocalUpdateRequest> vocals) {
+        return vocals.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.SongVocalCreateRequest(
+                                        item.vocalResourceUuid(),
+                                        item.voicebankResourceUuid(),
+                                        item.isMain(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<SongCreateRequest.SongRelationCreateRequest> toCreateRelations(
+            List<SongUpdateRequest.SongRelationUpdateRequest> relations) {
+        return relations.stream()
+                .map(
+                        item ->
+                                new SongCreateRequest.SongRelationCreateRequest(
+                                        item.targetSongResourceUuid()))
+                .toList();
     }
 
     private List<ResourceName> saveResourceNames(

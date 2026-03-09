@@ -81,4 +81,25 @@ public class Resource extends BaseEntity {
     public void updateData(JsonNode data) {
         this.data = data;
     }
+
+    /**
+     * Updates canonical display name.
+     *
+     * @param canonicalName updated canonical name
+     */
+    public void updateCanonicalName(String canonicalName) {
+        if (canonicalName == null || canonicalName.isBlank()) {
+            throw new IllegalArgumentException("canonicalName is required");
+        }
+        this.canonicalName = canonicalName;
+    }
+
+    /**
+     * Updates thumbnail url.
+     *
+     * @param thumbnailUrl updated thumbnail url
+     */
+    public void updateThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
+    }
 }

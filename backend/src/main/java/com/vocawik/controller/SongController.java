@@ -5,6 +5,7 @@ import com.vocawik.domain.song.SongType;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -29,6 +30,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -68,6 +71,23 @@ public class SongController {
         UUID resourceUuid = songService.create(request);
         SongResourceDetailResponse detail = resourceService.getSongByResourceUuid(resourceUuid);
         return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+    }
+
+    /**
+     * Updates an existing song resource.
+     *
+     * @param resourceUuid song resource UUID
+     * @param request song update payload
+     * @return updated song resource detail
+     */
+    @PatchMapping("/songs/{resourceUuid}")
+    @Operation(summary = "Update song", description = "Updates a song.")
+    public ResponseEntity<SongResourceDetailResponse> updateSong(
+            @PathVariable UUID resourceUuid, @Valid @RequestBody SongUpdateRequest request) {
+        UUID updatedResourceUuid = songService.update(resourceUuid, request);
+        SongResourceDetailResponse detail =
+                resourceService.getSongByResourceUuid(updatedResourceUuid);
+        return ResponseEntity.ok(detail);
     }
 
     /**
