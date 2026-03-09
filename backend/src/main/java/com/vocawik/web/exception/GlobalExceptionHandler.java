@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -117,6 +118,26 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ErrorResponse.of(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    /**
+     * Handles controller-level response status exceptions.
+     *
+     * @param ex the exception
+     * @return response with declared HTTP status
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
+
+        HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+        String message =
+                ex.getReason() == null || ex.getReason().isBlank()
+                        ? status.getReasonPhrase()
+                        : ex.getReason();
+
+        logger.warn("Response status exception [{}]: {}", status.value(), message);
+
+        return ResponseEntity.status(status).body(ErrorResponse.of(status, message));
     }
 
     /**
