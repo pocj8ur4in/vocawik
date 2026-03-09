@@ -1,6 +1,5 @@
 package com.vocawik.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.web.error.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Handles access-denied failures and writes a standardized JSON response. (403)
@@ -29,7 +29,7 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
      * @param objectMapper base mapper used to serialize {@link ErrorResponse}
      */
     public ApiAccessDeniedHandler(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper.copy();
+        this.objectMapper = objectMapper.rebuild().build();
     }
 
     /**
