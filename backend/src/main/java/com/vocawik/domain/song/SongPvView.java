@@ -32,12 +32,27 @@ public class SongPvView extends BaseEntity {
      * @return created row
      */
     public static SongPvView create(SongPv songPv) {
+        return create(songPv, 0L);
+    }
+
+    /**
+     * Creates a view row for a song PV.
+     *
+     * @param songPv target song pv
+     * @param viewCount initial view count
+     * @return created row
+     */
+    public static SongPvView create(SongPv songPv, long viewCount) {
         if (songPv == null) {
             throw new IllegalArgumentException("songPv is required");
+        }
+        if (viewCount < 0) {
+            throw new IllegalArgumentException("viewCount must be >= 0");
         }
 
         SongPvView songPvView = new SongPvView();
         songPvView.songPv = songPv;
+        songPvView.viewCount = viewCount;
         return songPvView;
     }
 }

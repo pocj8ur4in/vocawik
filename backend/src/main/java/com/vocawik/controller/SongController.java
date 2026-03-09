@@ -2,14 +2,20 @@ package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.SongType;
+import com.vocawik.dto.resource.SongResourceDetailResponse;
+import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +29,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,6 +38,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Song", description = "Song endpoints")
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "SongService is a Spring-managed bean reference and is not exposed externally.")
 public class SongController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
@@ -41,6 +53,22 @@ public class SongController {
                     "publishedAt", "publishedAt");
 
     private final SongService songService;
+    private final ResourceService resourceService;
+
+    /**
+     * Creates a new song resource.
+     *
+     * @param request song create payload
+     * @return created song resource detail
+     */
+    @PostMapping("/songs")
+    @Operation(summary = "Create song", description = "Creates a song.")
+    public ResponseEntity<SongResourceDetailResponse> createSong(
+            @Valid @RequestBody SongCreateRequest request) {
+        UUID resourceUuid = songService.create(request);
+        SongResourceDetailResponse detail = resourceService.getSongByResourceUuid(resourceUuid);
+        return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+    }
 
     /**
      * Searches songs with optional filters.

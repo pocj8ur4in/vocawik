@@ -65,6 +65,35 @@ public class SongPv extends BaseEntity {
      * @return created song pv
      */
     public static SongPv create(Song song, SongPvProvider service, String videoKey) {
+        return create(song, service, videoKey, null, null, null, null, true, null, 0);
+    }
+
+    /**
+     * Creates a new song PV row.
+     *
+     * @param song parent song
+     * @param service pv service provider
+     * @param videoKey video key in service
+     * @param title pv title
+     * @param thumbnailUrl pv thumbnail url
+     * @param uploaderKey uploader key
+     * @param durationSeconds duration in seconds
+     * @param isOfficial whether official upload
+     * @param publishedAt published datetime
+     * @param sortOrder display order
+     * @return created song pv
+     */
+    public static SongPv create(
+            Song song,
+            SongPvProvider service,
+            String videoKey,
+            String title,
+            String thumbnailUrl,
+            String uploaderKey,
+            Integer durationSeconds,
+            boolean isOfficial,
+            LocalDateTime publishedAt,
+            int sortOrder) {
         if (song == null) {
             throw new IllegalArgumentException("song is required");
         }
@@ -74,11 +103,24 @@ public class SongPv extends BaseEntity {
         if (videoKey == null || videoKey.isBlank()) {
             throw new IllegalArgumentException("videoKey is required");
         }
+        if (durationSeconds != null && durationSeconds < 0) {
+            throw new IllegalArgumentException("durationSeconds must be >= 0");
+        }
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
 
         SongPv songPv = new SongPv();
         songPv.song = song;
         songPv.service = service;
-        songPv.videoKey = videoKey;
+        songPv.videoKey = videoKey.trim();
+        songPv.title = title;
+        songPv.thumbnailUrl = thumbnailUrl;
+        songPv.uploaderKey = uploaderKey;
+        songPv.durationSeconds = durationSeconds;
+        songPv.isOfficial = isOfficial;
+        songPv.publishedAt = publishedAt;
+        songPv.sortOrder = sortOrder;
         return songPv;
     }
 }

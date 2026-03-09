@@ -84,6 +84,21 @@ public class ResourceService {
         };
     }
 
+    /**
+     * Finds song detail from {@code resources.data}.
+     *
+     * @param resourceUuid song resource UUID
+     * @return denormalized song detail payload
+     */
+    @Transactional(readOnly = true)
+    public SongResourceDetailResponse getSongByResourceUuid(UUID resourceUuid) {
+        Object detail = getByResourceUuid(resourceUuid);
+        if (detail instanceof SongResourceDetailResponse songDetail) {
+            return songDetail;
+        }
+        throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
