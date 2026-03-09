@@ -3,6 +3,7 @@ package com.vocawik.controller;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistCreateRequest;
 import com.vocawik.dto.artist.ArtistListResponse;
+import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.service.artist.ArtistService;
 import com.vocawik.service.resource.ResourceService;
@@ -26,6 +27,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -64,6 +67,23 @@ public class ArtistController {
         UUID resourceUuid = artistService.create(request);
         ArtistResourceDetailResponse detail = resourceService.getArtistByResourceUuid(resourceUuid);
         return ResponseEntity.created(URI.create("/resources/" + resourceUuid)).body(detail);
+    }
+
+    /**
+     * Updates an existing artist resource.
+     *
+     * @param resourceUuid artist resource UUID
+     * @param request artist update payload
+     * @return updated artist resource detail
+     */
+    @PatchMapping("/artists/{resourceUuid}")
+    @Operation(summary = "Update artist", description = "Updates an artist.")
+    public ResponseEntity<ArtistResourceDetailResponse> updateArtist(
+            @PathVariable UUID resourceUuid, @Valid @RequestBody ArtistUpdateRequest request) {
+        UUID updatedResourceUuid = artistService.update(resourceUuid, request);
+        ArtistResourceDetailResponse detail =
+                resourceService.getArtistByResourceUuid(updatedResourceUuid);
+        return ResponseEntity.ok(detail);
     }
 
     /**

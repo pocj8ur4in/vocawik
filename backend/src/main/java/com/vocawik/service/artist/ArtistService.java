@@ -16,6 +16,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistCreateRequest;
 import com.vocawik.dto.artist.ArtistElementResponse;
 import com.vocawik.dto.artist.ArtistListResponse;
+import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistCriteria;
 import com.vocawik.repository.artist.ArtistGroupRepository;
@@ -23,6 +24,8 @@ import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
@@ -81,6 +84,47 @@ public class ArtistService {
         List<ArtistGroup> groups = saveArtistGroups(artist, request.groups());
 
         resource.updateData(buildArtistProjection(artist, resource, resourceNames, acls, groups));
+        resourceRepository.saveAndFlush(resource);
+        return resource.getUuid();
+    }
+
+    /**
+     * Updates an artist and optionally replaces child collections.
+     *
+     * @param resourceUuid artist resource UUID
+     * @param request update payload
+     * @return updated artist resource UUID
+     */
+    @Transactional
+    public UUID update(UUID resourceUuid, ArtistUpdateRequest request) {
+        Artist artist =
+                artistRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = artist.getResource();
+        List<ArtistGroup> previousGroups =
+                artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
+                        artist.getId());
+
+        updateArtistFields(artist, resource, request);
+
+        List<ResourceName> resourceNames =
+                request.names() == null
+                        ? resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                                resource.getId())
+                        : replaceResourceNames(resource, toCreateNames(request.names()));
+        List<Acl> acls =
+                request.acls() == null
+                        ? aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId())
+                        : replaceAcls(resource, toCreateAcls(request.acls()));
+        List<ArtistGroup> groups =
+                request.groups() == null
+                        ? previousGroups
+                        : replaceArtistGroups(artist, toCreateGroups(request.groups()));
+
+        updateArtistProjection(artist, resource, resourceNames, acls, groups);
+        updateAffectedMemberProjections(previousGroups, groups);
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -157,6 +201,27 @@ public class ArtistService {
         if (links != null && !links.isArray()) {
             throw new IllegalArgumentException("links must be a JSON array");
         }
+    }
+
+    private void updateArtistFields(Artist artist, Resource resource, ArtistUpdateRequest request) {
+        String canonicalName =
+                request.canonicalName() == null
+                        ? resource.getCanonicalName()
+                        : normalizeCanonicalName(request.canonicalName());
+        String thumbnailUrl =
+                request.thumbnailUrl() == null
+                        ? resource.getThumbnailUrl()
+                        : normalizeNullable(request.thumbnailUrl());
+        String content =
+                request.content() == null
+                        ? artist.getContent()
+                        : normalizeNullable(request.content());
+        JsonNode links = request.links() == null ? artist.getLinks() : toJsonNode(request.links());
+        validateLinks(links);
+
+        resource.updateCanonicalName(canonicalName);
+        resource.updateThumbnailUrl(thumbnailUrl);
+        artist.update(content, links);
     }
 
     private List<UUID> normalizeUuids(List<UUID> uuids) {
@@ -287,6 +352,13 @@ public class ArtistService {
                                                 "Unknown memberArtistResourceUuid: "
                                                         + item.memberArtistResourceUuid());
                                     }
+                                    if (groupArtist
+                                            .getResource()
+                                            .getUuid()
+                                            .equals(item.memberArtistResourceUuid())) {
+                                        throw new IllegalArgumentException(
+                                                "groupArtist and memberArtist must be different");
+                                    }
                                     Artist memberArtist =
                                             entityManager.getReference(
                                                     Artist.class, memberArtistId);
@@ -301,6 +373,62 @@ public class ArtistService {
                 .sorted(
                         Comparator.comparingInt(ArtistGroup::getSortOrder)
                                 .thenComparing(ArtistGroup::getId))
+                .toList();
+    }
+
+    private List<ResourceName> replaceResourceNames(
+            Resource resource, List<ArtistCreateRequest.ResourceNameCreateRequest> names) {
+        resourceNameRepository.deleteByResourceId(resource.getId());
+        return saveResourceNames(resource, names);
+    }
+
+    private List<Acl> replaceAcls(
+            Resource resource, List<ArtistCreateRequest.ResourceAclCreateRequest> acls) {
+        aclRepository.deleteByResourceId(resource.getId());
+        return saveAcls(resource, acls);
+    }
+
+    private List<ArtistGroup> replaceArtistGroups(
+            Artist artist, List<ArtistCreateRequest.ArtistGroupCreateRequest> groups) {
+        artistGroupRepository.deleteByGroupArtistId(artist.getId());
+        return saveArtistGroups(artist, groups);
+    }
+
+    private List<ArtistCreateRequest.ResourceNameCreateRequest> toCreateNames(
+            List<ArtistUpdateRequest.ResourceNameUpdateRequest> names) {
+        return names.stream()
+                .map(
+                        item ->
+                                new ArtistCreateRequest.ResourceNameCreateRequest(
+                                        item.langCode(),
+                                        item.name(),
+                                        item.isPrimary(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<ArtistCreateRequest.ResourceAclCreateRequest> toCreateAcls(
+            List<ArtistUpdateRequest.ResourceAclUpdateRequest> acls) {
+        return acls.stream()
+                .map(
+                        item ->
+                                new ArtistCreateRequest.ResourceAclCreateRequest(
+                                        item.action(),
+                                        item.subjectType(),
+                                        item.subjectValue(),
+                                        item.effect(),
+                                        item.priority(),
+                                        item.expiresAt()))
+                .toList();
+    }
+
+    private List<ArtistCreateRequest.ArtistGroupCreateRequest> toCreateGroups(
+            List<ArtistUpdateRequest.ArtistGroupUpdateRequest> groups) {
+        return groups.stream()
+                .map(
+                        item ->
+                                new ArtistCreateRequest.ArtistGroupCreateRequest(
+                                        item.memberArtistResourceUuid(), item.sortOrder()))
                 .toList();
     }
 
@@ -387,6 +515,26 @@ public class ArtistService {
             List<ResourceName> names,
             List<Acl> acls,
             List<ArtistGroup> groups) {
+        return buildArtistProjection(
+                artist,
+                resource,
+                names,
+                acls,
+                groups,
+                extractExistingArray(resource.getData(), "songs"),
+                buildArtistMembersProjection(
+                        artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
+                                artist.getId())));
+    }
+
+    private JsonNode buildArtistProjection(
+            Artist artist,
+            Resource resource,
+            List<ResourceName> names,
+            List<Acl> acls,
+            List<ArtistGroup> groups,
+            JsonNode songs,
+            JsonNode members) {
         ObjectNode data = objectMapper.createObjectNode();
         data.put("resourceUuid", resource.getUuid().toString());
         data.put("canonicalName", resource.getCanonicalName());
@@ -401,9 +549,9 @@ public class ArtistService {
         putNullableText(data, "updatedAt", formatDateTime(resource.getUpdatedAt()));
         data.set("names", buildNamesProjection(names));
         data.set("acls", buildAclsProjection(acls));
-        data.set("songs", objectMapper.createArrayNode());
+        data.set("songs", songs == null ? objectMapper.createArrayNode() : songs);
         data.set("groups", buildArtistGroupsProjection(groups));
-        data.set("members", objectMapper.createArrayNode());
+        data.set("members", members == null ? objectMapper.createArrayNode() : members);
         return data;
     }
 
@@ -459,6 +607,72 @@ public class ArtistService {
             items.add(item);
         }
         return items;
+    }
+
+    private ArrayNode buildArtistMembersProjection(List<ArtistGroup> memberships) {
+        ArrayNode items = objectMapper.createArrayNode();
+        for (ArtistGroup membership : memberships) {
+            ObjectNode item = objectMapper.createObjectNode();
+            item.put(
+                    "groupArtistResourceUuid",
+                    membership.getGroupArtist().getResource().getUuid().toString());
+            item.put(
+                    "groupArtistCanonicalName",
+                    membership.getGroupArtist().getResource().getCanonicalName());
+            putNullableText(
+                    item,
+                    "groupArtistThumbnailUrl",
+                    membership.getGroupArtist().getResource().getThumbnailUrl());
+            item.put("sortOrder", membership.getSortOrder());
+            items.add(item);
+        }
+        return items;
+    }
+
+    private JsonNode extractExistingArray(JsonNode data, String fieldName) {
+        if (data == null || data.isNull()) {
+            return objectMapper.createArrayNode();
+        }
+        JsonNode node = data.get(fieldName);
+        return node != null && node.isArray() ? node.deepCopy() : objectMapper.createArrayNode();
+    }
+
+    private void updateArtistProjection(
+            Artist artist,
+            Resource resource,
+            List<ResourceName> resourceNames,
+            List<Acl> acls,
+            List<ArtistGroup> groups) {
+        resource.updateData(buildArtistProjection(artist, resource, resourceNames, acls, groups));
+    }
+
+    private void updateAffectedMemberProjections(
+            List<ArtistGroup> previousGroups, List<ArtistGroup> updatedGroups) {
+        LinkedHashSet<Long> affectedArtistIds = new LinkedHashSet<>();
+        previousGroups.stream()
+                .map(group -> group.getMemberArtist().getId())
+                .forEach(affectedArtistIds::add);
+        updatedGroups.stream()
+                .map(group -> group.getMemberArtist().getId())
+                .forEach(affectedArtistIds::add);
+        if (affectedArtistIds.isEmpty()) {
+            return;
+        }
+
+        for (Artist affectedArtist : artistRepository.findAllById(affectedArtistIds)) {
+            Resource affectedResource = affectedArtist.getResource();
+            List<ResourceName> names =
+                    resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                            affectedResource.getId());
+            List<Acl> acls =
+                    aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(
+                            affectedResource.getId());
+            List<ArtistGroup> groups =
+                    artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
+                            affectedArtist.getId());
+            affectedResource.updateData(
+                    buildArtistProjection(affectedArtist, affectedResource, names, acls, groups));
+        }
     }
 
     private void putNullableText(ObjectNode node, String fieldName, String value) {

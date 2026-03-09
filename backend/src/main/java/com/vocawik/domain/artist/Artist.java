@@ -56,4 +56,15 @@ public class Artist {
         artist.links = links;
         return artist;
     }
+
+    /**
+     * Updates artist detail fields.
+     *
+     * @param content updated content
+     * @param links updated links
+     */
+    public void update(String content, JsonNode links) {
+        this.content = content;
+        this.links = links;
+    }
 }
