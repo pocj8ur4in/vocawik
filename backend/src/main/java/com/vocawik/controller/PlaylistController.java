@@ -24,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,6 +70,15 @@ public class PlaylistController {
             @PathVariable UUID resourceUuid, @Valid @RequestBody PlaylistUpdateRequest request) {
         UUID updatedResourceUuid = playlistService.update(resourceUuid, request);
         return ResponseEntity.ok(resourceService.getPlaylistByResourceUuid(updatedResourceUuid));
+    }
+
+    /** Soft-deletes a playlist resource. */
+    @DeleteMapping("/playlists/{resourceUuid}")
+    @Operation(summary = "Delete playlist", description = "Soft-deletes a playlist.")
+    public ResponseEntity<PlaylistResourceDetailResponse> deletePlaylist(
+            @PathVariable UUID resourceUuid) {
+        playlistService.delete(resourceUuid);
+        return ResponseEntity.ok(resourceService.getPlaylistByResourceUuid(resourceUuid));
     }
 
     /** Gets a playlist detail. */

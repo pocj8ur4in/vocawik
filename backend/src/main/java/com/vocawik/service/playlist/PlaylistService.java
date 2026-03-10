@@ -118,6 +118,21 @@ public class PlaylistService {
         return resource.getUuid();
     }
 
+    @Transactional
+    public void delete(UUID resourceUuid) {
+        Playlist playlist =
+                playlistRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = playlist.getResource();
+        JsonNode snapshot = buildHistorySnapshot(playlist, resource);
+
+        resource.softDelete();
+        resourceHistoryService.recordDelete(resource, snapshot);
+        resourceRepository.saveAndFlush(resource);
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
