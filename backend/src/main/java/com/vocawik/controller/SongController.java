@@ -110,7 +110,7 @@ public class SongController {
      * Searches songs with optional filters.
      *
      * @param status optional resource status filter
-     * @param songType optional song type filter
+     * @param songTypes optional song type filters
      * @param query optional canonical name keyword
      * @param artistUuids optional artist resource UUID filter
      * @param vocalUuids optional vocal resource UUID filter
@@ -158,9 +158,9 @@ public class SongController {
             @Parameter(description = "Resource status filter")
                     @RequestParam(name = "status", required = false)
                     ResourceStatus status,
-            @Parameter(description = "Song type filter")
-                    @RequestParam(name = "songType", required = false)
-                    SongType songType,
+            @Parameter(description = "Song type filters")
+                    @RequestParam(name = "songTypes", required = false)
+                    List<SongType> songTypes,
             @Parameter(description = "Canonical name keyword")
                     @RequestParam(name = "query", required = false)
                     String query,
@@ -189,7 +189,7 @@ public class SongController {
         return ResponseEntity.ok(
                 songService.search(
                         status,
-                        songType,
+                        songTypes,
                         query,
                         artistUuids,
                         vocalUuids,
