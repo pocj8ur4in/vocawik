@@ -46,8 +46,8 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
             predicates.add(
                     criteriaBuilder.equal(root.get("resource").get("status"), criteria.status()));
         }
-        if (criteria.songType() != null) {
-            predicates.add(criteriaBuilder.equal(root.get("songType"), criteria.songType()));
+        if (criteria.songTypes() != null && !criteria.songTypes().isEmpty()) {
+            predicates.add(root.get("songType").in(criteria.songTypes()));
         }
         if (criteria.query() != null) {
             String keywordPattern = "%" + criteria.query().toLowerCase() + "%";

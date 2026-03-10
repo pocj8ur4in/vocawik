@@ -10,7 +10,7 @@ import java.util.UUID;
  * Search condition for song listing.
  *
  * @param status optional resource status filter
- * @param songType optional song type filter
+ * @param songTypes optional song type filters
  * @param query optional canonical-name keyword
  * @param artistUuids optional artist resource UUID filters
  * @param vocalUuids optional vocal resource UUID filters
@@ -19,7 +19,7 @@ import java.util.UUID;
  */
 public record SongCriteria(
         ResourceStatus status,
-        SongType songType,
+        List<SongType> songTypes,
         String query,
         List<UUID> artistUuids,
         List<UUID> vocalUuids,
@@ -27,6 +27,7 @@ public record SongCriteria(
         LocalDateTime publishedTo) {
 
     public SongCriteria {
+        songTypes = songTypes == null ? List.of() : List.copyOf(songTypes);
         artistUuids = artistUuids == null ? List.of() : List.copyOf(artistUuids);
         vocalUuids = vocalUuids == null ? List.of() : List.copyOf(vocalUuids);
     }

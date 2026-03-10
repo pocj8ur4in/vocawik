@@ -88,7 +88,7 @@ public class SongService {
      * Searches songs with optional filters.
      *
      * @param status optional resource status filter
-     * @param songType optional song type filter
+     * @param songTypes optional song type filters
      * @param query optional canonical-name query
      * @param artistUuids optional artist resource UUIDs
      * @param vocalUuids optional vocal resource UUIDs
@@ -100,7 +100,7 @@ public class SongService {
     @Transactional(readOnly = true)
     public SongListResponse search(
             ResourceStatus status,
-            SongType songType,
+            List<SongType> songTypes,
             String query,
             List<UUID> artistUuids,
             List<UUID> vocalUuids,
@@ -115,7 +115,7 @@ public class SongService {
                 songRepository.search(
                         new SongCriteria(
                                 status,
-                                songType,
+                                songTypes,
                                 normalizedQuery,
                                 normalizedArtistUuids,
                                 normalizedVocalUuids,
