@@ -3,6 +3,7 @@ package com.vocawik.controller;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.service.playlist.PlaylistService;
 import com.vocawik.service.resource.ResourceService;
@@ -24,6 +25,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,6 +60,15 @@ public class PlaylistController {
         UUID resourceUuid = playlistService.create(request);
         return ResponseEntity.created(java.net.URI.create("/playlists/" + resourceUuid))
                 .body(resourceService.getPlaylistByResourceUuid(resourceUuid));
+    }
+
+    /** Updates a playlist resource. */
+    @PatchMapping("/playlists/{resourceUuid}")
+    @Operation(summary = "Update playlist", description = "Updates a playlist.")
+    public ResponseEntity<PlaylistResourceDetailResponse> updatePlaylist(
+            @PathVariable UUID resourceUuid, @Valid @RequestBody PlaylistUpdateRequest request) {
+        UUID updatedResourceUuid = playlistService.update(resourceUuid, request);
+        return ResponseEntity.ok(resourceService.getPlaylistByResourceUuid(updatedResourceUuid));
     }
 
     /** Gets a playlist detail. */
