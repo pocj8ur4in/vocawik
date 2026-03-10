@@ -1,25 +1,60 @@
 package com.vocawik.service.playlist;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.vocawik.domain.acl.Acl;
+import com.vocawik.domain.acl.AclAction;
+import com.vocawik.domain.acl.AclEffect;
+import com.vocawik.domain.acl.AclSubjectType;
 import com.vocawik.domain.playlist.Playlist;
+import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
+import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistElementResponse;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.repository.acl.AclRepository;
+import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.playlist.PlaylistCriteria;
 import com.vocawik.repository.playlist.PlaylistRepository;
+import com.vocawik.repository.playlist.PlaylistSongRepository;
+import com.vocawik.repository.resource.ResourceNameRepository;
+import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.repository.song.SongRepository;
+import com.vocawik.service.history.ResourceHistoryService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import jakarta.persistence.EntityManager;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Service for playlist list queries. */
+/** Service for playlist queries and writes. */
 @Service
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification = "Spring-managed dependencies are stored for internal orchestration only.")
 public class PlaylistService {
 
     private final PlaylistRepository playlistRepository;
+    private final PlaylistSongRepository playlistSongRepository;
+    private final ResourceRepository resourceRepository;
+    private final ResourceNameRepository resourceNameRepository;
+    private final AclRepository aclRepository;
+    private final SongRepository songRepository;
+    private final ResourceHistoryService resourceHistoryService;
+    private final EntityManager entityManager;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public PlaylistListResponse search(ResourceStatus status, String query, Pageable pageable) {
@@ -34,11 +69,47 @@ public class PlaylistService {
                 items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
     }
 
+    @Transactional
+    public UUID create(PlaylistCreateRequest request) {
+        Playlist playlist =
+                Playlist.create(
+                        normalizeCanonicalName(request.canonicalName()),
+                        normalizeNullable(request.thumbnailUrl()),
+                        normalizeNullable(request.content()),
+                        request.isPublic() == null || request.isPublic());
+
+        Resource resource = resourceRepository.save(playlist.getResource());
+        playlistRepository.save(playlist);
+
+        saveResourceNames(resource, request.names());
+        saveAcls(resource, request.acls());
+        savePlaylistSongs(playlist, request.songs());
+
+        resourceHistoryService.recordCreate(resource, buildHistorySnapshot(playlist, resource));
+        resourceRepository.saveAndFlush(resource);
+        return resource.getUuid();
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
         }
         String trimmed = query.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeCanonicalName(String canonicalName) {
+        if (canonicalName == null || canonicalName.isBlank()) {
+            throw new IllegalArgumentException("canonicalName is required");
+        }
+        return canonicalName.trim();
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 
@@ -52,5 +123,259 @@ public class PlaylistService {
                 resource.getThumbnailUrl(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt());
+    }
+
+    private List<ResourceName> saveResourceNames(
+            Resource resource, List<PlaylistCreateRequest.ResourceNameCreateRequest> names) {
+        if (names == null || names.isEmpty()) {
+            return List.of();
+        }
+
+        HashSet<String> uniqueNames = new HashSet<>();
+        HashSet<String> primaryLangs = new HashSet<>();
+        List<ResourceName> entities =
+                names.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "names contains null item");
+                                    }
+                                    String normalizedName = normalizeCanonicalName(item.name());
+                                    String uniqueKey =
+                                            item.langCode().name() + "|" + normalizedName;
+                                    if (!uniqueNames.add(uniqueKey)) {
+                                        throw new IllegalArgumentException(
+                                                "Duplicate resource name for language and value");
+                                    }
+                                    if (item.isPrimary()
+                                            && !primaryLangs.add(item.langCode().name())) {
+                                        throw new IllegalArgumentException(
+                                                "Only one primary name is allowed per language");
+                                    }
+                                    return ResourceName.create(
+                                            resource,
+                                            item.langCode(),
+                                            normalizedName,
+                                            item.isPrimary(),
+                                            item.sortOrder() == null ? 0 : item.sortOrder());
+                                })
+                        .toList();
+
+        return resourceNameRepository.saveAllAndFlush(entities).stream()
+                .sorted(
+                        Comparator.comparingInt(ResourceName::getSortOrder)
+                                .thenComparing(ResourceName::getId))
+                .toList();
+    }
+
+    private List<Acl> saveAcls(
+            Resource resource, List<PlaylistCreateRequest.ResourceAclCreateRequest> acls) {
+        if (acls == null || acls.isEmpty()) {
+            return List.of();
+        }
+
+        List<Acl> entities =
+                acls.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "acls contains null item");
+                                    }
+                                    AclSubjectType subjectType =
+                                            parseAclSubjectType(item.subjectType());
+                                    String normalizedSubjectValue =
+                                            normalizeAclSubjectValue(
+                                                    subjectType, item.subjectValue());
+                                    return Acl.create(
+                                            resource,
+                                            parseAclAction(item.action()),
+                                            subjectType,
+                                            normalizedSubjectValue,
+                                            parseAclEffect(item.effect()),
+                                            item.priority() == null ? 100 : item.priority(),
+                                            item.expiresAt());
+                                })
+                        .toList();
+
+        return aclRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparingInt(Acl::getPriority).thenComparing(Acl::getId))
+                .toList();
+    }
+
+    private List<PlaylistSong> savePlaylistSongs(
+            Playlist playlist, List<PlaylistCreateRequest.PlaylistSongCreateRequest> songs) {
+        if (songs == null || songs.isEmpty()) {
+            return List.of();
+        }
+
+        HashSet<UUID> uniqueSongUuids = new HashSet<>();
+        HashSet<Integer> uniqueSortOrders = new HashSet<>();
+        for (PlaylistCreateRequest.PlaylistSongCreateRequest item : songs) {
+            if (item == null) {
+                throw new IllegalArgumentException("songs contains null item");
+            }
+            if (!uniqueSongUuids.add(item.songResourceUuid())) {
+                throw new IllegalArgumentException(
+                        "Duplicate songResourceUuid: " + item.songResourceUuid());
+            }
+            if (!uniqueSortOrders.add(item.sortOrder())) {
+                throw new IllegalArgumentException("Duplicate sortOrder in songs");
+            }
+        }
+
+        List<UUID> songUuids =
+                songs.stream()
+                        .map(PlaylistCreateRequest.PlaylistSongCreateRequest::songResourceUuid)
+                        .toList();
+        Map<UUID, Long> songIdsByUuid =
+                songRepository.findResourceRefsByResourceUuids(songUuids).stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        ResourceRefProjection::getResourceUuid,
+                                        ResourceRefProjection::getId));
+
+        if (songIdsByUuid.size() != songUuids.size()) {
+            for (UUID songUuid : songUuids) {
+                if (!songIdsByUuid.containsKey(songUuid)) {
+                    throw new IllegalArgumentException("Unknown songResourceUuid: " + songUuid);
+                }
+            }
+        }
+
+        List<PlaylistSong> entities =
+                songs.stream()
+                        .map(
+                                item ->
+                                        PlaylistSong.create(
+                                                playlist,
+                                                entityManager.getReference(
+                                                        com.vocawik.domain.song.Song.class,
+                                                        songIdsByUuid.get(item.songResourceUuid())),
+                                                item.sortOrder()))
+                        .toList();
+
+        return playlistSongRepository.saveAllAndFlush(entities).stream()
+                .sorted(
+                        Comparator.comparingInt(PlaylistSong::getSortOrder)
+                                .thenComparing(PlaylistSong::getId))
+                .toList();
+    }
+
+    private String normalizeAclSubjectValue(AclSubjectType subjectType, String subjectValue) {
+        if (subjectType == null) {
+            throw new IllegalArgumentException("acl.subjectType is required");
+        }
+
+        String normalized = subjectValue == null ? "" : subjectValue.trim();
+        return switch (subjectType) {
+            case ANONYMOUS, USER, USER_15, USER_VERIFIED, ADMIN -> {
+                if (!normalized.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "subjectValue must be empty for subjectType " + subjectType.name());
+                }
+                yield "";
+            }
+            case USER_ID, GUEST_ID, ACL_GROUP -> {
+                if (normalized.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "subjectValue is required for subjectType " + subjectType.name());
+                }
+                yield normalized;
+            }
+        };
+    }
+
+    private AclAction parseAclAction(String value) {
+        return parseEnum(value, AclAction.class, "acls.action");
+    }
+
+    private AclSubjectType parseAclSubjectType(String value) {
+        return parseEnum(value, AclSubjectType.class, "acls.subjectType");
+    }
+
+    private AclEffect parseAclEffect(String value) {
+        if (value == null || value.isBlank()) {
+            return AclEffect.ALLOW;
+        }
+        return parseEnum(value, AclEffect.class, "acls.effect");
+    }
+
+    private <E extends Enum<E>> E parseEnum(String rawValue, Class<E> enumClass, String fieldName) {
+        if (rawValue == null || rawValue.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        String normalized = rawValue.trim().toUpperCase(java.util.Locale.ROOT);
+        try {
+            return Enum.valueOf(enumClass, normalized);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(fieldName + " is invalid: " + rawValue);
+        }
+    }
+
+    private JsonNode buildHistorySnapshot(Playlist playlist, Resource resource) {
+        ObjectNode data = objectMapper.createObjectNode();
+        data.put("canonicalName", resource.getCanonicalName());
+        putNullableText(data, "thumbnailUrl", resource.getThumbnailUrl());
+        putNullableText(data, "content", playlist.getContent());
+        data.put("isPublic", playlist.isPublic());
+        data.set("names", buildNamesSnapshot(resource.getId()));
+        data.set("acls", buildAclsSnapshot(resource.getId()));
+        data.set("songs", buildSongsSnapshot(playlist.getId()));
+        return data;
+    }
+
+    private ArrayNode buildNamesSnapshot(Long resourceId) {
+        ArrayNode array = objectMapper.createArrayNode();
+        for (ResourceName name :
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(resourceId)) {
+            ObjectNode item = objectMapper.createObjectNode();
+            item.put("langCode", name.getLangCode().name());
+            item.put("name", name.getName());
+            item.put("isPrimary", name.isPrimary());
+            item.put("sortOrder", name.getSortOrder());
+            array.add(item);
+        }
+        return array;
+    }
+
+    private ArrayNode buildAclsSnapshot(Long resourceId) {
+        ArrayNode array = objectMapper.createArrayNode();
+        for (Acl acl : aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resourceId)) {
+            ObjectNode item = objectMapper.createObjectNode();
+            item.put("action", acl.getAction().name());
+            item.put("subjectType", acl.getSubjectType().name());
+            item.put("subjectValue", acl.getSubjectValue());
+            item.put("effect", acl.getEffect().name());
+            item.put("priority", acl.getPriority());
+            if (acl.getExpiresAt() == null) {
+                item.putNull("expiresAt");
+            } else {
+                item.put("expiresAt", acl.getExpiresAt().toString());
+            }
+            array.add(item);
+        }
+        return array;
+    }
+
+    private ArrayNode buildSongsSnapshot(Long playlistId) {
+        ArrayNode array = objectMapper.createArrayNode();
+        for (PlaylistSong playlistSong :
+                playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(playlistId)) {
+            ObjectNode item = objectMapper.createObjectNode();
+            item.put("songResourceUuid", playlistSong.getSong().getResource().getUuid().toString());
+            item.put("sortOrder", playlistSong.getSortOrder());
+            array.add(item);
+        }
+        return array;
+    }
+
+    private void putNullableText(ObjectNode objectNode, String fieldName, String value) {
+        if (value == null) {
+            objectNode.putNull(fieldName);
+            return;
+        }
+        objectNode.put(fieldName, value);
     }
 }
