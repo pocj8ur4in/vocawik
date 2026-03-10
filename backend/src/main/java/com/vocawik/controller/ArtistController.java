@@ -97,9 +97,10 @@ public class ArtistController {
     /** Soft-deletes an artist. */
     @DeleteMapping("/artists/{resourceUuid}")
     @Operation(summary = "Delete artist", description = "Soft-deletes an artist.")
-    public ResponseEntity<Void> deleteArtist(@PathVariable UUID resourceUuid) {
+    public ResponseEntity<ArtistResourceDetailResponse> deleteArtist(
+            @PathVariable UUID resourceUuid) {
         artistService.delete(resourceUuid);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(resourceService.getArtistByResourceUuid(resourceUuid));
     }
 
     /**

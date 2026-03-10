@@ -7,6 +7,7 @@ import java.util.UUID;
 /** Detailed vocal payload returned by resource detail endpoint. */
 public record VocalResourceDetailResponse(
         UUID resourceUuid,
+        boolean isDeleted,
         String canonicalName,
         String status,
         long viewCount,

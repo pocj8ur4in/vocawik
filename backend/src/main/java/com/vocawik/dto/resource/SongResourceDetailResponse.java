@@ -7,6 +7,7 @@ import java.util.UUID;
 /** Detailed song payload returned by resource detail endpoint. */
 public record SongResourceDetailResponse(
         UUID resourceUuid,
+        boolean isDeleted,
         String canonicalName,
         String status,
         String songType,

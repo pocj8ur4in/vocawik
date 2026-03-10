@@ -101,9 +101,9 @@ public class SongController {
     /** Soft-deletes a song. */
     @DeleteMapping("/songs/{resourceUuid}")
     @Operation(summary = "Delete song", description = "Soft-deletes a song.")
-    public ResponseEntity<Void> deleteSong(@PathVariable UUID resourceUuid) {
+    public ResponseEntity<SongResourceDetailResponse> deleteSong(@PathVariable UUID resourceUuid) {
         songService.delete(resourceUuid);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(resourceService.getSongByResourceUuid(resourceUuid));
     }
 
     /**
