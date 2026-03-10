@@ -1,6 +1,7 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.history.ResourceHistoryListResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.service.history.ResourceHistoryService;
@@ -130,6 +131,18 @@ public class ResourceController {
                 resourceHistoryService.listByResourceUuid(
                         resourceUuid,
                         PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())));
+    }
+
+    /** Gets a single resource history revision. */
+    @GetMapping("/resources/{resourceUuid}/histories/{historyUuid}")
+    @Operation(
+            summary = "Get resource history",
+            description =
+                    "Returns revision metadata and snapshot data for a single resource history row.")
+    public ResponseEntity<ResourceHistoryDetailResponse> getResourceHistory(
+            @PathVariable UUID resourceUuid, @PathVariable UUID historyUuid) {
+        return ResponseEntity.ok(
+                resourceHistoryService.getByResourceUuidAndHistoryUuid(resourceUuid, historyUuid));
     }
 
     private Sort sanitizeSort(Sort requestedSort) {
