@@ -71,6 +71,23 @@ public class ResourceHistoryService {
         return historyRepository.save(history);
     }
 
+    @Transactional
+    public History recordDelete(Resource resource, JsonNode snapshotData) {
+        int baseRevision = resource.getRevision();
+        int revision = resource.advanceRevision();
+        History history =
+                History.createSnapshot(
+                        resource,
+                        revision,
+                        baseRevision,
+                        HistoryActionType.DELETE,
+                        currentUser().orElse(null),
+                        currentGuest().orElse(null),
+                        snapshotData,
+                        contentHash(snapshotData));
+        return historyRepository.save(history);
+    }
+
     private Optional<User> currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
