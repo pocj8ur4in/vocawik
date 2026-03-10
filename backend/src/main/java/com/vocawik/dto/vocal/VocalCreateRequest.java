@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** Request payload for vocal character creation. */
+/** Request payload for vocal creation. */
 public record VocalCreateRequest(
         @NotBlank @Size(max = 255) String canonicalName,
         String thumbnailUrl,

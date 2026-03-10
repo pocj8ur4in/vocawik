@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Search condition for vocal character listing.
+ * Search condition for vocal listing.
  *
  * @param status optional resource status filter
  * @param query optional name keyword

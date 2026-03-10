@@ -410,13 +410,13 @@ CREATE TABLE song_artists (
     CONSTRAINT chk_song_artists_sort_order CHECK (sort_order >= 0)
 );
 
--- vocal_characters
-CREATE TABLE vocal_characters (
+-- vocals
+CREATE TABLE vocals (
     id BIGINT PRIMARY KEY,
     content TEXT,
     links JSONB,
-    CONSTRAINT fk_vocal_characters_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_vocal_characters_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
+    CONSTRAINT fk_vocals_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_vocals_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
 );
 
 -- song_vocals
@@ -430,7 +430,7 @@ CREATE TABLE song_vocals (
     is_main BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_vocals_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_song_vocals_vocal FOREIGN KEY (vocal_id) REFERENCES vocal_characters (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_song_vocals_vocal FOREIGN KEY (vocal_id) REFERENCES vocals (id) ON DELETE RESTRICT,
     CONSTRAINT uk_song_vocals_song_vocal UNIQUE (song_id, vocal_id),
     CONSTRAINT chk_song_vocals_sort_order CHECK (sort_order >= 0)
 );

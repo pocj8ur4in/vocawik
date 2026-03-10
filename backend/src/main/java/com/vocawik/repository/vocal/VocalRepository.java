@@ -1,6 +1,6 @@
 package com.vocawik.repository.vocal;
 
-import com.vocawik.domain.vocal.VocalCharacter;
+import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.repository.common.ResourceRefProjection;
 import java.util.Collection;
 import java.util.List;
@@ -8,24 +8,23 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Repository for {@link VocalCharacter} persistence access. */
-public interface VocalCharacterRepository
-        extends JpaRepository<VocalCharacter, Long>, VocalCriteriaRepository {
+/** Repository for {@link Vocal} persistence access. */
+public interface VocalRepository extends JpaRepository<Vocal, Long>, VocalCriteriaRepository {
 
-    /** Finds an active vocal character by resource UUID. */
-    java.util.Optional<VocalCharacter> findByResourceUuidAndResourceIsDeletedFalse(
+    /** Finds an active vocal by resource UUID. */
+    java.util.Optional<Vocal> findByResourceUuidAndResourceIsDeletedFalse(
             java.util.UUID resourceUuid);
 
     /**
-     * Finds active vocal characters by resource UUIDs.
+     * Finds active vocals by resource UUIDs.
      *
      * @param resourceUuids vocal resource UUIDs
-     * @return matching active vocal characters
+     * @return matching active vocals
      */
     @Query(
             """
             select v.id as id, v.resource.uuid as resourceUuid
-            from VocalCharacter v
+            from Vocal v
             where v.resource.isDeleted = false
               and v.resource.uuid in :resourceUuids
             """)

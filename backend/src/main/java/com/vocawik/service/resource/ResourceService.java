@@ -14,7 +14,7 @@ import com.vocawik.domain.song.SongPv;
 import com.vocawik.domain.song.SongPvView;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongVocal;
-import com.vocawik.domain.vocal.VocalCharacter;
+import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
 import com.vocawik.dto.resource.ResourceElementResponse;
@@ -36,7 +36,7 @@ import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
-import com.vocawik.repository.vocal.VocalCharacterRepository;
+import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -72,7 +72,7 @@ public class ResourceService {
     private final PlaylistSongRepository playlistSongRepository;
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
-    private final VocalCharacterRepository vocalCharacterRepository;
+    private final VocalRepository vocalRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -175,8 +175,8 @@ public class ResourceService {
 
     @Transactional(readOnly = true)
     public VocalResourceDetailResponse getVocalByResourceUuid(UUID resourceUuid) {
-        VocalCharacter vocal =
-                vocalCharacterRepository
+        Vocal vocal =
+                vocalRepository
                         .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();

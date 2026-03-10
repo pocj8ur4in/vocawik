@@ -19,7 +19,7 @@ import com.vocawik.domain.song.SongPvProvider;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.domain.song.SongVocal;
-import com.vocawik.domain.vocal.VocalCharacter;
+import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongElementResponse;
 import com.vocawik.dto.song.SongListResponse;
@@ -37,7 +37,7 @@ import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
-import com.vocawik.repository.vocal.VocalCharacterRepository;
+import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -76,7 +76,7 @@ public class SongService {
     private final SongVocalRepository songVocalRepository;
     private final SongRelationRepository songRelationRepository;
     private final ArtistRepository artistRepository;
-    private final VocalCharacterRepository vocalCharacterRepository;
+    private final VocalRepository vocalRepository;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
 
@@ -642,9 +642,7 @@ public class SongService {
                                                 "Unknown vocalResourceUuid: "
                                                         + item.vocalResourceUuid());
                                     }
-                                    VocalCharacter vocal =
-                                            entityManager.getReference(
-                                                    VocalCharacter.class, vocalId);
+                                    Vocal vocal = entityManager.getReference(Vocal.class, vocalId);
                                     return SongVocal.create(
                                             song,
                                             vocal,
@@ -727,7 +725,7 @@ public class SongService {
             return Map.of();
         }
         List<ResourceRefProjection> refs =
-                vocalCharacterRepository.findResourceRefsByResourceUuids(resourceUuids);
+                vocalRepository.findResourceRefsByResourceUuids(resourceUuids);
         return toIdMap(refs);
     }
 
