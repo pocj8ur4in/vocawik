@@ -113,29 +113,18 @@ public class VocalService {
      * @param status optional resource status filter
      * @param query optional name query
      * @param songUuids optional song resource UUID filters
-     * @param voicebankUuids optional voicebank resource UUID filters
      * @param pageable page/sort options
      * @return sliced vocal list response
      */
     @Transactional(readOnly = true)
     public VocalListResponse search(
-            ResourceStatus status,
-            String query,
-            List<UUID> songUuids,
-            List<UUID> voicebankUuids,
-            Pageable pageable) {
+            ResourceStatus status, String query, List<UUID> songUuids, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedSongUuids = normalizeUuids(songUuids);
-        List<UUID> normalizedVoicebankUuids = normalizeUuids(voicebankUuids);
 
         Slice<VocalCharacter> resultSlice =
                 vocalCharacterRepository.search(
-                        new VocalCriteria(
-                                status,
-                                normalizedQuery,
-                                normalizedSongUuids,
-                                normalizedVoicebankUuids),
-                        pageable);
+                        new VocalCriteria(status, normalizedQuery, normalizedSongUuids), pageable);
 
         List<VocalElementResponse> items =
                 resultSlice.getContent().stream().map(this::toSummary).toList();

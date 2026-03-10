@@ -23,7 +23,6 @@ public record SongResourceDetailResponse(
         List<SongPv> pvs,
         List<SongArtist> artists,
         List<SongVocal> vocals,
-        List<SongVoicebank> voicebanks,
         List<SongRelation> relations,
         List<SongIncomingRelation> incomingRelations,
         List<SongPlaylist> playlists) {
@@ -36,7 +35,6 @@ public record SongResourceDetailResponse(
         pvs = List.copyOf(pvs);
         artists = List.copyOf(artists);
         vocals = List.copyOf(vocals);
-        voicebanks = List.copyOf(voicebanks);
         relations = List.copyOf(relations);
         incomingRelations = List.copyOf(incomingRelations);
         playlists = List.copyOf(playlists);
@@ -93,16 +91,6 @@ public record SongResourceDetailResponse(
     /** Song vocal item in the detailed payload. */
     public record SongVocal(
             UUID vocalResourceUuid, String vocalCanonicalName, boolean isMain, int sortOrder) {}
-
-    /** Song voicebank item in the detailed payload. */
-    public record SongVoicebank(
-            UUID voicebankResourceUuid,
-            String voicebankCanonicalName,
-            UUID vocalResourceUuid,
-            String vocalCanonicalName,
-            String voicebankType,
-            boolean isMain,
-            int sortOrder) {}
 
     /** Song relation item in the detailed payload. */
     public record SongRelation(

@@ -99,7 +99,6 @@ public class VocalController {
      * @param status optional resource status filter
      * @param query optional name keyword
      * @param songUuids optional song resource UUID filter
-     * @param voicebankUuids optional voicebank resource UUID filter
      * @param pageable page and sort options
      * @return paged vocal summaries
      */
@@ -145,9 +144,6 @@ public class VocalController {
             @Parameter(description = "Song resource UUID filter")
                     @RequestParam(name = "songUuids", required = false)
                     List<UUID> songUuids,
-            @Parameter(description = "Voicebank resource UUID filter")
-                    @RequestParam(name = "voicebankUuids", required = false)
-                    List<UUID> voicebankUuids,
             @Parameter(hidden = true)
                     @PageableDefault(
                             size = 20,
@@ -159,7 +155,6 @@ public class VocalController {
                         status,
                         query,
                         songUuids,
-                        voicebankUuids,
                         PageRequest.of(
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),

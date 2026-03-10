@@ -87,8 +87,7 @@ public class SecurityConfig {
                                                 "/api/v1/resources/**",
                                                 "/api/v1/songs/**",
                                                 "/api/v1/artists/**",
-                                                "/api/v1/vocals/**",
-                                                "/api/v1/voicebanks/**")
+                                                "/api/v1/vocals/**")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())

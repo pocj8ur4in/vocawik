@@ -93,7 +93,7 @@ CREATE TABLE resources (
     CONSTRAINT chk_resources_view_count CHECK (view_count >= 0),
     CONSTRAINT chk_resources_status CHECK (status IN ('ACTIVE', 'DRAFT')),
     CONSTRAINT chk_resources_resource_type CHECK (
-        resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'VOICEBANK', 'PLAYLIST')
+        resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'PLAYLIST')
     )
 );
 
@@ -419,33 +419,6 @@ CREATE TABLE vocal_characters (
     CONSTRAINT chk_vocal_characters_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
 );
 
--- vocal_voicebanks
-CREATE TABLE vocal_voicebanks (
-    id BIGINT PRIMARY KEY,
-    content TEXT,
-    links JSONB,
-    vocal_character_id BIGINT,
-    voicebank_typ VARCHAR(20) NOT NULL DEFAULT 'OTHER',
-    CONSTRAINT fk_vocal_voicebanks_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_vocal_voicebanks_vocal_character FOREIGN KEY (vocal_character_id) REFERENCES vocal_characters (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_vocal_voicebanks_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array'),
-    CONSTRAINT chk_vocal_voicebanks_voicebank_typ CHECK (
-        voicebank_typ IN (
-            'VOCALOID',
-            'UTAU',
-            'CEVIO',
-            'SYNTHESIZER_V',
-            'NEUTRINO',
-            'VOISONA',
-            'VOICEROID',
-            'VOICEVOX',
-            'ACE',
-            'AI_VOICE',
-            'OTHER'
-        )
-    )
-);
-
 -- song_vocals
 CREATE TABLE song_vocals (
     id BIGSERIAL PRIMARY KEY,
@@ -460,20 +433,4 @@ CREATE TABLE song_vocals (
     CONSTRAINT fk_song_vocals_vocal FOREIGN KEY (vocal_id) REFERENCES vocal_characters (id) ON DELETE RESTRICT,
     CONSTRAINT uk_song_vocals_song_vocal UNIQUE (song_id, vocal_id),
     CONSTRAINT chk_song_vocals_sort_order CHECK (sort_order >= 0)
-);
-
--- song_voicebanks
-CREATE TABLE song_voicebanks (
-    id BIGSERIAL PRIMARY KEY,
-    uuid UUID NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL,
-    song_id BIGINT NOT NULL,
-    voicebank_id BIGINT NOT NULL,
-    is_main BOOLEAN NOT NULL DEFAULT FALSE,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    CONSTRAINT fk_song_voicebanks_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
-    CONSTRAINT fk_song_voicebanks_voicebank FOREIGN KEY (voicebank_id) REFERENCES vocal_voicebanks (id) ON DELETE RESTRICT,
-    CONSTRAINT uk_song_voicebanks_song_voicebank UNIQUE (song_id, voicebank_id),
-    CONSTRAINT chk_song_voicebanks_sort_order CHECK (sort_order >= 0)
 );

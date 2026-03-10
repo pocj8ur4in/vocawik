@@ -3,7 +3,6 @@ package com.vocawik.repository.vocal;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.song.SongVocal;
 import com.vocawik.domain.vocal.VocalCharacter;
-import com.vocawik.domain.vocal.VocalVoicebank;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -58,12 +57,6 @@ public class VocalCriteriaRepositoryImpl implements VocalCriteriaRepository {
             predicates.add(
                     hasAnySongUuid(criteria.songUuids(), criteriaQuery, root, criteriaBuilder));
         }
-        if (!criteria.voicebankUuids().isEmpty()) {
-            predicates.add(
-                    hasAnyVoicebankUuid(
-                            criteria.voicebankUuids(), criteriaQuery, root, criteriaBuilder));
-        }
-
         criteriaQuery.where(predicates.toArray(Predicate[]::new));
         criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
 
@@ -105,20 +98,6 @@ public class VocalCriteriaRepositoryImpl implements VocalCriteriaRepository {
         subquery.where(
                 criteriaBuilder.equal(songVocal.get("vocal"), root),
                 songVocal.get("song").get("resource").get("uuid").in(songUuids));
-        return criteriaBuilder.exists(subquery);
-    }
-
-    private Predicate hasAnyVoicebankUuid(
-            List<UUID> voicebankUuids,
-            CriteriaQuery<VocalCharacter> criteriaQuery,
-            Root<VocalCharacter> root,
-            CriteriaBuilder criteriaBuilder) {
-        Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
-        Root<VocalVoicebank> voicebank = subquery.from(VocalVoicebank.class);
-        subquery.select(criteriaBuilder.literal(1L));
-        subquery.where(
-                criteriaBuilder.equal(voicebank.get("vocalCharacter"), root),
-                voicebank.get("resource").get("uuid").in(voicebankUuids));
         return criteriaBuilder.exists(subquery);
     }
 

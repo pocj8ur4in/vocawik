@@ -26,7 +26,6 @@ public record SongCreateRequest(
         @Valid List<SongPvCreateRequest> pvs,
         @Valid List<SongArtistCreateRequest> artists,
         @Valid List<SongVocalCreateRequest> vocals,
-        @Valid List<SongVoicebankCreateRequest> voicebanks,
         @Valid List<SongRelationCreateRequest> relations) {
 
     /** Defensive copy for mutable request fields. */
@@ -37,7 +36,6 @@ public record SongCreateRequest(
         pvs = pvs == null ? List.of() : List.copyOf(pvs);
         artists = artists == null ? List.of() : List.copyOf(artists);
         vocals = vocals == null ? List.of() : List.copyOf(vocals);
-        voicebanks = voicebanks == null ? List.of() : List.copyOf(voicebanks);
         relations = relations == null ? List.of() : List.copyOf(relations);
     }
 
@@ -98,10 +96,6 @@ public record SongCreateRequest(
     /** Song-vocal mapping input. */
     public record SongVocalCreateRequest(
             @NotNull UUID vocalResourceUuid, boolean isMain, @Min(0) Integer sortOrder) {}
-
-    /** Song-voicebank mapping input. */
-    public record SongVoicebankCreateRequest(
-            @NotNull UUID voicebankResourceUuid, boolean isMain, @Min(0) Integer sortOrder) {}
 
     /** Song relation input. */
     public record SongRelationCreateRequest(@NotNull UUID targetSongResourceUuid) {}

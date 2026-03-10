@@ -10,10 +10,6 @@ import org.springframework.data.repository.query.Param;
 /** Repository for {@link SongVocal} persistence access. */
 public interface SongVocalRepository extends JpaRepository<SongVocal, Long> {
 
-    /** Returns whether any song-vocal row references the voicebank id. */
-    @Query("select (count(svb) > 0) from SongVoicebank svb where svb.voicebank.id = :voicebankId")
-    boolean existsByVoicebankId(@Param("voicebankId") Long voicebankId);
-
     /** Finds all song-vocal rows by song id in display order. */
     List<SongVocal> findAllBySongIdOrderBySortOrderAscIdAsc(Long songId);
 
