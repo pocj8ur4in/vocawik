@@ -2,7 +2,9 @@ package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.service.playlist.PlaylistService;
+import com.vocawik.service.resource.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,6 +39,15 @@ public class PlaylistController {
                     "createdAt", "resource.createdAt");
 
     private final PlaylistService playlistService;
+    private final ResourceService resourceService;
+
+    /** Gets a playlist detail. */
+    @GetMapping("/playlists/{resourceUuid}")
+    @Operation(summary = "Get playlist", description = "Returns playlist detail.")
+    public ResponseEntity<PlaylistResourceDetailResponse> getPlaylist(
+            @PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getPlaylistByResourceUuid(resourceUuid));
+    }
 
     /** Searches playlists with optional filters. */
     @GetMapping("/playlists")

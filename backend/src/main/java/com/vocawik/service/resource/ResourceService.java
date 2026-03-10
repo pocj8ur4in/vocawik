@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.artist.ArtistGroup;
+import com.vocawik.domain.playlist.Playlist;
 import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceStatus;
@@ -16,6 +17,7 @@ import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongVocal;
 import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
+import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
 import com.vocawik.dto.resource.ResourceElementResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
@@ -25,6 +27,7 @@ import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistGroupRepository;
 import com.vocawik.repository.artist.ArtistRepository;
+import com.vocawik.repository.playlist.PlaylistRepository;
 import com.vocawik.repository.playlist.PlaylistSongRepository;
 import com.vocawik.repository.resource.ResourceCriteria;
 import com.vocawik.repository.resource.ResourceNameRepository;
@@ -70,6 +73,7 @@ public class ResourceService {
     private final SongVocalRepository songVocalRepository;
     private final SongRelationRepository songRelationRepository;
     private final PlaylistSongRepository playlistSongRepository;
+    private final PlaylistRepository playlistRepository;
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
     private final VocalRepository vocalRepository;
@@ -198,6 +202,34 @@ public class ResourceService {
                 loadResourceAcls(resource.getId()),
                 songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
                         .map(this::toVocalSong)
+                        .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PlaylistResourceDetailResponse getPlaylistByResourceUuid(UUID resourceUuid) {
+        Playlist playlist =
+                playlistRepository
+                        .findByResourceUuid(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = playlist.getResource();
+
+        return new PlaylistResourceDetailResponse(
+                resource.getUuid(),
+                resource.isDeleted(),
+                resource.getCanonicalName(),
+                resource.getStatus().name(),
+                resource.getViewCount(),
+                resource.getThumbnailUrl(),
+                playlist.getContent(),
+                playlist.isPublic(),
+                resource.getCreatedAt(),
+                resource.getUpdatedAt(),
+                loadResourceNames(resource.getId()),
+                loadResourceAcls(resource.getId()),
+                playlistSongRepository
+                        .findAllByPlaylistIdOrderBySortOrderAscIdAsc(playlist.getId())
+                        .stream()
+                        .map(this::toPlaylistDetailSong)
                         .toList());
     }
 
@@ -378,5 +410,16 @@ public class ResourceService {
                 song.getPublishedAt(),
                 songVocal.isMain(),
                 songVocal.getSortOrder());
+    }
+
+    private PlaylistResourceDetailResponse.PlaylistSong toPlaylistDetailSong(
+            PlaylistSong playlistSong) {
+        Song song = playlistSong.getSong();
+        return new PlaylistResourceDetailResponse.PlaylistSong(
+                song.getResource().getUuid(),
+                song.getResource().getCanonicalName(),
+                song.getResource().getThumbnailUrl(),
+                song.getSongType().name(),
+                playlistSong.getSortOrder());
     }
 }
