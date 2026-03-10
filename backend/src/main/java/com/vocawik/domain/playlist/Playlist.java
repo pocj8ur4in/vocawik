@@ -52,4 +52,12 @@ public class Playlist {
         playlist.isPublic = isPublic;
         return playlist;
     }
+
+    /** Updates playlist-owned fields. */
+    public void update(String content, Boolean isPublic) {
+        this.content = content;
+        if (isPublic != null) {
+            this.isPublic = isPublic;
+        }
+    }
 }

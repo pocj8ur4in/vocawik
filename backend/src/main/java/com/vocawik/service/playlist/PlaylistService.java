@@ -16,6 +16,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistElementResponse;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.playlist.PlaylistCriteria;
@@ -25,6 +26,8 @@ import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.service.history.ResourceHistoryService;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.util.Comparator;
@@ -86,6 +89,31 @@ public class PlaylistService {
         savePlaylistSongs(playlist, request.songs());
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(playlist, resource));
+        resourceRepository.saveAndFlush(resource);
+        return resource.getUuid();
+    }
+
+    @Transactional
+    public UUID update(UUID resourceUuid, PlaylistUpdateRequest request) {
+        Playlist playlist =
+                playlistRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = playlist.getResource();
+        updatePlaylistFields(playlist, resource, request);
+
+        if (request.names() != null) {
+            replaceResourceNames(resource, toCreateNames(request.names()));
+        }
+        if (request.acls() != null) {
+            replaceAcls(resource, toCreateAcls(request.acls()));
+        }
+        if (request.songs() != null) {
+            replacePlaylistSongs(playlist, toCreateSongs(request.songs()));
+        }
+
+        resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(playlist, resource));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -261,6 +289,77 @@ public class PlaylistService {
                         Comparator.comparingInt(PlaylistSong::getSortOrder)
                                 .thenComparing(PlaylistSong::getId))
                 .toList();
+    }
+
+    private void updatePlaylistFields(
+            Playlist playlist, Resource resource, PlaylistUpdateRequest request) {
+        if (request.canonicalName() != null) {
+            resource.updateCanonicalName(normalizeCanonicalName(request.canonicalName()));
+        }
+        if (request.thumbnailUrl() != null) {
+            resource.updateThumbnailUrl(normalizeNullable(request.thumbnailUrl()));
+        }
+        playlist.update(
+                request.content() != null
+                        ? normalizeNullable(request.content())
+                        : playlist.getContent(),
+                request.isPublic());
+    }
+
+    private List<PlaylistCreateRequest.ResourceNameCreateRequest> toCreateNames(
+            List<PlaylistUpdateRequest.ResourceNameUpdateRequest> names) {
+        return names.stream()
+                .map(
+                        item ->
+                                new PlaylistCreateRequest.ResourceNameCreateRequest(
+                                        item.langCode(),
+                                        item.name(),
+                                        item.isPrimary(),
+                                        item.sortOrder()))
+                .toList();
+    }
+
+    private List<PlaylistCreateRequest.ResourceAclCreateRequest> toCreateAcls(
+            List<PlaylistUpdateRequest.ResourceAclUpdateRequest> acls) {
+        return acls.stream()
+                .map(
+                        item ->
+                                new PlaylistCreateRequest.ResourceAclCreateRequest(
+                                        item.action(),
+                                        item.subjectType(),
+                                        item.subjectValue(),
+                                        item.effect(),
+                                        item.priority(),
+                                        item.expiresAt()))
+                .toList();
+    }
+
+    private List<PlaylistCreateRequest.PlaylistSongCreateRequest> toCreateSongs(
+            List<PlaylistUpdateRequest.PlaylistSongUpdateRequest> songs) {
+        return songs.stream()
+                .map(
+                        item ->
+                                new PlaylistCreateRequest.PlaylistSongCreateRequest(
+                                        item.songResourceUuid(), item.sortOrder()))
+                .toList();
+    }
+
+    private void replaceResourceNames(
+            Resource resource, List<PlaylistCreateRequest.ResourceNameCreateRequest> names) {
+        resourceNameRepository.deleteByResourceId(resource.getId());
+        saveResourceNames(resource, names);
+    }
+
+    private void replaceAcls(
+            Resource resource, List<PlaylistCreateRequest.ResourceAclCreateRequest> acls) {
+        aclRepository.deleteByResourceId(resource.getId());
+        saveAcls(resource, acls);
+    }
+
+    private void replacePlaylistSongs(
+            Playlist playlist, List<PlaylistCreateRequest.PlaylistSongCreateRequest> songs) {
+        playlistSongRepository.deleteByPlaylistId(playlist.getId());
+        savePlaylistSongs(playlist, songs);
     }
 
     private String normalizeAclSubjectValue(AclSubjectType subjectType, String subjectValue) {
