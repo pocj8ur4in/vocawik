@@ -126,6 +126,26 @@ public class ArtistService {
     }
 
     /**
+     * Soft-deletes an artist and records delete history.
+     *
+     * @param resourceUuid artist resource UUID
+     */
+    @Transactional
+    public void delete(UUID resourceUuid) {
+        Artist artist =
+                artistRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = artist.getResource();
+        JsonNode snapshot = buildHistorySnapshot(artist, resource);
+
+        resource.softDelete();
+        resourceHistoryService.recordDelete(resource, snapshot);
+        resourceRepository.saveAndFlush(resource);
+    }
+
+    /**
      * Searches artists with optional filters.
      *
      * @param status optional resource status filter
