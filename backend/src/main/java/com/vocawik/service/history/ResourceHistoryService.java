@@ -7,6 +7,7 @@ import com.vocawik.domain.history.History;
 import com.vocawik.domain.history.HistoryActionType;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.user.User;
+import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.history.ResourceHistoryElementResponse;
 import com.vocawik.dto.history.ResourceHistoryListResponse;
 import com.vocawik.repository.guest.GuestRepository;
@@ -116,6 +117,45 @@ public class ResourceHistoryService {
 
         return new ResourceHistoryListResponse(
                 items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
+    }
+
+    @Transactional(readOnly = true)
+    public ResourceHistoryDetailResponse getByResourceUuidAndHistoryUuid(
+            UUID resourceUuid, UUID historyUuid) {
+        Resource resource =
+                resourceRepository
+                        .findByUuid(resourceUuid)
+                        .orElseThrow(
+                                () ->
+                                        new com.vocawik.web.exception.BusinessException(
+                                                com.vocawik.web.error.ErrorCode
+                                                        .RESOURCE_NOT_FOUND));
+
+        History history =
+                historyRepository
+                        .findByUuid(historyUuid)
+                        .orElseThrow(
+                                () ->
+                                        new com.vocawik.web.exception.BusinessException(
+                                                com.vocawik.web.error.ErrorCode
+                                                        .RESOURCE_NOT_FOUND));
+
+        if (!history.getResource().getId().equals(resource.getId())) {
+            throw new com.vocawik.web.exception.BusinessException(
+                    com.vocawik.web.error.ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        return new ResourceHistoryDetailResponse(
+                history.getUuid(),
+                history.getResource().getUuid(),
+                history.getRevision(),
+                history.getBaseRevision(),
+                history.getActionType().name(),
+                history.getActorUser() == null ? null : history.getActorUser().getUuid(),
+                history.getActorGuest() == null ? null : history.getActorGuest().getUuid(),
+                history.getContentHash(),
+                history.getCreatedAt(),
+                objectMapper.convertValue(history.getSnapshotData(), Object.class));
     }
 
     private ResourceHistoryElementResponse toSummary(History history) {
