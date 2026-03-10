@@ -43,10 +43,10 @@ import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -105,7 +105,7 @@ public class ResourceService {
         List<SongLyric> lyrics =
                 songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
         List<SongPv> pvs = songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
-        Map<Long, SongPvView> pvViewsBySongPvId = loadSongPvViews(pvs);
+        Map<Long, List<SongPvView>> pvViewsBySongPvId = loadSongPvViews(pvs);
         List<SongArtist> artists =
                 songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
         List<SongVocal> vocals =
@@ -287,13 +287,13 @@ public class ResourceService {
                 .toList();
     }
 
-    private Map<Long, SongPvView> loadSongPvViews(List<SongPv> pvs) {
+    private Map<Long, List<SongPvView>> loadSongPvViews(List<SongPv> pvs) {
         if (pvs.isEmpty()) {
             return Map.of();
         }
         List<Long> songPvIds = pvs.stream().map(SongPv::getId).toList();
         return songPvViewRepository.findAllBySongPvIdIn(songPvIds).stream()
-                .collect(Collectors.toMap(view -> view.getSongPv().getId(), Function.identity()));
+                .collect(Collectors.groupingBy(view -> view.getSongPv().getId()));
     }
 
     private SongResourceDetailResponse.SongLyric toSongLyric(SongLyric lyric) {
@@ -314,10 +314,9 @@ public class ResourceService {
         return objectMapper.convertValue(jsonNode, Object.class);
     }
 
-    private SongResourceDetailResponse.SongPv toSongPv(SongPv pv, SongPvView view) {
+    private SongResourceDetailResponse.SongPv toSongPv(SongPv pv, List<SongPvView> views) {
         return new SongResourceDetailResponse.SongPv(
                 pv.getUuid(),
-                view == null ? null : view.getUuid(),
                 pv.getService().name(),
                 pv.getVideoKey(),
                 pv.getTitle(),
@@ -327,9 +326,20 @@ public class ResourceService {
                 pv.isOfficial(),
                 pv.getPublishedAt(),
                 pv.getSortOrder(),
-                view == null ? 0L : view.getViewCount(),
+                (views == null ? List.<SongPvView>of() : views)
+                        .stream()
+                                .sorted(
+                                        Comparator.comparing(SongPvView::getCreatedAt)
+                                                .thenComparing(SongPvView::getId))
+                                .map(this::toSongPvView)
+                                .toList(),
                 pv.getCreatedAt(),
                 pv.getUpdatedAt());
+    }
+
+    private SongResourceDetailResponse.SongPvView toSongPvView(SongPvView view) {
+        return new SongResourceDetailResponse.SongPvView(
+                view.getUuid(), view.getViewCount(), view.getCreatedAt(), view.getUpdatedAt());
     }
 
     private SongResourceDetailResponse.SongArtist toSongArtist(SongArtist songArtist) {
