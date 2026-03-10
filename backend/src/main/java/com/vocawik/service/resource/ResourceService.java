@@ -14,9 +14,7 @@ import com.vocawik.domain.song.SongPv;
 import com.vocawik.domain.song.SongPvView;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongVocal;
-import com.vocawik.domain.song.SongVoicebank;
 import com.vocawik.domain.vocal.VocalCharacter;
-import com.vocawik.domain.vocal.VocalVoicebank;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
 import com.vocawik.dto.resource.ResourceElementResponse;
@@ -24,7 +22,6 @@ import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceNameDetailResponse;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
-import com.vocawik.dto.resource.VoicebankResourceDetailResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistGroupRepository;
 import com.vocawik.repository.artist.ArtistRepository;
@@ -39,9 +36,7 @@ import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
-import com.vocawik.repository.song.SongVoicebankRepository;
 import com.vocawik.repository.vocal.VocalCharacterRepository;
-import com.vocawik.repository.vocal.VocalVoicebankRepository;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -73,13 +68,11 @@ public class ResourceService {
     private final SongPvViewRepository songPvViewRepository;
     private final SongArtistRepository songArtistRepository;
     private final SongVocalRepository songVocalRepository;
-    private final SongVoicebankRepository songVoicebankRepository;
     private final SongRelationRepository songRelationRepository;
     private final PlaylistSongRepository playlistSongRepository;
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
     private final VocalCharacterRepository vocalCharacterRepository;
-    private final VocalVoicebankRepository vocalVoicebankRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -113,8 +106,6 @@ public class ResourceService {
                 songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
         List<SongVocal> vocals =
                 songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
-        List<SongVoicebank> voicebanks =
-                songVoicebankRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
         List<SongRelation> outgoingRelations =
                 songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
         List<SongRelation> incomingRelations =
@@ -140,7 +131,6 @@ public class ResourceService {
                 pvs.stream().map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()))).toList(),
                 artists.stream().map(this::toSongArtist).toList(),
                 vocals.stream().map(this::toSongVocal).toList(),
-                voicebanks.stream().map(this::toSongVoicebank).toList(),
                 outgoingRelations.stream().map(this::toSongRelation).toList(),
                 incomingRelations.stream().map(this::toSongIncomingRelation).toList(),
                 playlists.stream().map(this::toSongPlaylist).toList());
@@ -205,36 +195,6 @@ public class ResourceService {
                 loadResourceAcls(resource.getId()),
                 songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
                         .map(this::toVocalSong)
-                        .toList());
-    }
-
-    @Transactional(readOnly = true)
-    public VoicebankResourceDetailResponse getVoicebankByResourceUuid(UUID resourceUuid) {
-        VocalVoicebank voicebank =
-                vocalVoicebankRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-        Resource resource = voicebank.getResource();
-
-        return new VoicebankResourceDetailResponse(
-                resource.getUuid(),
-                resource.getCanonicalName(),
-                resource.getStatus().name(),
-                resource.getViewCount(),
-                resource.getThumbnailUrl(),
-                voicebank.getVocalCharacter().getResource().getUuid(),
-                voicebank.getVocalCharacter().getResource().getCanonicalName(),
-                voicebank.getVoicebankType().name(),
-                voicebank.getContent(),
-                toJsonValue(voicebank.getLinks()),
-                resource.getCreatedAt(),
-                resource.getUpdatedAt(),
-                loadResourceNames(resource.getId()),
-                loadResourceAcls(resource.getId()),
-                songVoicebankRepository
-                        .findAllByVoicebankIdOrderBySortOrderAscIdAsc(voicebank.getId())
-                        .stream()
-                        .map(this::toVoicebankSong)
                         .toList());
     }
 
@@ -355,17 +315,6 @@ public class ResourceService {
                 songVocal.getSortOrder());
     }
 
-    private SongResourceDetailResponse.SongVoicebank toSongVoicebank(SongVoicebank songVoicebank) {
-        return new SongResourceDetailResponse.SongVoicebank(
-                songVoicebank.getVoicebank().getResource().getUuid(),
-                songVoicebank.getVoicebank().getResource().getCanonicalName(),
-                songVoicebank.getVoicebank().getVocalCharacter().getResource().getUuid(),
-                songVoicebank.getVoicebank().getVocalCharacter().getResource().getCanonicalName(),
-                songVoicebank.getVoicebank().getVoicebankType().name(),
-                songVoicebank.isMain(),
-                songVoicebank.getSortOrder());
-    }
-
     private SongResourceDetailResponse.SongRelation toSongRelation(SongRelation relation) {
         return new SongResourceDetailResponse.SongRelation(
                 relation.getTargetSong().getResource().getUuid(),
@@ -426,21 +375,5 @@ public class ResourceService {
                 song.getPublishedAt(),
                 songVocal.isMain(),
                 songVocal.getSortOrder());
-    }
-
-    private VoicebankResourceDetailResponse.VoicebankSong toVoicebankSong(
-            SongVoicebank songVoicebank) {
-        Song song = songVoicebank.getSong();
-        VocalCharacter vocal = songVoicebank.getVoicebank().getVocalCharacter();
-        return new VoicebankResourceDetailResponse.VoicebankSong(
-                song.getResource().getUuid(),
-                song.getResource().getCanonicalName(),
-                song.getResource().getThumbnailUrl(),
-                song.getSongType().name(),
-                song.getPublishedAt(),
-                vocal.getResource().getUuid(),
-                vocal.getResource().getCanonicalName(),
-                songVoicebank.isMain(),
-                songVoicebank.getSortOrder());
     }
 }

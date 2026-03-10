@@ -5,6 +5,5 @@ public enum ResourceType {
     SONG,
     ARTIST,
     VOCAL,
-    VOICEBANK,
     PLAYLIST
 }

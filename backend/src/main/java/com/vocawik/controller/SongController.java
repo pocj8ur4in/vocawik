@@ -105,7 +105,6 @@ public class SongController {
      * @param query optional canonical name keyword
      * @param artistUuids optional artist resource UUID filter
      * @param vocalUuids optional vocal resource UUID filter
-     * @param voicebankUuids optional voicebank resource UUID filter
      * @param publishedFrom optional published-at start datetime (inclusive)
      * @param publishedTo optional published-at end datetime (inclusive)
      * @param pageable page and sort options
@@ -162,9 +161,6 @@ public class SongController {
             @Parameter(description = "Vocal resource UUID filter")
                     @RequestParam(name = "vocalUuids", required = false)
                     List<UUID> vocalUuids,
-            @Parameter(description = "Voicebank resource UUID filter")
-                    @RequestParam(name = "voicebankUuids", required = false)
-                    List<UUID> voicebankUuids,
             @Parameter(description = "Published-at start datetime, e.g. 2026-03-01T00:00:00")
                     @RequestParam(name = "publishedFrom", required = false)
                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -188,7 +184,6 @@ public class SongController {
                         query,
                         artistUuids,
                         vocalUuids,
-                        voicebankUuids,
                         publishedFrom,
                         publishedTo,
                         PageRequest.of(
