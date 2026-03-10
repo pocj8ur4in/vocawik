@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -91,6 +92,14 @@ public class VocalController {
         VocalResourceDetailResponse detail =
                 resourceService.getVocalByResourceUuid(updatedResourceUuid);
         return ResponseEntity.ok(detail);
+    }
+
+    /** Soft-deletes a vocal. */
+    @DeleteMapping("/vocals/{resourceUuid}")
+    @Operation(summary = "Delete vocal", description = "Soft-deletes a vocal.")
+    public ResponseEntity<Void> deleteVocal(@PathVariable UUID resourceUuid) {
+        vocalService.delete(resourceUuid);
+        return ResponseEntity.noContent().build();
     }
 
     /**

@@ -112,6 +112,26 @@ public class VocalService {
     }
 
     /**
+     * Soft-deletes a vocal and records delete history.
+     *
+     * @param resourceUuid vocal resource UUID
+     */
+    @Transactional
+    public void delete(UUID resourceUuid) {
+        Vocal vocal =
+                vocalRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = vocal.getResource();
+        JsonNode snapshot = buildHistorySnapshot(vocal, resource);
+
+        resource.softDelete();
+        resourceHistoryService.recordDelete(resource, snapshot);
+        resourceRepository.saveAndFlush(resource);
+    }
+
+    /**
      * Searches vocals with optional filters.
      *
      * @param status optional resource status filter
