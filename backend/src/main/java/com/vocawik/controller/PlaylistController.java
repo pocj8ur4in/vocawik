@@ -1,16 +1,19 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.service.playlist.PlaylistService;
 import com.vocawik.service.resource.ResourceService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
@@ -22,6 +25,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,6 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Playlist", description = "Playlist endpoints")
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "Spring injects singleton services; references are not exposed outside controller boundaries.")
 public class PlaylistController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
@@ -40,6 +49,16 @@ public class PlaylistController {
 
     private final PlaylistService playlistService;
     private final ResourceService resourceService;
+
+    /** Creates a new playlist resource. */
+    @PostMapping("/playlists")
+    @Operation(summary = "Create playlist", description = "Creates a playlist.")
+    public ResponseEntity<PlaylistResourceDetailResponse> createPlaylist(
+            @Valid @RequestBody PlaylistCreateRequest request) {
+        UUID resourceUuid = playlistService.create(request);
+        return ResponseEntity.created(java.net.URI.create("/playlists/" + resourceUuid))
+                .body(resourceService.getPlaylistByResourceUuid(resourceUuid));
+    }
 
     /** Gets a playlist detail. */
     @GetMapping("/playlists/{resourceUuid}")
