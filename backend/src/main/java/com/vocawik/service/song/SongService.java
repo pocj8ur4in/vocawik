@@ -213,6 +213,26 @@ public class SongService {
         return resource.getUuid();
     }
 
+    /**
+     * Soft-deletes a song and records delete history.
+     *
+     * @param resourceUuid song resource UUID
+     */
+    @Transactional
+    public void delete(UUID resourceUuid) {
+        Song song =
+                songRepository
+                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Resource resource = song.getResource();
+        JsonNode snapshot = buildHistorySnapshot(song, resource);
+
+        resource.softDelete();
+        resourceHistoryService.recordDelete(resource, snapshot);
+        resourceRepository.saveAndFlush(resource);
+    }
+
     private String normalizeQuery(String query) {
         if (query == null) {
             return null;
