@@ -49,67 +49,19 @@ public class History extends BaseEntity {
     @JoinColumn(name = "actor_guest_id")
     private Guest actorGuest;
 
-    @Column(name = "is_snapshot", nullable = false)
-    private boolean isSnapshot;
-
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "patch_data", columnDefinition = "jsonb")
-    private JsonNode patchData;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "snapshot_data", columnDefinition = "jsonb")
+    @Column(name = "snapshot_data", nullable = false, columnDefinition = "jsonb")
     private JsonNode snapshotData;
 
     @Column(name = "content_hash", nullable = false, length = HASH_LENGTH)
     private String contentHash;
 
     /**
-     * Creates a history row based patch.
+     * Creates a snapshot-only history row.
      *
      * @param resource target resource
      * @param revision resource revision number
-     * @param baseRevision base revision used to build patch
-     * @param actionType action type
-     * @param actorUser actor user (nullable)
-     * @param actorGuest actor guest (nullable)
-     * @param patchData json patch payload
-     * @param contentHash hash of resulting full content
-     * @return created history row
-     */
-    public static History createPatch(
-            Resource resource,
-            int revision,
-            int baseRevision,
-            HistoryActionType actionType,
-            User actorUser,
-            Guest actorGuest,
-            JsonNode patchData,
-            String contentHash) {
-        validate(resource, revision, baseRevision, actionType, actorUser, actorGuest, contentHash);
-        if (patchData == null) {
-            throw new IllegalArgumentException("patchData is required for patch row");
-        }
-
-        History history = new History();
-        history.resource = resource;
-        history.revision = revision;
-        history.baseRevision = baseRevision;
-        history.actionType = actionType;
-        history.actorUser = actorUser;
-        history.actorGuest = actorGuest;
-        history.isSnapshot = false;
-        history.patchData = patchData;
-        history.snapshotData = null;
-        history.contentHash = contentHash;
-        return history;
-    }
-
-    /**
-     * Creates a history row based snapshot.
-     *
-     * @param resource target resource
-     * @param revision resource revision number
-     * @param baseRevision base revision used to build snapshot
+     * @param baseRevision previous revision number
      * @param actionType action type
      * @param actorUser actor user (nullable)
      * @param actorGuest actor guest (nullable)
@@ -138,8 +90,6 @@ public class History extends BaseEntity {
         history.actionType = actionType;
         history.actorUser = actorUser;
         history.actorGuest = actorGuest;
-        history.isSnapshot = true;
-        history.patchData = null;
         history.snapshotData = snapshotData;
         history.contentHash = contentHash;
         return history;
