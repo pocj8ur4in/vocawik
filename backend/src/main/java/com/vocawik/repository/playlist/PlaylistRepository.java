@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PlaylistRepository
         extends JpaRepository<Playlist, Long>, PlaylistCriteriaRepository {
 
+    /** Finds a playlist by resource UUID, including deleted resources. */
+    Optional<Playlist> findByResourceUuid(UUID resourceUuid);
+
     /** Finds an active playlist by resource UUID. */
     Optional<Playlist> findByResourceUuidAndResourceIsDeletedFalse(UUID resourceUuid);
 }
