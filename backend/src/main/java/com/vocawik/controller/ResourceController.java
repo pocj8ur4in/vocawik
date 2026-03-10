@@ -1,7 +1,9 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.history.ResourceHistoryListResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
+import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.resource.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,6 +36,7 @@ public class ResourceController {
     private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of("updatedAt", "createdAt");
 
     private final ResourceService resourceService;
+    private final ResourceHistoryService resourceHistoryService;
 
     /**
      * Searches active resources filtered by status/query.
@@ -95,6 +100,36 @@ public class ResourceController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Lists revision metadata for a resource. */
+    @GetMapping("/resources/{resourceUuid}/histories")
+    @Operation(
+            summary = "List resource histories",
+            description = "Returns revision metadata for a resource in reverse revision order.")
+    @Parameters({
+        @Parameter(
+                name = "page",
+                in = ParameterIn.QUERY,
+                description = "Page index",
+                example = "0",
+                schema = @Schema(type = "integer", defaultValue = "0", minimum = "0")),
+        @Parameter(
+                name = "size",
+                in = ParameterIn.QUERY,
+                description = "Page size",
+                example = "20",
+                schema = @Schema(type = "integer", defaultValue = "20", minimum = "1"))
+    })
+    public ResponseEntity<ResourceHistoryListResponse> listResourceHistories(
+            @PathVariable UUID resourceUuid,
+            @Parameter(hidden = true)
+                    @PageableDefault(size = 20, sort = "revision", direction = Sort.Direction.DESC)
+                    Pageable pageable) {
+        return ResponseEntity.ok(
+                resourceHistoryService.listByResourceUuid(
+                        resourceUuid,
+                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())));
     }
 
     private Sort sanitizeSort(Sort requestedSort) {
