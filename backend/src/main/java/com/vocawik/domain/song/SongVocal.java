@@ -1,7 +1,7 @@
 package com.vocawik.domain.song;
 
 import com.vocawik.domain.BaseEntity;
-import com.vocawik.domain.vocal.VocalCharacter;
+import com.vocawik.domain.vocal.Vocal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** Mapping entity between songs and vocal characters. */
+/** Mapping entity between songs and vocals. */
 @Getter
 @Entity
 @Table(
@@ -32,7 +32,7 @@ public class SongVocal extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "vocal_id", nullable = false)
-    private VocalCharacter vocal;
+    private Vocal vocal;
 
     @Column(name = "is_main", nullable = false)
     private boolean isMain;
@@ -44,12 +44,12 @@ public class SongVocal extends BaseEntity {
      * Creates a song-vocal mapping row.
      *
      * @param song target song
-     * @param vocal target vocal character
+     * @param vocal target vocal
      * @param isMain whether vocal is main participant
      * @param sortOrder display order
      * @return created mapping row
      */
-    public static SongVocal create(Song song, VocalCharacter vocal, boolean isMain, int sortOrder) {
+    public static SongVocal create(Song song, Vocal vocal, boolean isMain, int sortOrder) {
         if (song == null) {
             throw new IllegalArgumentException("song is required");
         }

@@ -11,7 +11,7 @@ import com.vocawik.domain.acl.AclSubjectType;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
-import com.vocawik.domain.vocal.VocalCharacter;
+import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalElementResponse;
 import com.vocawik.dto.vocal.VocalListResponse;
@@ -19,8 +19,8 @@ import com.vocawik.dto.vocal.VocalUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
-import com.vocawik.repository.vocal.VocalCharacterRepository;
 import com.vocawik.repository.vocal.VocalCriteria;
+import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -36,7 +36,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Service for searching vocal characters. */
+/** Service for searching vocals. */
 @Service
 @RequiredArgsConstructor
 @SuppressFBWarnings(
@@ -45,14 +45,14 @@ import org.springframework.transaction.annotation.Transactional;
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class VocalService {
 
-    private final VocalCharacterRepository vocalCharacterRepository;
+    private final VocalRepository vocalRepository;
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
     private final ObjectMapper objectMapper;
 
     /**
-     * Creates a vocal character and initializes resource projection payload.
+     * Creates a vocal.
      *
      * @param request create payload
      * @return created vocal resource UUID
@@ -62,15 +62,15 @@ public class VocalService {
         JsonNode links = toJsonNode(request.links());
         validateLinks(links);
 
-        VocalCharacter vocalCharacter =
-                VocalCharacter.create(
+        Vocal vocal =
+                Vocal.create(
                         normalizeCanonicalName(request.canonicalName()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
                         links);
 
-        Resource resource = resourceRepository.save(vocalCharacter.getResource());
-        vocalCharacterRepository.save(vocalCharacter);
+        Resource resource = resourceRepository.save(vocal.getResource());
+        vocalRepository.save(vocal);
 
         saveResourceNames(resource, request.names());
         saveAcls(resource, request.acls());
@@ -80,7 +80,7 @@ public class VocalService {
     }
 
     /**
-     * Updates a vocal character and optionally replaces child collections.
+     * Updates a vocal and optionally replaces child collections.
      *
      * @param resourceUuid vocal resource UUID
      * @param request update payload
@@ -88,13 +88,13 @@ public class VocalService {
      */
     @Transactional
     public UUID update(UUID resourceUuid, VocalUpdateRequest request) {
-        VocalCharacter vocalCharacter =
-                vocalCharacterRepository
+        Vocal vocal =
+                vocalRepository
                         .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
-        Resource resource = vocalCharacter.getResource();
-        updateVocalFields(vocalCharacter, resource, request);
+        Resource resource = vocal.getResource();
+        updateVocalFields(vocal, resource, request);
 
         if (request.names() != null) {
             replaceResourceNames(resource, toCreateNames(request.names()));
@@ -108,7 +108,7 @@ public class VocalService {
     }
 
     /**
-     * Searches vocal characters with optional filters.
+     * Searches vocals with optional filters.
      *
      * @param status optional resource status filter
      * @param query optional name query
@@ -122,8 +122,8 @@ public class VocalService {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedSongUuids = normalizeUuids(songUuids);
 
-        Slice<VocalCharacter> resultSlice =
-                vocalCharacterRepository.search(
+        Slice<Vocal> resultSlice =
+                vocalRepository.search(
                         new VocalCriteria(status, normalizedQuery, normalizedSongUuids), pageable);
 
         List<VocalElementResponse> items =
@@ -260,8 +260,7 @@ public class VocalService {
                 .toList();
     }
 
-    private void updateVocalFields(
-            VocalCharacter vocalCharacter, Resource resource, VocalUpdateRequest request) {
+    private void updateVocalFields(Vocal vocal, Resource resource, VocalUpdateRequest request) {
         String canonicalName =
                 request.canonicalName() == null
                         ? resource.getCanonicalName()
@@ -272,15 +271,14 @@ public class VocalService {
                         : normalizeNullable(request.thumbnailUrl());
         String content =
                 request.content() == null
-                        ? vocalCharacter.getContent()
+                        ? vocal.getContent()
                         : normalizeNullable(request.content());
-        JsonNode links =
-                request.links() == null ? vocalCharacter.getLinks() : toJsonNode(request.links());
+        JsonNode links = request.links() == null ? vocal.getLinks() : toJsonNode(request.links());
         validateLinks(links);
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        vocalCharacter.update(content, links);
+        vocal.update(content, links);
     }
 
     private List<ResourceName> replaceResourceNames(
@@ -382,22 +380,17 @@ public class VocalService {
     }
 
     private JsonNode buildVocalProjection(
-            VocalCharacter vocalCharacter,
-            Resource resource,
-            List<ResourceName> names,
-            List<Acl> acls) {
+            Vocal vocal, Resource resource, List<ResourceName> names, List<Acl> acls) {
         ObjectNode data = objectMapper.createObjectNode();
         data.put("resourceUuid", resource.getUuid().toString());
         data.put("canonicalName", resource.getCanonicalName());
         data.put("status", resource.getStatus().name());
         data.put("viewCount", resource.getViewCount());
         putNullableText(data, "thumbnailUrl", resource.getThumbnailUrl());
-        putNullableText(data, "content", vocalCharacter.getContent());
+        putNullableText(data, "content", vocal.getContent());
         data.set(
                 "links",
-                vocalCharacter.getLinks() == null
-                        ? objectMapper.createArrayNode()
-                        : vocalCharacter.getLinks());
+                vocal.getLinks() == null ? objectMapper.createArrayNode() : vocal.getLinks());
         putNullableText(data, "createdAt", formatDateTime(resource.getCreatedAt()));
         putNullableText(data, "updatedAt", formatDateTime(resource.getUpdatedAt()));
         data.set("names", buildNamesProjection(names));
@@ -452,8 +445,8 @@ public class VocalService {
         return value == null ? null : value.toString();
     }
 
-    private VocalElementResponse toSummary(VocalCharacter vocalCharacter) {
-        Resource resource = vocalCharacter.getResource();
+    private VocalElementResponse toSummary(Vocal vocal) {
+        Resource resource = vocal.getResource();
         return new VocalElementResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),

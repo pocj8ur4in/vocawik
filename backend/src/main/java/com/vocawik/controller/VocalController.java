@@ -34,9 +34,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Endpoints for Vocal character. */
+/** Endpoints for Vocal. */
 @RestController
-@Tag(name = "Vocal", description = "Vocal character endpoints")
+@Tag(name = "Vocal", description = "Vocal endpoints")
 @RequiredArgsConstructor
 @SuppressFBWarnings(
         value = "EI_EXPOSE_REP2",
@@ -55,13 +55,13 @@ public class VocalController {
     private final ResourceService resourceService;
 
     /**
-     * Creates a new vocal character resource.
+     * Creates a new vocal resource.
      *
      * @param request vocal create payload
      * @return created vocal resource detail
      */
     @PostMapping("/vocals")
-    @Operation(summary = "Create vocal", description = "Creates a vocal character.")
+    @Operation(summary = "Create vocal", description = "Creates a vocal.")
     public ResponseEntity<VocalResourceDetailResponse> createVocal(
             @Valid @RequestBody VocalCreateRequest request) {
         UUID resourceUuid = vocalService.create(request);
@@ -69,22 +69,22 @@ public class VocalController {
         return ResponseEntity.created(URI.create("/vocals/" + resourceUuid)).body(detail);
     }
 
-    /** Gets a vocal character detail. */
+    /** Gets a vocal detail. */
     @GetMapping("/vocals/{resourceUuid}")
-    @Operation(summary = "Get vocal", description = "Returns vocal character detail.")
+    @Operation(summary = "Get vocal", description = "Returns vocal detail.")
     public ResponseEntity<VocalResourceDetailResponse> getVocal(@PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(resourceService.getVocalByResourceUuid(resourceUuid));
     }
 
     /**
-     * Updates an existing vocal character resource.
+     * Updates an existing vocal resource.
      *
      * @param resourceUuid vocal resource UUID
      * @param request vocal update payload
      * @return updated vocal resource detail
      */
     @PatchMapping("/vocals/{resourceUuid}")
-    @Operation(summary = "Update vocal", description = "Updates a vocal character.")
+    @Operation(summary = "Update vocal", description = "Updates a vocal.")
     public ResponseEntity<VocalResourceDetailResponse> updateVocal(
             @PathVariable UUID resourceUuid, @Valid @RequestBody VocalUpdateRequest request) {
         UUID updatedResourceUuid = vocalService.update(resourceUuid, request);
@@ -94,7 +94,7 @@ public class VocalController {
     }
 
     /**
-     * Searches vocal characters with optional filters.
+     * Searches vocals with optional filters.
      *
      * @param status optional resource status filter
      * @param query optional name keyword
@@ -105,7 +105,7 @@ public class VocalController {
     @GetMapping("/vocals")
     @Operation(
             summary = "Search vocal",
-            description = "Returns active vocal characters with optional filters.")
+            description = "Returns active vocals with optional filters.")
     @Parameters({
         @Parameter(
                 name = "page",

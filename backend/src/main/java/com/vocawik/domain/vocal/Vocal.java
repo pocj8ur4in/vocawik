@@ -17,12 +17,12 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** Vocal character detail entity using shared PK with {@link Resource}. */
+/** Vocal detail entity using shared PK with {@link Resource}. */
 @Getter
 @Entity
-@Table(name = "vocal_characters")
+@Table(name = "vocals")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class VocalCharacter {
+public class Vocal {
 
     @Id
     @Column(name = "id")
@@ -40,25 +40,25 @@ public class VocalCharacter {
     private JsonNode links;
 
     /**
-     * Creates a new vocal character detail.
+     * Creates a new vocal detail.
      *
      * @param canonicalName representative display name
      * @param thumbnailUrl representative thumbnail url (nullable)
-     * @param content vocal character description (nullable)
+     * @param content vocal description (nullable)
      * @param links external links payload (nullable JSON array)
-     * @return created vocal character
+     * @return created vocal
      */
-    public static VocalCharacter create(
+    public static Vocal create(
             String canonicalName, String thumbnailUrl, String content, JsonNode links) {
-        VocalCharacter vocalCharacter = new VocalCharacter();
-        vocalCharacter.resource = Resource.create(ResourceType.VOCAL, canonicalName, thumbnailUrl);
-        vocalCharacter.content = content;
-        vocalCharacter.links = links;
-        return vocalCharacter;
+        Vocal vocal = new Vocal();
+        vocal.resource = Resource.create(ResourceType.VOCAL, canonicalName, thumbnailUrl);
+        vocal.content = content;
+        vocal.links = links;
+        return vocal;
     }
 
     /**
-     * Updates vocal character detail fields.
+     * Updates vocal detail fields.
      *
      * @param content updated description
      * @param links updated external links
