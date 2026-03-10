@@ -10,6 +10,14 @@ public interface ResourceRepository
         extends JpaRepository<Resource, Long>, ResourceCriteriaRepository {
 
     /**
+     * Finds a resource by UUID, including deleted resources.
+     *
+     * @param uuid resource UUID
+     * @return resource when found
+     */
+    Optional<Resource> findByUuid(UUID uuid);
+
+    /**
      * Finds an active resource by UUID.
      *
      * @param uuid resource UUID
