@@ -60,7 +60,6 @@ public record SongResourceDetailResponse(
     /** Song PV item in the detailed payload. */
     public record SongPv(
             UUID pvUuid,
-            UUID pvViewUuid,
             String service,
             String videoKey,
             String title,
@@ -70,9 +69,18 @@ public record SongResourceDetailResponse(
             boolean isOfficial,
             LocalDateTime publishedAt,
             int sortOrder,
-            long viewCount,
+            List<SongPvView> views,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt) {}
+            LocalDateTime updatedAt) {
+
+        public SongPv {
+            views = List.copyOf(views);
+        }
+    }
+
+    /** Song PV view item in the detailed payload. */
+    public record SongPvView(
+            UUID pvViewUuid, long viewCount, LocalDateTime createdAt, LocalDateTime updatedAt) {}
 
     /** Song artist item in the detailed payload. */
     public record SongArtist(

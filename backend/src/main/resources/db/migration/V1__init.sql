@@ -354,7 +354,6 @@ CREATE TABLE song_pv_views (
     song_pv_id BIGINT NOT NULL,
     view_count BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_pv_views_song_pv FOREIGN KEY (song_pv_id) REFERENCES song_pvs (id) ON DELETE RESTRICT,
-    CONSTRAINT uk_song_pv_views_song_pv UNIQUE (song_pv_id),
     CONSTRAINT chk_song_pv_views_view_count CHECK (view_count >= 0)
 );
 
