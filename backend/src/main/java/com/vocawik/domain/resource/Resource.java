@@ -20,6 +20,9 @@ public class Resource extends BaseEntity {
     @Column(name = "view_count", nullable = false)
     private long viewCount;
 
+    @Column(nullable = false)
+    private int revision;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ResourceStatus status = ResourceStatus.ACTIVE;
@@ -85,5 +88,15 @@ public class Resource extends BaseEntity {
      */
     public void updateThumbnailUrl(String thumbnailUrl) {
         this.thumbnailUrl = thumbnailUrl;
+    }
+
+    /**
+     * Advances the revision and returns the new revision number.
+     *
+     * @return incremented revision
+     */
+    public int advanceRevision() {
+        this.revision += 1;
+        return this.revision;
     }
 }

@@ -90,7 +90,9 @@ CREATE TABLE resources (
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     resource_type VARCHAR(20) NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT chk_resources_view_count CHECK (view_count >= 0),
+    CONSTRAINT chk_resources_revision CHECK (revision >= 0),
     CONSTRAINT chk_resources_status CHECK (status IN ('ACTIVE', 'DRAFT')),
     CONSTRAINT chk_resources_resource_type CHECK (
         resource_type IN ('SONG', 'ARTIST', 'VOCAL', 'PLAYLIST')
@@ -226,9 +228,7 @@ CREATE TABLE histories (
     action_type VARCHAR(20) NOT NULL,
     actor_user_id BIGINT,
     actor_guest_id BIGINT,
-    is_snapshot BOOLEAN NOT NULL DEFAULT FALSE,
-    patch_data JSONB,
-    snapshot_data JSONB,
+    snapshot_data JSONB NOT NULL,
     content_hash CHAR(64) NOT NULL,
     CONSTRAINT fk_histories_resource FOREIGN KEY (resource_id) REFERENCES resources (id) ON DELETE RESTRICT,
     CONSTRAINT fk_histories_actor_user FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT,
@@ -243,11 +243,6 @@ CREATE TABLE histories (
     ),
     CONSTRAINT chk_histories_actor_exclusive CHECK (
         NOT (actor_user_id IS NOT NULL AND actor_guest_id IS NOT NULL)
-    ),
-    CONSTRAINT chk_histories_snapshot_or_patch CHECK (
-        (is_snapshot = TRUE AND snapshot_data IS NOT NULL AND patch_data IS NOT NULL)
-        OR
-        (is_snapshot = FALSE AND patch_data IS NOT NULL AND snapshot_data IS NULL)
     )
 );
 

@@ -2,6 +2,8 @@ package com.vocawik.service.song;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.vocawik.domain.acl.Acl;
 import com.vocawik.domain.acl.AclAction;
 import com.vocawik.domain.acl.AclEffect;
@@ -38,6 +40,7 @@ import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -77,6 +80,7 @@ public class SongService {
     private final SongRelationRepository songRelationRepository;
     private final ArtistRepository artistRepository;
     private final VocalRepository vocalRepository;
+    private final ResourceHistoryService resourceHistoryService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
 
@@ -158,6 +162,7 @@ public class SongService {
         saveSongRelations(song, request.relations());
         validateSongParticipationPresent(vocals);
 
+        resourceHistoryService.recordCreate(resource, buildHistorySnapshot(song, resource));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -203,6 +208,7 @@ public class SongService {
         }
         validateSongParticipationPresent(vocals);
 
+        resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(song, resource));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -853,5 +859,170 @@ public class SongService {
                 song.getPublishedAt(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt());
+    }
+
+    private JsonNode buildHistorySnapshot(Song song, Resource resource) {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.put("canonicalName", resource.getCanonicalName());
+        if (resource.getThumbnailUrl() == null) {
+            snapshot.putNull("thumbnailUrl");
+        } else {
+            snapshot.put("thumbnailUrl", resource.getThumbnailUrl());
+        }
+        if (song.getContent() == null) {
+            snapshot.putNull("content");
+        } else {
+            snapshot.put("content", song.getContent());
+        }
+        snapshot.set("links", toSnapshotJson(song.getLinks()));
+        if (song.getPublishedAt() == null) {
+            snapshot.putNull("publishedAt");
+        } else {
+            snapshot.put("publishedAt", song.getPublishedAt().toString());
+        }
+        snapshot.put("songType", song.getSongType().name());
+        snapshot.set("names", buildNamesSnapshot(resource));
+        snapshot.set("acls", buildAclsSnapshot(resource));
+        snapshot.set("lyrics", buildLyricsSnapshot(song));
+        snapshot.set("pvs", buildPvsSnapshot(song));
+        snapshot.set("artists", buildArtistsSnapshot(song));
+        snapshot.set("vocals", buildVocalsSnapshot(song));
+        snapshot.set("relations", buildRelationsSnapshot(song));
+        return snapshot;
+    }
+
+    private ArrayNode buildNamesSnapshot(Resource resource) {
+        ArrayNode names = objectMapper.createArrayNode();
+        for (ResourceName item :
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId())) {
+            ObjectNode name = objectMapper.createObjectNode();
+            name.put("langCode", item.getLangCode().name());
+            name.put("name", item.getName());
+            name.put("isPrimary", item.isPrimary());
+            name.put("sortOrder", item.getSortOrder());
+            names.add(name);
+        }
+        return names;
+    }
+
+    private ArrayNode buildAclsSnapshot(Resource resource) {
+        ArrayNode acls = objectMapper.createArrayNode();
+        for (Acl item :
+                aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId())) {
+            ObjectNode acl = objectMapper.createObjectNode();
+            acl.put("action", item.getAction().name());
+            acl.put("subjectType", item.getSubjectType().name());
+            acl.put("subjectValue", item.getSubjectValue());
+            acl.put("effect", item.getEffect().name());
+            acl.put("priority", item.getPriority());
+            if (item.getExpiresAt() == null) {
+                acl.putNull("expiresAt");
+            } else {
+                acl.put("expiresAt", item.getExpiresAt().toString());
+            }
+            acls.add(acl);
+        }
+        return acls;
+    }
+
+    private ArrayNode buildLyricsSnapshot(Song song) {
+        ArrayNode lyrics = objectMapper.createArrayNode();
+        for (SongLyric item :
+                songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())) {
+            ObjectNode lyric = objectMapper.createObjectNode();
+            ArrayNode langCodes = objectMapper.createArrayNode();
+            item.getLangCodes().stream().map(Enum::name).sorted().forEach(langCodes::add);
+            lyric.set("langCodes", langCodes);
+            lyric.set("lyrics", toSnapshotJson(item.getLyrics()));
+            lyric.put("isPrimary", item.isPrimary());
+            lyric.put("sortOrder", item.getSortOrder());
+            lyrics.add(lyric);
+        }
+        return lyrics;
+    }
+
+    private ArrayNode buildPvsSnapshot(Song song) {
+        ArrayNode pvs = objectMapper.createArrayNode();
+        for (SongPv item : songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())) {
+            ObjectNode pv = objectMapper.createObjectNode();
+            pv.put("service", item.getService().name());
+            pv.put("videoKey", item.getVideoKey());
+            if (item.getTitle() == null) {
+                pv.putNull("title");
+            } else {
+                pv.put("title", item.getTitle());
+            }
+            if (item.getThumbnailUrl() == null) {
+                pv.putNull("thumbnailUrl");
+            } else {
+                pv.put("thumbnailUrl", item.getThumbnailUrl());
+            }
+            if (item.getUploaderKey() == null) {
+                pv.putNull("uploaderKey");
+            } else {
+                pv.put("uploaderKey", item.getUploaderKey());
+            }
+            if (item.getDurationSeconds() == null) {
+                pv.putNull("durationSeconds");
+            } else {
+                pv.put("durationSeconds", item.getDurationSeconds());
+            }
+            pv.put("isOfficial", item.isOfficial());
+            if (item.getPublishedAt() == null) {
+                pv.putNull("publishedAt");
+            } else {
+                pv.put("publishedAt", item.getPublishedAt().toString());
+            }
+            pv.put("sortOrder", item.getSortOrder());
+            pvs.add(pv);
+        }
+        return pvs;
+    }
+
+    private ArrayNode buildArtistsSnapshot(Song song) {
+        ArrayNode artists = objectMapper.createArrayNode();
+        for (SongArtist item :
+                songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())) {
+            ObjectNode artist = objectMapper.createObjectNode();
+            artist.put("artistResourceUuid", item.getArtist().getResource().getUuid().toString());
+            ArrayNode roles = objectMapper.createArrayNode();
+            item.getRoles().stream().map(Enum::name).sorted().forEach(roles::add);
+            artist.set("roles", roles);
+            artist.put("isMain", item.isMain());
+            artist.put("sortOrder", item.getSortOrder());
+            artists.add(artist);
+        }
+        return artists;
+    }
+
+    private ArrayNode buildVocalsSnapshot(Song song) {
+        ArrayNode vocals = objectMapper.createArrayNode();
+        for (SongVocal item :
+                songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())) {
+            ObjectNode vocal = objectMapper.createObjectNode();
+            vocal.put("vocalResourceUuid", item.getVocal().getResource().getUuid().toString());
+            vocal.put("isMain", item.isMain());
+            vocal.put("sortOrder", item.getSortOrder());
+            vocals.add(vocal);
+        }
+        return vocals;
+    }
+
+    private ArrayNode buildRelationsSnapshot(Song song) {
+        ArrayNode relations = objectMapper.createArrayNode();
+        for (SongRelation item :
+                songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId())) {
+            ObjectNode relation = objectMapper.createObjectNode();
+            relation.put(
+                    "targetSongResourceUuid",
+                    item.getTargetSong().getResource().getUuid().toString());
+            relations.add(relation);
+        }
+        return relations;
+    }
+
+    private JsonNode toSnapshotJson(JsonNode value) {
+        return value == null ? objectMapper.nullNode() : value.deepCopy();
     }
 }

@@ -24,6 +24,7 @@ import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -58,6 +59,7 @@ public class ArtistService {
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
+    private final ResourceHistoryService resourceHistoryService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
 
@@ -86,6 +88,7 @@ public class ArtistService {
         saveAcls(resource, request.acls());
         saveArtistMemberships(artist, request.members());
 
+        resourceHistoryService.recordCreate(resource, buildHistorySnapshot(artist, resource));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -117,6 +120,7 @@ public class ArtistService {
             replaceArtistMemberships(artist, toCreateMembers(request.members()));
         }
 
+        resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(artist, resource));
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -679,5 +683,79 @@ public class ArtistService {
                 resource.getThumbnailUrl(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt());
+    }
+
+    private JsonNode buildHistorySnapshot(Artist artist, Resource resource) {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.put("canonicalName", resource.getCanonicalName());
+        if (resource.getThumbnailUrl() == null) {
+            snapshot.putNull("thumbnailUrl");
+        } else {
+            snapshot.put("thumbnailUrl", resource.getThumbnailUrl());
+        }
+        if (artist.getContent() == null) {
+            snapshot.putNull("content");
+        } else {
+            snapshot.put("content", artist.getContent());
+        }
+        snapshot.set("links", toSnapshotJson(artist.getLinks()));
+        snapshot.set("names", buildNamesSnapshot(resource));
+        snapshot.set("acls", buildAclsSnapshot(resource));
+        snapshot.set("members", buildMembersSnapshot(artist));
+        return snapshot;
+    }
+
+    private ArrayNode buildNamesSnapshot(Resource resource) {
+        ArrayNode names = objectMapper.createArrayNode();
+        for (ResourceName item :
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId())) {
+            ObjectNode name = objectMapper.createObjectNode();
+            name.put("langCode", item.getLangCode().name());
+            name.put("name", item.getName());
+            name.put("isPrimary", item.isPrimary());
+            name.put("sortOrder", item.getSortOrder());
+            names.add(name);
+        }
+        return names;
+    }
+
+    private ArrayNode buildAclsSnapshot(Resource resource) {
+        ArrayNode acls = objectMapper.createArrayNode();
+        for (Acl item :
+                aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId())) {
+            ObjectNode acl = objectMapper.createObjectNode();
+            acl.put("action", item.getAction().name());
+            acl.put("subjectType", item.getSubjectType().name());
+            acl.put("subjectValue", item.getSubjectValue());
+            acl.put("effect", item.getEffect().name());
+            acl.put("priority", item.getPriority());
+            if (item.getExpiresAt() == null) {
+                acl.putNull("expiresAt");
+            } else {
+                acl.put("expiresAt", item.getExpiresAt().toString());
+            }
+            acls.add(acl);
+        }
+        return acls;
+    }
+
+    private ArrayNode buildMembersSnapshot(Artist artist) {
+        ArrayNode members = objectMapper.createArrayNode();
+        for (ArtistGroup item :
+                artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
+                        artist.getId())) {
+            ObjectNode member = objectMapper.createObjectNode();
+            member.put(
+                    "groupArtistResourceUuid",
+                    item.getGroupArtist().getResource().getUuid().toString());
+            member.put("sortOrder", item.getSortOrder());
+            members.add(member);
+        }
+        return members;
+    }
+
+    private JsonNode toSnapshotJson(JsonNode value) {
+        return value == null ? objectMapper.nullNode() : value.deepCopy();
     }
 }
