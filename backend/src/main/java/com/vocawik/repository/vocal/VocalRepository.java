@@ -11,6 +11,9 @@ import org.springframework.data.repository.query.Param;
 /** Repository for {@link Vocal} persistence access. */
 public interface VocalRepository extends JpaRepository<Vocal, Long>, VocalCriteriaRepository {
 
+    /** Finds a vocal by resource UUID, including deleted resources. */
+    java.util.Optional<Vocal> findByResourceUuid(java.util.UUID resourceUuid);
+
     /** Finds an active vocal by resource UUID. */
     java.util.Optional<Vocal> findByResourceUuidAndResourceIsDeletedFalse(
             java.util.UUID resourceUuid);

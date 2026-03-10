@@ -92,7 +92,7 @@ public class ResourceService {
     public SongResourceDetailResponse getSongByResourceUuid(UUID resourceUuid) {
         Song song =
                 songRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = song.getResource();
 
@@ -115,6 +115,7 @@ public class ResourceService {
 
         return new SongResourceDetailResponse(
                 resource.getUuid(),
+                resource.isDeleted(),
                 resource.getCanonicalName(),
                 resource.getStatus().name(),
                 song.getSongType().name(),
@@ -140,12 +141,13 @@ public class ResourceService {
     public ArtistResourceDetailResponse getArtistByResourceUuid(UUID resourceUuid) {
         Artist artist =
                 artistRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
 
         return new ArtistResourceDetailResponse(
                 resource.getUuid(),
+                resource.isDeleted(),
                 resource.getCanonicalName(),
                 resource.getStatus().name(),
                 resource.getViewCount(),
@@ -177,12 +179,13 @@ public class ResourceService {
     public VocalResourceDetailResponse getVocalByResourceUuid(UUID resourceUuid) {
         Vocal vocal =
                 vocalRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();
 
         return new VocalResourceDetailResponse(
                 resource.getUuid(),
+                resource.isDeleted(),
                 resource.getCanonicalName(),
                 resource.getStatus().name(),
                 resource.getViewCount(),

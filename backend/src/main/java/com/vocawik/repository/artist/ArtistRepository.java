@@ -14,6 +14,14 @@ import org.springframework.data.repository.query.Param;
 public interface ArtistRepository extends JpaRepository<Artist, Long>, ArtistCriteriaRepository {
 
     /**
+     * Finds an artist by resource UUID, including deleted resources.
+     *
+     * @param resourceUuid artist resource UUID
+     * @return matching artist when found
+     */
+    Optional<Artist> findByResourceUuid(UUID resourceUuid);
+
+    /**
      * Finds an active artist by resource UUID.
      *
      * @param resourceUuid artist resource UUID

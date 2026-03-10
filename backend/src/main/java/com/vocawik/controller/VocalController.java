@@ -97,9 +97,10 @@ public class VocalController {
     /** Soft-deletes a vocal. */
     @DeleteMapping("/vocals/{resourceUuid}")
     @Operation(summary = "Delete vocal", description = "Soft-deletes a vocal.")
-    public ResponseEntity<Void> deleteVocal(@PathVariable UUID resourceUuid) {
+    public ResponseEntity<VocalResourceDetailResponse> deleteVocal(
+            @PathVariable UUID resourceUuid) {
         vocalService.delete(resourceUuid);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(resourceService.getVocalByResourceUuid(resourceUuid));
     }
 
     /**
