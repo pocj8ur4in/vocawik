@@ -1,8 +1,8 @@
 package com.vocawik.repository.resource;
 
 import com.vocawik.domain.resource.Resource;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 
 /** Custom search repository for {@link Resource}. */
 public interface ResourceCriteriaRepository {
@@ -12,7 +12,7 @@ public interface ResourceCriteriaRepository {
      *
      * @param criteria search criteria
      * @param pageable page/sort options
-     * @return sliced resources
+     * @return paged resources
      */
-    Slice<Resource> search(ResourceCriteria criteria, Pageable pageable);
+    Page<Resource> search(ResourceCriteria criteria, Pageable pageable);
 }

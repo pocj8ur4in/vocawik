@@ -49,8 +49,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,14 +82,14 @@ public class ResourceService {
     @Transactional(readOnly = true)
     public ResourceListResponse search(ResourceStatus status, String query, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
-        Slice<Resource> resultSlice =
+        Page<Resource> result =
                 resourceRepository.search(new ResourceCriteria(status, normalizedQuery), pageable);
 
         List<ResourceElementResponse> items =
-                resultSlice.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream().map(this::toSummary).toList();
 
         return new ResourceListResponse(
-                items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
+                items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
     @Transactional(readOnly = true)

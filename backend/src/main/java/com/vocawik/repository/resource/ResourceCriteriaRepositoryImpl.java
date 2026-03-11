@@ -15,9 +15,9 @@ import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
@@ -32,11 +32,40 @@ public class ResourceCriteriaRepositoryImpl implements ResourceCriteriaRepositor
     private final EntityManager entityManager;
 
     @Override
-    public Slice<Resource> search(ResourceCriteria criteria, Pageable pageable) {
+    public Page<Resource> search(ResourceCriteria criteria, Pageable pageable) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Resource> criteriaQuery = criteriaBuilder.createQuery(Resource.class);
         Root<Resource> root = criteriaQuery.from(Resource.class);
+        List<Predicate> predicates =
+                buildPredicates(criteria, criteriaQuery, root, criteriaBuilder);
 
+        criteriaQuery.where(predicates.toArray(Predicate[]::new));
+        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
+
+        TypedQuery<Resource> typedQuery = entityManager.createQuery(criteriaQuery);
+        typedQuery.setFirstResult((int) pageable.getOffset());
+        typedQuery.setMaxResults(pageable.getPageSize());
+
+        List<Resource> rows = typedQuery.getResultList();
+        long totalCount = count(criteria, criteriaBuilder);
+        return new PageImpl<>(rows, pageable, totalCount);
+    }
+
+    private long count(ResourceCriteria criteria, CriteriaBuilder criteriaBuilder) {
+        CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
+        Root<Resource> countRoot = countQuery.from(Resource.class);
+        List<Predicate> predicates =
+                buildPredicates(criteria, countQuery, countRoot, criteriaBuilder);
+        countQuery.select(criteriaBuilder.count(countRoot));
+        countQuery.where(predicates.toArray(Predicate[]::new));
+        return entityManager.createQuery(countQuery).getSingleResult();
+    }
+
+    private List<Predicate> buildPredicates(
+            ResourceCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            Root<Resource> root,
+            CriteriaBuilder criteriaBuilder) {
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(criteriaBuilder.isFalse(root.get("isDeleted")));
         if (criteria.status() != null) {
@@ -47,25 +76,12 @@ public class ResourceCriteriaRepositoryImpl implements ResourceCriteriaRepositor
             predicates.add(
                     hasAnyResourceNameLike(keywordPattern, criteriaQuery, root, criteriaBuilder));
         }
-
-        criteriaQuery.where(predicates.toArray(Predicate[]::new));
-        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
-
-        TypedQuery<Resource> typedQuery = entityManager.createQuery(criteriaQuery);
-        typedQuery.setFirstResult((int) pageable.getOffset());
-        typedQuery.setMaxResults(pageable.getPageSize() + 1);
-
-        List<Resource> rows = typedQuery.getResultList();
-        boolean hasNext = rows.size() > pageable.getPageSize();
-        if (hasNext) {
-            rows = rows.subList(0, pageable.getPageSize());
-        }
-        return new SliceImpl<>(rows, pageable, hasNext);
+        return predicates;
     }
 
     private Predicate hasAnyResourceNameLike(
             String keywordPattern,
-            CriteriaQuery<Resource> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Resource> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);

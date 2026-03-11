@@ -1,8 +1,8 @@
 package com.vocawik.repository.song;
 
 import com.vocawik.domain.song.Song;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 
 /** Custom search repository for {@link Song}. */
 public interface SongCriteriaRepository {
@@ -12,7 +12,7 @@ public interface SongCriteriaRepository {
      *
      * @param criteria search criteria
      * @param pageable page/sort options
-     * @return sliced songs
+     * @return paged songs
      */
-    Slice<Song> search(SongCriteria criteria, Pageable pageable);
+    Page<Song> search(SongCriteria criteria, Pageable pageable);
 }

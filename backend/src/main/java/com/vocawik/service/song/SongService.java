@@ -54,8 +54,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,7 +111,7 @@ public class SongService {
         List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
         List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
 
-        Slice<Song> resultSlice =
+        Page<Song> result =
                 songRepository.search(
                         new SongCriteria(
                                 status,
@@ -124,10 +124,10 @@ public class SongService {
                         pageable);
 
         List<SongElementResponse> items =
-                resultSlice.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream().map(this::toSummary).toList();
 
         return new SongListResponse(
-                items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
+                items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
     /**
