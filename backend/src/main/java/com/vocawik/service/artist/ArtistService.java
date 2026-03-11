@@ -40,8 +40,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -169,7 +169,7 @@ public class ArtistService {
         List<UUID> normalizedGroupArtistUuids = normalizeUuids(groupArtistUuids);
         List<UUID> normalizedMemberArtistUuids = normalizeUuids(memberArtistUuids);
 
-        Slice<Artist> resultSlice =
+        Page<Artist> result =
                 artistRepository.search(
                         new ArtistCriteria(
                                 status,
@@ -180,10 +180,10 @@ public class ArtistService {
                         pageable);
 
         List<ArtistElementResponse> items =
-                resultSlice.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream().map(this::toSummary).toList();
 
         return new ArtistListResponse(
-                items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
+                items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
     private String normalizeQuery(String query) {

@@ -36,8 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,14 +62,14 @@ public class PlaylistService {
     @Transactional(readOnly = true)
     public PlaylistListResponse search(ResourceStatus status, String query, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
-        Slice<Playlist> resultSlice =
+        Page<Playlist> result =
                 playlistRepository.search(new PlaylistCriteria(status, normalizedQuery), pageable);
 
         List<PlaylistElementResponse> items =
-                resultSlice.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream().map(this::toSummary).toList();
 
         return new PlaylistListResponse(
-                items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
+                items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
     @Transactional

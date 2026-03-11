@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -108,15 +108,15 @@ public class ResourceHistoryService {
                                                 com.vocawik.web.error.ErrorCode
                                                         .RESOURCE_NOT_FOUND));
 
-        Slice<History> resultSlice =
+        Page<History> result =
                 historyRepository.findAllByResourceIdOrderByRevisionDescCreatedAtDesc(
                         resource.getId(), pageable);
 
         List<ResourceHistoryElementResponse> items =
-                resultSlice.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream().map(this::toSummary).toList();
 
         return new ResourceHistoryListResponse(
-                items, resultSlice.getNumber(), resultSlice.getSize(), resultSlice.hasNext());
+                items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
     @Transactional(readOnly = true)

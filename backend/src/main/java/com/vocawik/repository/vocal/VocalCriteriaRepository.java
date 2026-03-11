@@ -1,8 +1,8 @@
 package com.vocawik.repository.vocal;
 
 import com.vocawik.domain.vocal.Vocal;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 
 /** Custom search repository for {@link Vocal}. */
 public interface VocalCriteriaRepository {
@@ -12,7 +12,7 @@ public interface VocalCriteriaRepository {
      *
      * @param criteria search criteria
      * @param pageable page/sort options
-     * @return sliced vocals
+     * @return paged vocals
      */
-    Slice<Vocal> search(VocalCriteria criteria, Pageable pageable);
+    Page<Vocal> search(VocalCriteria criteria, Pageable pageable);
 }

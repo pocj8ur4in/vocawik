@@ -18,9 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
@@ -35,12 +35,40 @@ public class VocalCriteriaRepositoryImpl implements VocalCriteriaRepository {
     private final EntityManager entityManager;
 
     @Override
-    public Slice<Vocal> search(VocalCriteria criteria, Pageable pageable) {
+    public Page<Vocal> search(VocalCriteria criteria, Pageable pageable) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Vocal> criteriaQuery = criteriaBuilder.createQuery(Vocal.class);
         Root<Vocal> root = criteriaQuery.from(Vocal.class);
         root.fetch("resource", JoinType.INNER);
+        List<Predicate> predicates =
+                buildPredicates(criteria, criteriaQuery, root, criteriaBuilder);
+        criteriaQuery.where(predicates.toArray(Predicate[]::new));
+        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
 
+        TypedQuery<Vocal> typedQuery = entityManager.createQuery(criteriaQuery);
+        typedQuery.setFirstResult((int) pageable.getOffset());
+        typedQuery.setMaxResults(pageable.getPageSize());
+
+        List<Vocal> rows = typedQuery.getResultList();
+        long totalCount = count(criteria, criteriaBuilder);
+        return new PageImpl<>(rows, pageable, totalCount);
+    }
+
+    private long count(VocalCriteria criteria, CriteriaBuilder criteriaBuilder) {
+        CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
+        Root<Vocal> countRoot = countQuery.from(Vocal.class);
+        List<Predicate> predicates =
+                buildPredicates(criteria, countQuery, countRoot, criteriaBuilder);
+        countQuery.select(criteriaBuilder.count(countRoot));
+        countQuery.where(predicates.toArray(Predicate[]::new));
+        return entityManager.createQuery(countQuery).getSingleResult();
+    }
+
+    private List<Predicate> buildPredicates(
+            VocalCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            Root<Vocal> root,
+            CriteriaBuilder criteriaBuilder) {
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(criteriaBuilder.isFalse(root.get("resource").get("isDeleted")));
         if (criteria.status() != null) {
@@ -56,24 +84,12 @@ public class VocalCriteriaRepositoryImpl implements VocalCriteriaRepository {
             predicates.add(
                     hasAnySongUuid(criteria.songUuids(), criteriaQuery, root, criteriaBuilder));
         }
-        criteriaQuery.where(predicates.toArray(Predicate[]::new));
-        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
-
-        TypedQuery<Vocal> typedQuery = entityManager.createQuery(criteriaQuery);
-        typedQuery.setFirstResult((int) pageable.getOffset());
-        typedQuery.setMaxResults(pageable.getPageSize() + 1);
-
-        List<Vocal> rows = typedQuery.getResultList();
-        boolean hasNext = rows.size() > pageable.getPageSize();
-        if (hasNext) {
-            rows = rows.subList(0, pageable.getPageSize());
-        }
-        return new SliceImpl<>(rows, pageable, hasNext);
+        return predicates;
     }
 
     private Predicate hasAnyResourceNameLike(
             String keywordPattern,
-            CriteriaQuery<Vocal> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Vocal> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
@@ -88,7 +104,7 @@ public class VocalCriteriaRepositoryImpl implements VocalCriteriaRepository {
 
     private Predicate hasAnySongUuid(
             List<UUID> songUuids,
-            CriteriaQuery<Vocal> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Vocal> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);

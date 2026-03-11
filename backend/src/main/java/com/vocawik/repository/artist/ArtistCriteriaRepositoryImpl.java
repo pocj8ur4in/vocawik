@@ -19,9 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
@@ -36,12 +36,41 @@ public class ArtistCriteriaRepositoryImpl implements ArtistCriteriaRepository {
     private final EntityManager entityManager;
 
     @Override
-    public Slice<Artist> search(ArtistCriteria criteria, Pageable pageable) {
+    public Page<Artist> search(ArtistCriteria criteria, Pageable pageable) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Artist> criteriaQuery = criteriaBuilder.createQuery(Artist.class);
         Root<Artist> root = criteriaQuery.from(Artist.class);
         root.fetch("resource", JoinType.INNER);
+        List<Predicate> predicates =
+                buildPredicates(criteria, criteriaQuery, root, criteriaBuilder);
 
+        criteriaQuery.where(predicates.toArray(Predicate[]::new));
+        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
+
+        TypedQuery<Artist> typedQuery = entityManager.createQuery(criteriaQuery);
+        typedQuery.setFirstResult((int) pageable.getOffset());
+        typedQuery.setMaxResults(pageable.getPageSize());
+
+        List<Artist> rows = typedQuery.getResultList();
+        long totalCount = count(criteria, criteriaBuilder);
+        return new PageImpl<>(rows, pageable, totalCount);
+    }
+
+    private long count(ArtistCriteria criteria, CriteriaBuilder criteriaBuilder) {
+        CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
+        Root<Artist> countRoot = countQuery.from(Artist.class);
+        List<Predicate> predicates =
+                buildPredicates(criteria, countQuery, countRoot, criteriaBuilder);
+        countQuery.select(criteriaBuilder.count(countRoot));
+        countQuery.where(predicates.toArray(Predicate[]::new));
+        return entityManager.createQuery(countQuery).getSingleResult();
+    }
+
+    private List<Predicate> buildPredicates(
+            ArtistCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            Root<Artist> root,
+            CriteriaBuilder criteriaBuilder) {
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(criteriaBuilder.isFalse(root.get("resource").get("isDeleted")));
         if (criteria.status() != null) {
@@ -67,25 +96,12 @@ public class ArtistCriteriaRepositoryImpl implements ArtistCriteriaRepository {
                     hasAnyMemberArtistUuid(
                             criteria.memberArtistUuids(), criteriaQuery, root, criteriaBuilder));
         }
-
-        criteriaQuery.where(predicates.toArray(Predicate[]::new));
-        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
-
-        TypedQuery<Artist> typedQuery = entityManager.createQuery(criteriaQuery);
-        typedQuery.setFirstResult((int) pageable.getOffset());
-        typedQuery.setMaxResults(pageable.getPageSize() + 1);
-
-        List<Artist> rows = typedQuery.getResultList();
-        boolean hasNext = rows.size() > pageable.getPageSize();
-        if (hasNext) {
-            rows = rows.subList(0, pageable.getPageSize());
-        }
-        return new SliceImpl<>(rows, pageable, hasNext);
+        return predicates;
     }
 
     private Predicate hasAnyResourceNameLike(
             String keywordPattern,
-            CriteriaQuery<Artist> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Artist> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
@@ -100,7 +116,7 @@ public class ArtistCriteriaRepositoryImpl implements ArtistCriteriaRepository {
 
     private Predicate hasAnySongUuid(
             List<UUID> songUuids,
-            CriteriaQuery<Artist> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Artist> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
@@ -114,7 +130,7 @@ public class ArtistCriteriaRepositoryImpl implements ArtistCriteriaRepository {
 
     private Predicate hasAnyGroupArtistUuid(
             List<UUID> groupArtistUuids,
-            CriteriaQuery<Artist> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Artist> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
@@ -128,7 +144,7 @@ public class ArtistCriteriaRepositoryImpl implements ArtistCriteriaRepository {
 
     private Predicate hasAnyMemberArtistUuid(
             List<UUID> memberArtistUuids,
-            CriteriaQuery<Artist> criteriaQuery,
+            CriteriaQuery<?> criteriaQuery,
             Root<Artist> root,
             CriteriaBuilder criteriaBuilder) {
         Subquery<Long> subquery = criteriaQuery.subquery(Long.class);

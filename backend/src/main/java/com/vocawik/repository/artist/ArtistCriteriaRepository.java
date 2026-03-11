@@ -1,8 +1,8 @@
 package com.vocawik.repository.artist;
 
 import com.vocawik.domain.artist.Artist;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 
 /** Custom search repository for {@link Artist}. */
 public interface ArtistCriteriaRepository {
@@ -12,7 +12,7 @@ public interface ArtistCriteriaRepository {
      *
      * @param criteria search criteria
      * @param pageable page/sort options
-     * @return sliced artists
+     * @return paged artists
      */
-    Slice<Artist> search(ArtistCriteria criteria, Pageable pageable);
+    Page<Artist> search(ArtistCriteria criteria, Pageable pageable);
 }
