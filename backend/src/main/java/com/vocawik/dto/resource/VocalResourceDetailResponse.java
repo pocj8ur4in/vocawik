@@ -1,5 +1,6 @@
 package com.vocawik.dto.resource;
 
+import com.vocawik.dto.history.ResourceHistoryElementResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -18,12 +19,14 @@ public record VocalResourceDetailResponse(
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
         List<ResourceAclDetailResponse> acls,
+        List<ResourceHistoryElementResponse> histories,
         List<VocalSong> songs) {
 
     /** Creates an immutable vocal detail response. */
     public VocalResourceDetailResponse {
         names = List.copyOf(names);
         acls = List.copyOf(acls);
+        histories = List.copyOf(histories);
         songs = List.copyOf(songs);
     }
 

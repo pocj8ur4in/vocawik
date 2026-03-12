@@ -40,6 +40,7 @@ import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -77,6 +78,7 @@ public class ResourceService {
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
     private final VocalRepository vocalRepository;
+    private final ResourceHistoryService resourceHistoryService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -132,6 +134,7 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 names,
                 acls,
+                resourceHistoryService.listByResourceId(resource.getId()),
                 lyrics.stream().map(this::toSongLyric).toList(),
                 pvs.stream().map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()))).toList(),
                 artists.stream().map(this::toSongArtist).toList(),
@@ -162,6 +165,7 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
+                resourceHistoryService.listByResourceId(resource.getId()),
                 songArtistRepository
                         .findAllByArtistIdOrderBySortOrderAscIdAsc(artist.getId())
                         .stream()
@@ -200,6 +204,7 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
+                resourceHistoryService.listByResourceId(resource.getId()),
                 songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
                         .map(this::toVocalSong)
                         .toList());
@@ -226,6 +231,7 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
+                resourceHistoryService.listByResourceId(resource.getId()),
                 playlistSongRepository
                         .findAllByPlaylistIdOrderBySortOrderAscIdAsc(playlist.getId())
                         .stream()

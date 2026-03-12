@@ -53,7 +53,6 @@ import org.springframework.transaction.annotation.Transactional;
         justification =
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class ArtistService {
-
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
     private final ResourceRepository resourceRepository;

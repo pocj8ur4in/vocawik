@@ -9,7 +9,6 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.user.User;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.history.ResourceHistoryElementResponse;
-import com.vocawik.dto.history.ResourceHistoryListResponse;
 import com.vocawik.repository.guest.GuestRepository;
 import com.vocawik.repository.history.HistoryRepository;
 import com.vocawik.repository.resource.ResourceRepository;
@@ -25,8 +24,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -98,25 +95,12 @@ public class ResourceHistoryService {
     }
 
     @Transactional(readOnly = true)
-    public ResourceHistoryListResponse listByResourceUuid(UUID resourceUuid, Pageable pageable) {
-        Resource resource =
-                resourceRepository
-                        .findByUuid(resourceUuid)
-                        .orElseThrow(
-                                () ->
-                                        new com.vocawik.web.exception.BusinessException(
-                                                com.vocawik.web.error.ErrorCode
-                                                        .RESOURCE_NOT_FOUND));
-
-        Page<History> result =
-                historyRepository.findAllByResourceIdOrderByRevisionDescCreatedAtDesc(
-                        resource.getId(), pageable);
-
-        List<ResourceHistoryElementResponse> items =
-                result.getContent().stream().map(this::toSummary).toList();
-
-        return new ResourceHistoryListResponse(
-                items, result.getNumber(), result.getSize(), result.getTotalElements());
+    public List<ResourceHistoryElementResponse> listByResourceId(Long resourceId) {
+        return historyRepository
+                .findAllByResourceIdOrderByRevisionDescCreatedAtDesc(resourceId)
+                .stream()
+                .map(this::toSummary)
+                .toList();
     }
 
     @Transactional(readOnly = true)
