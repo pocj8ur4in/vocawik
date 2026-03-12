@@ -2,7 +2,6 @@ package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
-import com.vocawik.dto.history.ResourceHistoryListResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.resource.ResourceService;
@@ -101,36 +100,6 @@ public class ResourceController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
-    }
-
-    /** Lists revision metadata for a resource. */
-    @GetMapping("/resources/{resourceUuid}/histories")
-    @Operation(
-            summary = "List resource histories",
-            description = "Returns revision metadata for a resource in reverse revision order.")
-    @Parameters({
-        @Parameter(
-                name = "page",
-                in = ParameterIn.QUERY,
-                description = "Page index",
-                example = "0",
-                schema = @Schema(type = "integer", defaultValue = "0", minimum = "0")),
-        @Parameter(
-                name = "size",
-                in = ParameterIn.QUERY,
-                description = "Page size",
-                example = "20",
-                schema = @Schema(type = "integer", defaultValue = "20", minimum = "1"))
-    })
-    public ResponseEntity<ResourceHistoryListResponse> listResourceHistories(
-            @PathVariable UUID resourceUuid,
-            @Parameter(hidden = true)
-                    @PageableDefault(size = 20, sort = "revision", direction = Sort.Direction.DESC)
-                    Pageable pageable) {
-        return ResponseEntity.ok(
-                resourceHistoryService.listByResourceUuid(
-                        resourceUuid,
-                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())));
     }
 
     /** Gets a single resource history revision. */
