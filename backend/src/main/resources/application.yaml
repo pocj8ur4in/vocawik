@@ -147,6 +147,7 @@ logging:
       - secret
       - api_key
       - apikey
+      - registerTicket
       - email
     masked-header-keys:
       - authorization
@@ -171,4 +172,5 @@ logging:
       - secret
       - api_key
       - apikey
+      - registerTicket
       - email

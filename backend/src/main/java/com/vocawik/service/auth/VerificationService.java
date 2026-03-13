@@ -62,8 +62,10 @@ public class VerificationService {
     private static final String INVALID_OR_EXPIRED_REGISTER_TICKET_MESSAGE =
             "Invalid or expired register ticket.";
     private static final Duration EMAIL_VERIFY_TOKEN_TTL = Duration.ofMinutes(10);
-    private static final Duration EMAIL_VERIFY_REQUEST_LOCK_TTL = Duration.ofMinutes(11);
     private static final Duration REGISTER_TICKET_TTL = Duration.ofMinutes(15);
+    private static final Duration EMAIL_VERIFY_REQUEST_LOCK_TTL =
+            REGISTER_TICKET_TTL.plusMinutes(1);
+    private static final String REGISTER_VERIFY_PAYLOAD_SEPARATOR = "\n";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
@@ -153,25 +155,18 @@ public class VerificationService {
         }
 
         if (payload.startsWith(EMAIL_VERIFY_REGISTER_VALUE_PREFIX)) {
-            String rawValue = payload.substring(EMAIL_VERIFY_REGISTER_VALUE_PREFIX.length());
-            int separator = rawValue.indexOf(':');
-            if (separator <= 0 || separator >= rawValue.length() - 1) {
-                throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
-            }
-            String tokenRequestId = rawValue.substring(0, separator);
-            String verifiedEmail = rawValue.substring(separator + 1);
+            RegisterVerificationPayload registerVerificationPayload =
+                    parseRegisterVerificationPayload(
+                            payload.substring(EMAIL_VERIFY_REGISTER_VALUE_PREFIX.length()));
+            String tokenRequestId = registerVerificationPayload.requestId();
+            String verifiedEmail = registerVerificationPayload.email();
             stringRedisTemplate.delete(registerEmailVerifyKey(verifiedEmail));
             if (requestId != null
                     && !requestId.isBlank()
                     && !tokenRequestId.equals(requestId.trim())) {
                 throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
             }
-            String registerTicket = generateEmailVerificationToken();
-            String registerTicketHash = sha256(registerTicket);
-            stringRedisTemplate
-                    .opsForValue()
-                    .set(registerTicketKey(registerTicketHash), verifiedEmail, REGISTER_TICKET_TTL);
-            return registerTicket;
+            return registerVerificationPayload.registerTicket();
         }
 
         if (payload.startsWith(EMAIL_VERIFY_USER_VALUE_PREFIX)) {
@@ -243,12 +238,12 @@ public class VerificationService {
     }
 
     /**
-     * Returns the verification token lifetime in seconds.
+     * Returns the registration email link lifetime in seconds.
      *
-     * @return verification token TTL in seconds
+     * @return registration email link TTL in seconds
      */
-    public long getEmailVerificationTtlSeconds() {
-        return EMAIL_VERIFY_TOKEN_TTL.toSeconds();
+    public long getRegistrationEmailLinkTtlSeconds() {
+        return REGISTER_TICKET_TTL.toSeconds();
     }
 
     /**
@@ -264,14 +259,19 @@ public class VerificationService {
         String rawToken = generateEmailVerificationToken();
         String tokenHash = sha256(rawToken);
         String tokenKey = emailVerifyKey(tokenHash);
+        String registerTicket = generateEmailVerificationToken();
+        String registerTicketKey = registerTicketKey(sha256(registerTicket));
+        stringRedisTemplate.opsForValue().set(registerTicketKey, email, REGISTER_TICKET_TTL);
         stringRedisTemplate
                 .opsForValue()
                 .set(
                         tokenKey,
-                        EMAIL_VERIFY_REGISTER_VALUE_PREFIX + requestId + ":" + email,
+                        EMAIL_VERIFY_REGISTER_VALUE_PREFIX
+                                + buildRegisterVerificationPayload(
+                                        requestId, email, registerTicket),
                         EMAIL_VERIFY_TOKEN_TTL);
 
-        String verifyUrl = buildFrontendVerifyUrl(rawToken);
+        String verifyUrl = buildFrontendVerifyUrl(email, registerTicket);
         try {
             emailService.send(
                     email,
@@ -279,6 +279,7 @@ public class VerificationService {
                     buildEmailVerificationContent(verifyUrl));
         } catch (RuntimeException ex) {
             stringRedisTemplate.delete(tokenKey);
+            stringRedisTemplate.delete(registerTicketKey);
             throw ex;
         }
     }
@@ -304,10 +305,15 @@ public class VerificationService {
         user.activate();
     }
 
-    private String buildFrontendVerifyUrl(String rawToken) {
+    private String buildFrontendVerifyUrl(String email, String registerTicket) {
         String baseUrl = emailVerificationFrontendUrl.trim();
         String delimiter = baseUrl.contains("?") ? "&" : "?";
-        return baseUrl + delimiter + "token=" + encode(rawToken);
+        return baseUrl
+                + delimiter
+                + "email="
+                + encode(email)
+                + "&registerTicket="
+                + encode(registerTicket);
     }
 
     private String resolveEmailVerificationSubject() {
@@ -332,6 +338,25 @@ public class VerificationService {
         byte[] bytes = new byte[EMAIL_VERIFY_TOKEN_BYTES];
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private String buildRegisterVerificationPayload(
+            String requestId, String email, String registerTicket) {
+        return String.join(REGISTER_VERIFY_PAYLOAD_SEPARATOR, requestId, email, registerTicket);
+    }
+
+    private RegisterVerificationPayload parseRegisterVerificationPayload(String rawValue) {
+        String[] parts = rawValue.split(REGISTER_VERIFY_PAYLOAD_SEPARATOR, 3);
+        if (parts.length != 3) {
+            throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+        }
+        String requestId = parts[0];
+        String email = parts[1];
+        String registerTicket = parts[2];
+        if (requestId.isBlank() || email.isBlank() || registerTicket.isBlank()) {
+            throw new IllegalArgumentException(INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE);
+        }
+        return new RegisterVerificationPayload(requestId, email, registerTicket);
     }
 
     private String emailVerifyKey(String tokenHash) {
@@ -360,4 +385,7 @@ public class VerificationService {
             throw new IllegalStateException("SHA-256 not available", e);
         }
     }
+
+    private record RegisterVerificationPayload(
+            String requestId, String email, String registerTicket) {}
 }
