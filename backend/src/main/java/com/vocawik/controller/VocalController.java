@@ -74,7 +74,7 @@ public class VocalController {
     @GetMapping("/vocals/{resourceUuid}")
     @Operation(summary = "Get vocal", description = "Returns vocal detail.")
     public ResponseEntity<VocalResourceDetailResponse> getVocal(@PathVariable UUID resourceUuid) {
-        return ResponseEntity.ok(resourceService.getVocalByResourceUuid(resourceUuid));
+        return ResponseEntity.ok(resourceService.getVocalByResourceUuidWithTracking(resourceUuid));
     }
 
     /**

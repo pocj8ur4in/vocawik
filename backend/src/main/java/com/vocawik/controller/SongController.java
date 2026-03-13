@@ -78,7 +78,7 @@ public class SongController {
     @GetMapping("/songs/{resourceUuid}")
     @Operation(summary = "Get song", description = "Returns song detail.")
     public ResponseEntity<SongResourceDetailResponse> getSong(@PathVariable UUID resourceUuid) {
-        return ResponseEntity.ok(resourceService.getSongByResourceUuid(resourceUuid));
+        return ResponseEntity.ok(resourceService.getSongByResourceUuidWithTracking(resourceUuid));
     }
 
     /**
