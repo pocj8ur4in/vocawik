@@ -5,6 +5,7 @@ import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.resource.PopularResourceListResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
+import com.vocawik.dto.resource.ResourceSuggestionListResponse;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.resource.ResourcePopularityService;
 import com.vocawik.service.resource.ResourceService;
@@ -104,6 +105,17 @@ public class ResourceController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Suggests resources matching the current query. */
+    @GetMapping("/resources/suggestions")
+    @Operation(
+            summary = "Suggest resources",
+            description = "Returns up to 10 resource suggestions matching the current query.")
+    public ResponseEntity<ResourceSuggestionListResponse> suggestResources(
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
+        return ResponseEntity.ok(resourceService.suggest(query));
     }
 
     /** Lists the most recent resource changes across all resource types. */
