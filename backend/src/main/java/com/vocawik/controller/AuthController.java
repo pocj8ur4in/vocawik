@@ -77,7 +77,7 @@ public class AuthController {
             @Valid @RequestBody RegistrationVerificationRequestCreateRequest request) {
         String requestId = verificationService.requestEmailVerification(request.email());
         Instant expiresAt =
-                Instant.now().plusSeconds(verificationService.getEmailVerificationTtlSeconds());
+                Instant.now().plusSeconds(verificationService.getRegistrationEmailLinkTtlSeconds());
 
         return ResponseEntity.created(
                         URI.create("/api/v1/registration-verification-requests/" + requestId))
