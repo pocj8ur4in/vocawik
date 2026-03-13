@@ -86,7 +86,8 @@ public class PlaylistController {
     @Operation(summary = "Get playlist", description = "Returns playlist detail.")
     public ResponseEntity<PlaylistResourceDetailResponse> getPlaylist(
             @PathVariable UUID resourceUuid) {
-        return ResponseEntity.ok(resourceService.getPlaylistByResourceUuid(resourceUuid));
+        return ResponseEntity.ok(
+                resourceService.getPlaylistByResourceUuidWithTracking(resourceUuid));
     }
 
     /** Searches playlists with optional filters. */

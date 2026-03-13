@@ -3,8 +3,10 @@ package com.vocawik.controller;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
+import com.vocawik.dto.resource.PopularResourceListResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.service.history.ResourceHistoryService;
+import com.vocawik.service.resource.ResourcePopularityService;
 import com.vocawik.service.resource.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,6 +40,7 @@ public class ResourceController {
 
     private final ResourceService resourceService;
     private final ResourceHistoryService resourceHistoryService;
+    private final ResourcePopularityService resourcePopularityService;
 
     /**
      * Searches active resources filtered by status/query.
@@ -119,6 +122,24 @@ public class ResourceController {
     public ResponseEntity<RecentChangeListResponse> listRecentChanges(
             @RequestParam(name = "size", defaultValue = "10") int size) {
         return ResponseEntity.ok(resourceHistoryService.listRecentChanges(size));
+    }
+
+    /** Lists popular resources over the last 10 minutes. */
+    @GetMapping("/resources/popular")
+    @Operation(
+            summary = "List popular resources",
+            description = "Returns the most viewed public resources during the last 10 minutes.")
+    @Parameters({
+        @Parameter(
+                name = "size",
+                in = ParameterIn.QUERY,
+                description = "Maximum number of items to return (capped at 10)",
+                example = "10",
+                schema = @Schema(type = "integer", defaultValue = "10", minimum = "1"))
+    })
+    public ResponseEntity<PopularResourceListResponse> listPopularResources(
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        return ResponseEntity.ok(resourcePopularityService.listPopularResources(size));
     }
 
     /** Gets a single resource history revision. */

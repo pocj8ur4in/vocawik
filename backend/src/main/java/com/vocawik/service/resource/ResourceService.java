@@ -79,6 +79,7 @@ public class ResourceService {
     private final ArtistGroupRepository artistGroupRepository;
     private final VocalRepository vocalRepository;
     private final ResourceHistoryService resourceHistoryService;
+    private final ResourcePopularityService resourcePopularityService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -144,6 +145,12 @@ public class ResourceService {
                 playlists.stream().map(this::toSongPlaylist).toList());
     }
 
+    @Transactional
+    public SongResourceDetailResponse getSongByResourceUuidWithTracking(UUID resourceUuid) {
+        resourcePopularityService.trackView(resourceUuid);
+        return getSongByResourceUuid(resourceUuid);
+    }
+
     @Transactional(readOnly = true)
     public ArtistResourceDetailResponse getArtistByResourceUuid(UUID resourceUuid) {
         Artist artist =
@@ -183,6 +190,12 @@ public class ResourceService {
                         .toList());
     }
 
+    @Transactional
+    public ArtistResourceDetailResponse getArtistByResourceUuidWithTracking(UUID resourceUuid) {
+        resourcePopularityService.trackView(resourceUuid);
+        return getArtistByResourceUuid(resourceUuid);
+    }
+
     @Transactional(readOnly = true)
     public VocalResourceDetailResponse getVocalByResourceUuid(UUID resourceUuid) {
         Vocal vocal =
@@ -208,6 +221,12 @@ public class ResourceService {
                 songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
                         .map(this::toVocalSong)
                         .toList());
+    }
+
+    @Transactional
+    public VocalResourceDetailResponse getVocalByResourceUuidWithTracking(UUID resourceUuid) {
+        resourcePopularityService.trackView(resourceUuid);
+        return getVocalByResourceUuid(resourceUuid);
     }
 
     @Transactional(readOnly = true)
@@ -237,6 +256,12 @@ public class ResourceService {
                         .stream()
                         .map(this::toPlaylistDetailSong)
                         .toList());
+    }
+
+    @Transactional
+    public PlaylistResourceDetailResponse getPlaylistByResourceUuidWithTracking(UUID resourceUuid) {
+        resourcePopularityService.trackView(resourceUuid);
+        return getPlaylistByResourceUuid(resourceUuid);
     }
 
     private String normalizeQuery(String query) {

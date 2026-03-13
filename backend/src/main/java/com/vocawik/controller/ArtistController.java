@@ -74,7 +74,7 @@ public class ArtistController {
     @GetMapping("/artists/{resourceUuid}")
     @Operation(summary = "Get artist", description = "Returns artist detail.")
     public ResponseEntity<ArtistResourceDetailResponse> getArtist(@PathVariable UUID resourceUuid) {
-        return ResponseEntity.ok(resourceService.getArtistByResourceUuid(resourceUuid));
+        return ResponseEntity.ok(resourceService.getArtistByResourceUuidWithTracking(resourceUuid));
     }
 
     /**
