@@ -22,6 +22,8 @@ import com.vocawik.dto.resource.ResourceAclDetailResponse;
 import com.vocawik.dto.resource.ResourceElementResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceNameDetailResponse;
+import com.vocawik.dto.resource.ResourceSuggestionElementResponse;
+import com.vocawik.dto.resource.ResourceSuggestionListResponse;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.repository.acl.AclRepository;
@@ -45,6 +47,7 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,6 +65,8 @@ import org.springframework.transaction.annotation.Transactional;
         value = "EI_EXPOSE_REP2",
         justification = "Repositories and ObjectMapper are Spring-managed dependencies.")
 public class ResourceService {
+
+    private static final int RESOURCE_SUGGESTION_LIMIT = 10;
 
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
@@ -93,6 +98,33 @@ public class ResourceService {
 
         return new ResourceListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public ResourceSuggestionListResponse suggest(String query) {
+        String normalizedQuery = normalizeQuery(query);
+        if (normalizedQuery == null) {
+            return new ResourceSuggestionListResponse(List.of());
+        }
+
+        Map<UUID, ResourceSuggestionElementResponse> suggestionsByUuid = new LinkedHashMap<>();
+        resourceNameRepository
+                .findSuggestionCandidates(
+                        ResourceStatus.ACTIVE,
+                        normalizedQuery,
+                        org.springframework.data.domain.PageRequest.of(
+                                0, RESOURCE_SUGGESTION_LIMIT * 3))
+                .forEach(
+                        resourceName -> {
+                            UUID resourceUuid = resourceName.getResource().getUuid();
+                            suggestionsByUuid.putIfAbsent(
+                                    resourceUuid,
+                                    new ResourceSuggestionElementResponse(
+                                            resourceUuid, resourceName.getName()));
+                        });
+
+        return new ResourceSuggestionListResponse(
+                suggestionsByUuid.values().stream().limit(RESOURCE_SUGGESTION_LIMIT).toList());
     }
 
     @Transactional(readOnly = true)
