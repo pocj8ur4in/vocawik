@@ -1,6 +1,7 @@
 package com.vocawik.controller;
 
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.service.history.ResourceHistoryService;
@@ -100,6 +101,24 @@ public class ResourceController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Lists the most recent resource changes across all resource types. */
+    @GetMapping("/histories/recent")
+    @Operation(
+            summary = "List recent changes",
+            description = "Returns the most recent resource changes across all resource types.")
+    @Parameters({
+        @Parameter(
+                name = "size",
+                in = ParameterIn.QUERY,
+                description = "Maximum number of changes to return (capped at 10)",
+                example = "10",
+                schema = @Schema(type = "integer", defaultValue = "10", minimum = "1"))
+    })
+    public ResponseEntity<RecentChangeListResponse> listRecentChanges(
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        return ResponseEntity.ok(resourceHistoryService.listRecentChanges(size));
     }
 
     /** Gets a single resource history revision. */
