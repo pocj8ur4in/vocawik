@@ -7,10 +7,13 @@ import com.vocawik.domain.history.History;
 import com.vocawik.domain.history.HistoryActionType;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.user.User;
+import com.vocawik.dto.history.RecentChangeElementResponse;
+import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.history.ResourceHistoryElementResponse;
 import com.vocawik.repository.guest.GuestRepository;
 import com.vocawik.repository.history.HistoryRepository;
+import com.vocawik.repository.history.RecentChangeProjection;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.guest.GuestPrincipal;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -37,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
         justification =
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class ResourceHistoryService {
+    private static final int MAX_RECENT_CHANGES_SIZE = 10;
 
     private final HistoryRepository historyRepository;
     private final ResourceRepository resourceRepository;
@@ -104,6 +109,16 @@ public class ResourceHistoryService {
     }
 
     @Transactional(readOnly = true)
+    public RecentChangeListResponse listRecentChanges(int size) {
+        int effectiveSize = Math.min(Math.max(size, 1), MAX_RECENT_CHANGES_SIZE);
+        List<RecentChangeElementResponse> items =
+                historyRepository.findRecentChanges(PageRequest.of(0, effectiveSize)).stream()
+                        .map(this::toRecentChange)
+                        .toList();
+        return new RecentChangeListResponse(items, effectiveSize);
+    }
+
+    @Transactional(readOnly = true)
     public ResourceHistoryDetailResponse getByResourceUuidAndHistoryUuid(
             UUID resourceUuid, UUID historyUuid) {
         Resource resource =
@@ -153,6 +168,14 @@ public class ResourceHistoryService {
                 history.getActorGuest() == null ? null : history.getActorGuest().getUuid(),
                 history.getContentHash(),
                 history.getCreatedAt());
+    }
+
+    private RecentChangeElementResponse toRecentChange(RecentChangeProjection projection) {
+        return new RecentChangeElementResponse(
+                projection.getCreatedAt(),
+                projection.getCanonicalName(),
+                projection.getActionType().name(),
+                projection.getActorUserNickname());
     }
 
     private Optional<User> currentUser() {
