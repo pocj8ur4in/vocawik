@@ -6,36 +6,37 @@ import com.vocawik.infrastructure.pv.model.ParsedPvUrl;
 import com.vocawik.service.pv.detector.PvUrlDetector;
 import com.vocawik.service.pv.detector.PvUrlDetectorLeaf;
 import java.util.Optional;
-import java.util.Set;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Detects Piapro song PV links. */
+/** Detects Bandcamp track links. */
 @Component
 @PvUrlDetectorLeaf
-@Order(40)
-public class PiaproPvUrlDetector implements PvUrlDetector {
-
-    private static final Set<String> SUPPORTED_HOSTS = Set.of("piapro.jp");
+@Order(70)
+public class BandcampPvUrlDetector implements PvUrlDetector {
 
     @Override
     public Optional<DetectedPv> detect(ParsedPvUrl parsedUrl) {
-        if (!SUPPORTED_HOSTS.contains(parsedUrl.host())) {
+        if (!isBandcampHost(parsedUrl.host())) {
             return Optional.empty();
         }
         if (parsedUrl.pathSegments().size() < 2) {
             return Optional.empty();
         }
-
-        String pathType = parsedUrl.pathSegments().getFirst();
-        if (!"t".equalsIgnoreCase(pathType) && !"content".equalsIgnoreCase(pathType)) {
+        if (!"track".equalsIgnoreCase(parsedUrl.pathSegments().getFirst())) {
             return Optional.empty();
         }
+
         String videoKey = parsedUrl.pathSegments().get(1);
         if (videoKey.isBlank()) {
             return Optional.empty();
         }
+
         return Optional.of(
-                new DetectedPv(SongPvProvider.PIAPRO, videoKey, parsedUrl.normalizedUrl()));
+                new DetectedPv(SongPvProvider.BANDCAMP, videoKey, parsedUrl.normalizedUrl()));
+    }
+
+    private boolean isBandcampHost(String host) {
+        return host != null && (host.equals("bandcamp.com") || host.endsWith(".bandcamp.com"));
     }
 }
