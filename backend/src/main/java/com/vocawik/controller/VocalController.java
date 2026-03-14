@@ -4,6 +4,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalListResponse;
+import com.vocawik.dto.vocal.VocalSuggestionListResponse;
 import com.vocawik.dto.vocal.VocalUpdateRequest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.vocal.VocalService;
@@ -169,6 +170,17 @@ public class VocalController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Suggests vocals matching the current query. */
+    @GetMapping("/vocals/suggestions")
+    @Operation(
+            summary = "Suggest vocals",
+            description = "Returns up to 10 vocal suggestions matching the current query.")
+    public ResponseEntity<VocalSuggestionListResponse> suggestVocals(
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
+        return ResponseEntity.ok(vocalService.suggest(query));
     }
 
     private Sort sanitizeSort(Sort requestedSort) {

@@ -15,6 +15,8 @@ import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalElementResponse;
 import com.vocawik.dto.vocal.VocalListResponse;
+import com.vocawik.dto.vocal.VocalSuggestionElementResponse;
+import com.vocawik.dto.vocal.VocalSuggestionListResponse;
 import com.vocawik.dto.vocal.VocalUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
@@ -28,6 +30,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
         justification =
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class VocalService {
+
+    private static final int VOCAL_SUGGESTION_LIMIT = 10;
 
     private final VocalRepository vocalRepository;
     private final ResourceRepository resourceRepository;
@@ -155,6 +160,34 @@ public class VocalService {
 
         return new VocalListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public VocalSuggestionListResponse suggest(String query) {
+        String normalizedQuery = normalizeQuery(query);
+        if (normalizedQuery == null) {
+            return new VocalSuggestionListResponse(List.of());
+        }
+
+        LinkedHashMap<UUID, VocalSuggestionElementResponse> suggestionsByUuid =
+                new LinkedHashMap<>();
+        resourceNameRepository
+                .findVocalSuggestionCandidates(
+                        ResourceStatus.ACTIVE,
+                        normalizedQuery,
+                        org.springframework.data.domain.PageRequest.of(
+                                0, VOCAL_SUGGESTION_LIMIT * 3))
+                .forEach(
+                        resourceName -> {
+                            UUID resourceUuid = resourceName.getResource().getUuid();
+                            suggestionsByUuid.putIfAbsent(
+                                    resourceUuid,
+                                    new VocalSuggestionElementResponse(
+                                            resourceUuid, resourceName.getName()));
+                        });
+
+        return new VocalSuggestionListResponse(
+                suggestionsByUuid.values().stream().limit(VOCAL_SUGGESTION_LIMIT).toList());
     }
 
     private String normalizeQuery(String query) {
