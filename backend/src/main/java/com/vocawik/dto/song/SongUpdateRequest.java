@@ -14,13 +14,13 @@ import java.util.UUID;
 
 /** Request payload for song update. */
 public record SongUpdateRequest(
-        String canonicalName,
+        @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
         Object links,
         LocalDateTime publishedAt,
         String songType,
-        @Valid List<ResourceNameUpdateRequest> names,
+        @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
         @Valid List<SongLyricUpdateRequest> lyrics,
         @Valid List<SongPvUpdateRequest> pvs,
@@ -30,7 +30,7 @@ public record SongUpdateRequest(
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public SongUpdateRequest {
-        names = names == null ? null : List.copyOf(names);
+        aliases = aliases == null ? null : List.copyOf(aliases);
         acls = acls == null ? null : List.copyOf(acls);
         lyrics = lyrics == null ? null : List.copyOf(lyrics);
         pvs = pvs == null ? null : List.copyOf(pvs);
@@ -39,11 +39,14 @@ public record SongUpdateRequest(
         relations = relations == null ? null : List.copyOf(relations);
     }
 
-    /** Localized resource name input. */
-    public record ResourceNameUpdateRequest(
+    /** Canonical resource name input. */
+    public record CanonicalNameUpdateRequest(
+            @NotNull Language langCode, @NotBlank @Size(max = 255) String name) {}
+
+    /** Alias resource name input. */
+    public record ResourceAliasUpdateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
-            boolean isPrimary,
             @Min(0) Integer sortOrder) {}
 
     /** ACL rule input. */

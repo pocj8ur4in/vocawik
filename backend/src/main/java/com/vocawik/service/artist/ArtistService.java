@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.acl.Acl;
 import com.vocawik.domain.acl.AclAction;
 import com.vocawik.domain.acl.AclEffect;
@@ -78,9 +79,10 @@ public class ArtistService {
         JsonNode links = toJsonNode(request.links());
         validateLinks(links);
 
+        ArtistCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
         Artist artist =
                 Artist.create(
-                        normalizeCanonicalName(request.canonicalName()),
+                        normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
                         links);
@@ -88,7 +90,7 @@ public class ArtistService {
         Resource resource = resourceRepository.save(artist.getResource());
         artistRepository.saveAndFlush(artist);
 
-        saveResourceNames(resource, request.names());
+        saveResourceNames(resource, canonicalName, request.aliases());
         saveAcls(resource, request.acls());
         saveArtistMemberships(artist, request.members());
 
@@ -114,8 +116,16 @@ public class ArtistService {
         Resource resource = artist.getResource();
         updateArtistFields(artist, resource, request);
 
-        if (request.names() != null) {
-            replaceResourceNames(resource, toCreateNames(request.names()));
+        if (request.canonicalName() != null || request.aliases() != null) {
+            ArtistCreateRequest.CanonicalNameCreateRequest canonicalName =
+                    request.canonicalName() == null
+                            ? toCreateCanonical(loadCanonicalName(resource))
+                            : toCreateCanonical(request.canonicalName());
+            List<ArtistCreateRequest.ResourceAliasCreateRequest> aliases =
+                    request.aliases() == null
+                            ? toCreateAliasesFromResourceNames(loadAliases(resource))
+                            : toCreateAliases(request.aliases());
+            replaceResourceNames(resource, canonicalName, aliases);
         }
         if (request.acls() != null) {
             replaceAcls(resource, toCreateAcls(request.acls()));
@@ -255,7 +265,7 @@ public class ArtistService {
         String canonicalName =
                 request.canonicalName() == null
                         ? resource.getCanonicalName()
-                        : normalizeCanonicalName(request.canonicalName());
+                        : normalizeCanonicalName(request.canonicalName().name());
         String thumbnailUrl =
                 request.thumbnailUrl() == null
                         ? resource.getThumbnailUrl()
@@ -287,42 +297,42 @@ public class ArtistService {
     }
 
     private List<ResourceName> saveResourceNames(
-            Resource resource, List<ArtistCreateRequest.ResourceNameCreateRequest> names) {
-        if (names == null || names.isEmpty()) {
-            return List.of();
+            Resource resource,
+            ArtistCreateRequest.CanonicalNameCreateRequest canonicalName,
+            List<ArtistCreateRequest.ResourceAliasCreateRequest> aliases) {
+        if (canonicalName == null) {
+            throw new IllegalArgumentException("canonicalName is required");
         }
 
         HashSet<String> uniqueNames = new HashSet<>();
-        HashSet<String> primaryLangs = new HashSet<>();
-        List<ResourceName> entities =
-                names.stream()
-                        .map(
-                                item -> {
-                                    if (item == null) {
-                                        throw new IllegalArgumentException(
-                                                "names contains null item");
-                                    }
-                                    String normalizedName = normalizeCanonicalName(item.name());
-                                    String uniqueKey =
-                                            item.langCode().name() + "|" + normalizedName;
-                                    if (!uniqueNames.add(uniqueKey)) {
-                                        throw new IllegalArgumentException(
-                                                "Duplicate resource name for language and value");
-                                    }
-                                    if (item.isPrimary()
-                                            && !primaryLangs.add(item.langCode().name())) {
-                                        throw new IllegalArgumentException(
-                                                "Only one primary name is allowed per language");
-                                    }
+        String normalizedCanonicalName = normalizeCanonicalName(canonicalName.name());
+        uniqueNames.add(canonicalName.langCode().name() + "|" + normalizedCanonicalName);
 
-                                    return ResourceName.create(
-                                            resource,
-                                            item.langCode(),
-                                            normalizedName,
-                                            item.isPrimary(),
-                                            item.sortOrder() == null ? 0 : item.sortOrder());
-                                })
-                        .toList();
+        List<ResourceName> entities = new ArrayList<>();
+        entities.add(
+                ResourceName.create(
+                        resource, canonicalName.langCode(), normalizedCanonicalName, true, 0));
+        for (ArtistCreateRequest.ResourceAliasCreateRequest alias :
+                (aliases == null
+                        ? List.<ArtistCreateRequest.ResourceAliasCreateRequest>of()
+                        : aliases)) {
+            if (alias == null) {
+                throw new IllegalArgumentException("aliases contains null item");
+            }
+            String normalizedAlias = normalizeCanonicalName(alias.name());
+            String uniqueKey = alias.langCode().name() + "|" + normalizedAlias;
+            if (!uniqueNames.add(uniqueKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate resource name for language and value");
+            }
+            entities.add(
+                    ResourceName.create(
+                            resource,
+                            alias.langCode(),
+                            normalizedAlias,
+                            false,
+                            alias.sortOrder() == null ? 0 : alias.sortOrder()));
+        }
 
         return resourceNameRepository.saveAllAndFlush(entities).stream()
                 .sorted(
@@ -430,9 +440,11 @@ public class ArtistService {
     }
 
     private List<ResourceName> replaceResourceNames(
-            Resource resource, List<ArtistCreateRequest.ResourceNameCreateRequest> names) {
+            Resource resource,
+            ArtistCreateRequest.CanonicalNameCreateRequest canonicalName,
+            List<ArtistCreateRequest.ResourceAliasCreateRequest> aliases) {
         resourceNameRepository.deleteByResourceId(resource.getId());
-        return saveResourceNames(resource, names);
+        return saveResourceNames(resource, canonicalName, aliases);
     }
 
     private List<Acl> replaceAcls(
@@ -447,16 +459,61 @@ public class ArtistService {
         return saveArtistMemberships(artist, members);
     }
 
-    private List<ArtistCreateRequest.ResourceNameCreateRequest> toCreateNames(
-            List<ArtistUpdateRequest.ResourceNameUpdateRequest> names) {
-        return names.stream()
+    private ArtistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
+            ArtistUpdateRequest.CanonicalNameUpdateRequest canonicalName) {
+        return new ArtistCreateRequest.CanonicalNameCreateRequest(
+                canonicalName.langCode(), canonicalName.name());
+    }
+
+    private ArtistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
+            ResourceName resourceName) {
+        return new ArtistCreateRequest.CanonicalNameCreateRequest(
+                resourceName.getLangCode(), resourceName.getName());
+    }
+
+    private List<ArtistCreateRequest.ResourceAliasCreateRequest> toCreateAliases(
+            List<ArtistUpdateRequest.ResourceAliasUpdateRequest> aliases) {
+        return aliases.stream()
                 .map(
                         item ->
-                                new ArtistCreateRequest.ResourceNameCreateRequest(
-                                        item.langCode(),
-                                        item.name(),
-                                        item.isPrimary(),
-                                        item.sortOrder()))
+                                new ArtistCreateRequest.ResourceAliasCreateRequest(
+                                        item.langCode(), item.name(), item.sortOrder()))
+                .toList();
+    }
+
+    private List<ArtistCreateRequest.ResourceAliasCreateRequest> toCreateAliasesFromResourceNames(
+            List<ResourceName> aliases) {
+        return aliases.stream()
+                .map(
+                        item ->
+                                new ArtistCreateRequest.ResourceAliasCreateRequest(
+                                        item.getLangCode(), item.getName(), item.getSortOrder()))
+                .toList();
+    }
+
+    private ResourceName loadCanonicalName(Resource resource) {
+        List<ResourceName> existingNames =
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId());
+        return existingNames.stream()
+                .filter(ResourceName::isPrimary)
+                .findFirst()
+                .or(() -> existingNames.stream().findFirst())
+                .orElseGet(
+                        () ->
+                                ResourceName.create(
+                                        resource,
+                                        Language.UND,
+                                        resource.getCanonicalName(),
+                                        true,
+                                        0));
+    }
+
+    private List<ResourceName> loadAliases(Resource resource) {
+        return resourceNameRepository
+                .findAllByResourceIdOrderBySortOrderAscIdAsc(resource.getId())
+                .stream()
+                .filter(existing -> !existing.isPrimary())
                 .toList();
     }
 
