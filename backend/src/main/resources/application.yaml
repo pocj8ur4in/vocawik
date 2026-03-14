@@ -98,6 +98,35 @@ oauth:
     user-info-uri: ${GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}
     redirect-uri: ${GOOGLE_REDIRECT_URI:}
 
+pv:
+  http:
+    connect-timeout-ms: ${PV_HTTP_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${PV_HTTP_READ_TIMEOUT_MS:5000}
+    retry-attempts: ${PV_HTTP_RETRY_ATTEMPTS:2}
+    retry-delay-ms: ${PV_HTTP_RETRY_DELAY_MS:300}
+  youtube:
+    api-key: ${YOUTUBE_API_KEY:}
+    base-url: ${YOUTUBE_API_BASE_URL:https://www.googleapis.com/youtube/v3}
+    connect-timeout-ms: ${YOUTUBE_API_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${YOUTUBE_API_READ_TIMEOUT_MS:5000}
+  vimeo:
+    access-token: ${VIMEO_ACCESS_TOKEN:}
+    base-url: ${VIMEO_API_BASE_URL:https://api.vimeo.com}
+    oembed-base-url: ${VIMEO_OEMBED_BASE_URL:https://vimeo.com/api/oembed.json}
+    connect-timeout-ms: ${VIMEO_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${VIMEO_READ_TIMEOUT_MS:5000}
+  niconico:
+    base-url: ${NICONICO_API_BASE_URL:https://ext.nicovideo.jp/api/getthumbinfo}
+  bilibili:
+    base-url: ${BILIBILI_API_BASE_URL:https://api.bilibili.com/x/web-interface/view}
+  piapro:
+    base-url: ${PIAPRO_BASE_URL:https://piapro.jp/t}
+  soundcloud:
+    proxy-base-url: ${SOUNDCLOUD_PROXY_BASE_URL:https://dream-traveler.fly.dev/soundcloud/api}
+    oembed-base-url: ${SOUNDCLOUD_OEMBED_BASE_URL:https://soundcloud.com/oembed}
+    connect-timeout-ms: ${SOUNDCLOUD_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${SOUNDCLOUD_READ_TIMEOUT_MS:5000}
+
 auth:
   email-verification:
     frontend-url: ${EMAIL_VERIFICATION_FRONTEND_URL}

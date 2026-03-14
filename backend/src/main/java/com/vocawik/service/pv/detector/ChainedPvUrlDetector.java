@@ -4,10 +4,12 @@ import com.vocawik.infrastructure.pv.model.DetectedPv;
 import com.vocawik.infrastructure.pv.model.ParsedPvUrl;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /** Delegates URL detection to ordered detector units and returns the first match. */
 @Component
+@Primary
 public class ChainedPvUrlDetector implements PvUrlDetector {
 
     private final List<PvUrlDetector> detectors;
