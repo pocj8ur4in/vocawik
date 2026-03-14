@@ -3,6 +3,7 @@ package com.vocawik.controller;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistCreateRequest;
 import com.vocawik.dto.artist.ArtistListResponse;
+import com.vocawik.dto.artist.ArtistSuggestionListResponse;
 import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.service.artist.ArtistService;
@@ -180,6 +181,17 @@ public class ArtistController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Suggests artists matching the current query. */
+    @GetMapping("/artists/suggestions")
+    @Operation(
+            summary = "Suggest artists",
+            description = "Returns up to 10 artist suggestions matching the current query.")
+    public ResponseEntity<ArtistSuggestionListResponse> suggestArtists(
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
+        return ResponseEntity.ok(artistService.suggest(query));
     }
 
     private Sort sanitizeSort(Sort requestedSort) {

@@ -16,6 +16,8 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistCreateRequest;
 import com.vocawik.dto.artist.ArtistElementResponse;
 import com.vocawik.dto.artist.ArtistListResponse;
+import com.vocawik.dto.artist.ArtistSuggestionElementResponse;
+import com.vocawik.dto.artist.ArtistSuggestionListResponse;
 import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistCriteria;
@@ -34,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +56,8 @@ import org.springframework.transaction.annotation.Transactional;
         justification =
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class ArtistService {
+    private static final int ARTIST_SUGGESTION_LIMIT = 10;
+
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
     private final ResourceRepository resourceRepository;
@@ -183,6 +188,34 @@ public class ArtistService {
 
         return new ArtistListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public ArtistSuggestionListResponse suggest(String query) {
+        String normalizedQuery = normalizeQuery(query);
+        if (normalizedQuery == null) {
+            return new ArtistSuggestionListResponse(List.of());
+        }
+
+        LinkedHashMap<UUID, ArtistSuggestionElementResponse> suggestionsByUuid =
+                new LinkedHashMap<>();
+        resourceNameRepository
+                .findArtistSuggestionCandidates(
+                        ResourceStatus.ACTIVE,
+                        normalizedQuery,
+                        org.springframework.data.domain.PageRequest.of(
+                                0, ARTIST_SUGGESTION_LIMIT * 3))
+                .forEach(
+                        resourceName -> {
+                            UUID resourceUuid = resourceName.getResource().getUuid();
+                            suggestionsByUuid.putIfAbsent(
+                                    resourceUuid,
+                                    new ArtistSuggestionElementResponse(
+                                            resourceUuid, resourceName.getName()));
+                        });
+
+        return new ArtistSuggestionListResponse(
+                suggestionsByUuid.values().stream().limit(ARTIST_SUGGESTION_LIMIT).toList());
     }
 
     private String normalizeQuery(String query) {
