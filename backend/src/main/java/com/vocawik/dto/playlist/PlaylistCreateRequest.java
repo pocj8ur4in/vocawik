@@ -12,26 +12,29 @@ import java.util.UUID;
 
 /** Request payload for playlist creation. */
 public record PlaylistCreateRequest(
-        @NotBlank @Size(max = 255) String canonicalName,
+        @NotNull @Valid CanonicalNameCreateRequest canonicalName,
         String thumbnailUrl,
         String content,
         Boolean isPublic,
-        @Valid List<ResourceNameCreateRequest> names,
+        @Valid List<ResourceAliasCreateRequest> aliases,
         @Valid List<ResourceAclCreateRequest> acls,
         @Valid List<PlaylistSongCreateRequest> songs) {
 
     /** Defensive copy for mutable request fields. */
     public PlaylistCreateRequest {
-        names = names == null ? List.of() : List.copyOf(names);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
         acls = acls == null ? List.of() : List.copyOf(acls);
         songs = songs == null ? List.of() : List.copyOf(songs);
     }
 
-    /** Localized resource name input. */
-    public record ResourceNameCreateRequest(
+    /** Canonical resource name input. */
+    public record CanonicalNameCreateRequest(
+            @NotNull Language langCode, @NotBlank @Size(max = 255) String name) {}
+
+    /** Alias resource name input. */
+    public record ResourceAliasCreateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
-            boolean isPrimary,
             @Min(0) Integer sortOrder) {}
 
     /** ACL rule input. */

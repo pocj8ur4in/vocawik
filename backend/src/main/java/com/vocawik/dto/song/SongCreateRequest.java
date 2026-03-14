@@ -14,13 +14,13 @@ import java.util.UUID;
 
 /** Request payload for song creation. */
 public record SongCreateRequest(
-        @NotBlank @Size(max = 255) String canonicalName,
+        @NotNull @Valid CanonicalNameCreateRequest canonicalName,
         String thumbnailUrl,
         String content,
         Object links,
         LocalDateTime publishedAt,
         @NotBlank String songType,
-        @Valid List<ResourceNameCreateRequest> names,
+        @Valid List<ResourceAliasCreateRequest> aliases,
         @Valid List<ResourceAclCreateRequest> acls,
         @Valid List<SongLyricCreateRequest> lyrics,
         @Valid List<SongPvCreateRequest> pvs,
@@ -30,7 +30,7 @@ public record SongCreateRequest(
 
     /** Defensive copy for mutable request fields. */
     public SongCreateRequest {
-        names = names == null ? List.of() : List.copyOf(names);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
         acls = acls == null ? List.of() : List.copyOf(acls);
         lyrics = lyrics == null ? List.of() : List.copyOf(lyrics);
         pvs = pvs == null ? List.of() : List.copyOf(pvs);
@@ -39,11 +39,14 @@ public record SongCreateRequest(
         relations = relations == null ? List.of() : List.copyOf(relations);
     }
 
-    /** Localized resource name input. */
-    public record ResourceNameCreateRequest(
+    /** Canonical resource name input. */
+    public record CanonicalNameCreateRequest(
+            @NotNull Language langCode, @NotBlank @Size(max = 255) String name) {}
+
+    /** Alias resource name input. */
+    public record ResourceAliasCreateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
-            boolean isPrimary,
             @Min(0) Integer sortOrder) {}
 
     /** ACL rule input. */

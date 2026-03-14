@@ -12,26 +12,29 @@ import java.util.UUID;
 
 /** Request payload for artist creation. */
 public record ArtistCreateRequest(
-        @NotBlank @Size(max = 255) String canonicalName,
+        @NotNull @Valid CanonicalNameCreateRequest canonicalName,
         String thumbnailUrl,
         String content,
         Object links,
-        @Valid List<ResourceNameCreateRequest> names,
+        @Valid List<ResourceAliasCreateRequest> aliases,
         @Valid List<ResourceAclCreateRequest> acls,
         @Valid List<ArtistMemberCreateRequest> members) {
 
     /** Defensive copy for mutable request fields. */
     public ArtistCreateRequest {
-        names = names == null ? List.of() : List.copyOf(names);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
         acls = acls == null ? List.of() : List.copyOf(acls);
         members = members == null ? List.of() : List.copyOf(members);
     }
 
-    /** Localized resource name input. */
-    public record ResourceNameCreateRequest(
+    /** Canonical resource name input. */
+    public record CanonicalNameCreateRequest(
+            @NotNull Language langCode, @NotBlank @Size(max = 255) String name) {}
+
+    /** Alias resource name input. */
+    public record ResourceAliasCreateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
-            boolean isPrimary,
             @Min(0) Integer sortOrder) {}
 
     /** ACL rule input. */

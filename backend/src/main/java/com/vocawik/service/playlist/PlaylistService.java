@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.acl.Acl;
 import com.vocawik.domain.acl.AclAction;
 import com.vocawik.domain.acl.AclEffect;
@@ -30,6 +31,7 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -74,9 +76,10 @@ public class PlaylistService {
 
     @Transactional
     public UUID create(PlaylistCreateRequest request) {
+        PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
         Playlist playlist =
                 Playlist.create(
-                        normalizeCanonicalName(request.canonicalName()),
+                        normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
                         request.isPublic() == null || request.isPublic());
@@ -84,7 +87,7 @@ public class PlaylistService {
         Resource resource = resourceRepository.save(playlist.getResource());
         playlistRepository.save(playlist);
 
-        saveResourceNames(resource, request.names());
+        saveResourceNames(resource, canonicalName, request.aliases());
         saveAcls(resource, request.acls());
         savePlaylistSongs(playlist, request.songs());
 
@@ -103,8 +106,16 @@ public class PlaylistService {
         Resource resource = playlist.getResource();
         updatePlaylistFields(playlist, resource, request);
 
-        if (request.names() != null) {
-            replaceResourceNames(resource, toCreateNames(request.names()));
+        if (request.canonicalName() != null || request.aliases() != null) {
+            PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName =
+                    request.canonicalName() == null
+                            ? toCreateCanonical(loadCanonicalName(resource))
+                            : toCreateCanonical(request.canonicalName());
+            List<PlaylistCreateRequest.ResourceAliasCreateRequest> aliases =
+                    request.aliases() == null
+                            ? toCreateAliasesFromResourceNames(loadAliases(resource))
+                            : toCreateAliases(request.aliases());
+            replaceResourceNames(resource, canonicalName, aliases);
         }
         if (request.acls() != null) {
             replaceAcls(resource, toCreateAcls(request.acls()));
@@ -169,41 +180,42 @@ public class PlaylistService {
     }
 
     private List<ResourceName> saveResourceNames(
-            Resource resource, List<PlaylistCreateRequest.ResourceNameCreateRequest> names) {
-        if (names == null || names.isEmpty()) {
-            return List.of();
+            Resource resource,
+            PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName,
+            List<PlaylistCreateRequest.ResourceAliasCreateRequest> aliases) {
+        if (canonicalName == null) {
+            throw new IllegalArgumentException("canonicalName is required");
         }
 
         HashSet<String> uniqueNames = new HashSet<>();
-        HashSet<String> primaryLangs = new HashSet<>();
-        List<ResourceName> entities =
-                names.stream()
-                        .map(
-                                item -> {
-                                    if (item == null) {
-                                        throw new IllegalArgumentException(
-                                                "names contains null item");
-                                    }
-                                    String normalizedName = normalizeCanonicalName(item.name());
-                                    String uniqueKey =
-                                            item.langCode().name() + "|" + normalizedName;
-                                    if (!uniqueNames.add(uniqueKey)) {
-                                        throw new IllegalArgumentException(
-                                                "Duplicate resource name for language and value");
-                                    }
-                                    if (item.isPrimary()
-                                            && !primaryLangs.add(item.langCode().name())) {
-                                        throw new IllegalArgumentException(
-                                                "Only one primary name is allowed per language");
-                                    }
-                                    return ResourceName.create(
-                                            resource,
-                                            item.langCode(),
-                                            normalizedName,
-                                            item.isPrimary(),
-                                            item.sortOrder() == null ? 0 : item.sortOrder());
-                                })
-                        .toList();
+        String normalizedCanonicalName = normalizeCanonicalName(canonicalName.name());
+        uniqueNames.add(canonicalName.langCode().name() + "|" + normalizedCanonicalName);
+
+        List<ResourceName> entities = new ArrayList<>();
+        entities.add(
+                ResourceName.create(
+                        resource, canonicalName.langCode(), normalizedCanonicalName, true, 0));
+        for (PlaylistCreateRequest.ResourceAliasCreateRequest alias :
+                (aliases == null
+                        ? List.<PlaylistCreateRequest.ResourceAliasCreateRequest>of()
+                        : aliases)) {
+            if (alias == null) {
+                throw new IllegalArgumentException("aliases contains null item");
+            }
+            String normalizedAlias = normalizeCanonicalName(alias.name());
+            String uniqueKey = alias.langCode().name() + "|" + normalizedAlias;
+            if (!uniqueNames.add(uniqueKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate resource name for language and value");
+            }
+            entities.add(
+                    ResourceName.create(
+                            resource,
+                            alias.langCode(),
+                            normalizedAlias,
+                            false,
+                            alias.sortOrder() == null ? 0 : alias.sortOrder()));
+        }
 
         return resourceNameRepository.saveAllAndFlush(entities).stream()
                 .sorted(
@@ -309,7 +321,7 @@ public class PlaylistService {
     private void updatePlaylistFields(
             Playlist playlist, Resource resource, PlaylistUpdateRequest request) {
         if (request.canonicalName() != null) {
-            resource.updateCanonicalName(normalizeCanonicalName(request.canonicalName()));
+            resource.updateCanonicalName(normalizeCanonicalName(request.canonicalName().name()));
         }
         if (request.thumbnailUrl() != null) {
             resource.updateThumbnailUrl(normalizeNullable(request.thumbnailUrl()));
@@ -321,16 +333,35 @@ public class PlaylistService {
                 request.isPublic());
     }
 
-    private List<PlaylistCreateRequest.ResourceNameCreateRequest> toCreateNames(
-            List<PlaylistUpdateRequest.ResourceNameUpdateRequest> names) {
-        return names.stream()
+    private PlaylistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
+            PlaylistUpdateRequest.CanonicalNameUpdateRequest canonicalName) {
+        return new PlaylistCreateRequest.CanonicalNameCreateRequest(
+                canonicalName.langCode(), canonicalName.name());
+    }
+
+    private PlaylistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
+            ResourceName resourceName) {
+        return new PlaylistCreateRequest.CanonicalNameCreateRequest(
+                resourceName.getLangCode(), resourceName.getName());
+    }
+
+    private List<PlaylistCreateRequest.ResourceAliasCreateRequest> toCreateAliases(
+            List<PlaylistUpdateRequest.ResourceAliasUpdateRequest> aliases) {
+        return aliases.stream()
                 .map(
                         item ->
-                                new PlaylistCreateRequest.ResourceNameCreateRequest(
-                                        item.langCode(),
-                                        item.name(),
-                                        item.isPrimary(),
-                                        item.sortOrder()))
+                                new PlaylistCreateRequest.ResourceAliasCreateRequest(
+                                        item.langCode(), item.name(), item.sortOrder()))
+                .toList();
+    }
+
+    private List<PlaylistCreateRequest.ResourceAliasCreateRequest> toCreateAliasesFromResourceNames(
+            List<ResourceName> aliases) {
+        return aliases.stream()
+                .map(
+                        item ->
+                                new PlaylistCreateRequest.ResourceAliasCreateRequest(
+                                        item.getLangCode(), item.getName(), item.getSortOrder()))
                 .toList();
     }
 
@@ -360,9 +391,37 @@ public class PlaylistService {
     }
 
     private void replaceResourceNames(
-            Resource resource, List<PlaylistCreateRequest.ResourceNameCreateRequest> names) {
+            Resource resource,
+            PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName,
+            List<PlaylistCreateRequest.ResourceAliasCreateRequest> aliases) {
         resourceNameRepository.deleteByResourceId(resource.getId());
-        saveResourceNames(resource, names);
+        saveResourceNames(resource, canonicalName, aliases);
+    }
+
+    private ResourceName loadCanonicalName(Resource resource) {
+        List<ResourceName> existingNames =
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId());
+        return existingNames.stream()
+                .filter(ResourceName::isPrimary)
+                .findFirst()
+                .or(() -> existingNames.stream().findFirst())
+                .orElseGet(
+                        () ->
+                                ResourceName.create(
+                                        resource,
+                                        Language.UND,
+                                        resource.getCanonicalName(),
+                                        true,
+                                        0));
+    }
+
+    private List<ResourceName> loadAliases(Resource resource) {
+        return resourceNameRepository
+                .findAllByResourceIdOrderBySortOrderAscIdAsc(resource.getId())
+                .stream()
+                .filter(existing -> !existing.isPrimary())
+                .toList();
     }
 
     private void replaceAcls(

@@ -11,24 +11,27 @@ import java.util.List;
 
 /** Request payload for vocal creation. */
 public record VocalCreateRequest(
-        @NotBlank @Size(max = 255) String canonicalName,
+        @NotNull @Valid CanonicalNameCreateRequest canonicalName,
         String thumbnailUrl,
         String content,
         Object links,
-        @Valid List<ResourceNameCreateRequest> names,
+        @Valid List<ResourceAliasCreateRequest> aliases,
         @Valid List<ResourceAclCreateRequest> acls) {
 
     /** Defensive copy for mutable request fields. */
     public VocalCreateRequest {
-        names = names == null ? List.of() : List.copyOf(names);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
         acls = acls == null ? List.of() : List.copyOf(acls);
     }
 
-    /** Localized resource name input. */
-    public record ResourceNameCreateRequest(
+    /** Canonical resource name input. */
+    public record CanonicalNameCreateRequest(
+            @NotNull Language langCode, @NotBlank @Size(max = 255) String name) {}
+
+    /** Alias resource name input. */
+    public record ResourceAliasCreateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
-            boolean isPrimary,
             @Min(0) Integer sortOrder) {}
 
     /** ACL rule input. */
