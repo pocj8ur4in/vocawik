@@ -36,6 +36,32 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
             @Param("query") String query,
             Pageable pageable);
 
+    /** Finds ranked vocal-name candidates for query suggestions. */
+    @Query(
+            """
+            select rn
+            from ResourceName rn
+            where rn.resource.isDeleted = false
+              and rn.resource.status = :status
+              and lower(rn.name) like concat('%', lower(:query), '%')
+              and exists (
+                  select 1
+                  from Vocal v
+                  where v.resource = rn.resource
+              )
+            order by
+              case when lower(rn.name) like concat(lower(:query), '%') then 0 else 1 end,
+              case when rn.isPrimary = true then 0 else 1 end,
+              rn.resource.viewCount desc,
+              rn.resource.updatedAt desc,
+              rn.sortOrder asc,
+              rn.id asc
+            """)
+    java.util.List<ResourceName> findVocalSuggestionCandidates(
+            @Param("status") ResourceStatus status,
+            @Param("query") String query,
+            Pageable pageable);
+
     /** Deletes all names by resource id. */
     @Modifying(flushAutomatically = true)
     @Query("delete from ResourceName rn where rn.resource.id = :resourceId")
