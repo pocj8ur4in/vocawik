@@ -8,4 +8,5 @@ public record SongPvResolveResponse(
         String thumbnailUrl,
         String uploaderKey,
         Integer durationSeconds,
-        String publishedAt) {}
+        String publishedAt,
+        boolean isDuplicated) {}
