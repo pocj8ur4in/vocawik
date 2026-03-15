@@ -106,6 +106,20 @@ public class SongArtist extends BaseEntity {
         this.roleValues = normalizeRoles(roles);
     }
 
+    /**
+     * Updates participant flags and ordering.
+     *
+     * @param isMain updated main flag
+     * @param sortOrder updated sort order
+     */
+    public void updateParticipation(boolean isMain, int sortOrder) {
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.isMain = isMain;
+        this.sortOrder = sortOrder;
+    }
+
     private static String[] normalizeRoles(Set<SongArtistRole> roles) {
         if (roles == null || roles.isEmpty()) {
             throw new IllegalArgumentException("roles is required");

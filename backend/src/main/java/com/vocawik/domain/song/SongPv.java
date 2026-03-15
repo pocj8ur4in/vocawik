@@ -123,4 +123,38 @@ public class SongPv extends BaseEntity {
         songPv.sortOrder = sortOrder;
         return songPv;
     }
+
+    /**
+     * Updates mutable PV metadata fields.
+     *
+     * @param title updated title
+     * @param thumbnailUrl updated thumbnail URL
+     * @param uploaderKey updated uploader key
+     * @param durationSeconds updated duration in seconds
+     * @param isOfficial updated official flag
+     * @param publishedAt updated published datetime
+     * @param sortOrder updated sort order
+     */
+    public void updateMetadata(
+            String title,
+            String thumbnailUrl,
+            String uploaderKey,
+            Integer durationSeconds,
+            boolean isOfficial,
+            LocalDateTime publishedAt,
+            int sortOrder) {
+        if (durationSeconds != null && durationSeconds < 0) {
+            throw new IllegalArgumentException("durationSeconds must be >= 0");
+        }
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.title = title;
+        this.thumbnailUrl = thumbnailUrl;
+        this.uploaderKey = uploaderKey;
+        this.durationSeconds = durationSeconds;
+        this.isOfficial = isOfficial;
+        this.publishedAt = publishedAt;
+        this.sortOrder = sortOrder;
+    }
 }

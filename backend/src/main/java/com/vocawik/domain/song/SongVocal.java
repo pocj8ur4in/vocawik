@@ -67,4 +67,18 @@ public class SongVocal extends BaseEntity {
         songVocal.sortOrder = sortOrder;
         return songVocal;
     }
+
+    /**
+     * Updates participant flags and ordering.
+     *
+     * @param isMain updated main flag
+     * @param sortOrder updated sort order
+     */
+    public void updateParticipation(boolean isMain, int sortOrder) {
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.isMain = isMain;
+        this.sortOrder = sortOrder;
+    }
 }
