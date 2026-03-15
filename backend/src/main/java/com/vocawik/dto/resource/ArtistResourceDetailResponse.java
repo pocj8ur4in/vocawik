@@ -14,7 +14,7 @@ public record ArtistResourceDetailResponse(
         long viewCount,
         String thumbnailUrl,
         String content,
-        Object links,
+        List<ArtistLink> links,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
@@ -26,6 +26,7 @@ public record ArtistResourceDetailResponse(
 
     /** Creates an immutable artist detail response. */
     public ArtistResourceDetailResponse {
+        links = List.copyOf(links);
         names = List.copyOf(names);
         acls = List.copyOf(acls);
         histories = List.copyOf(histories);
@@ -33,6 +34,9 @@ public record ArtistResourceDetailResponse(
         groups = List.copyOf(groups);
         members = List.copyOf(members);
     }
+
+    /** Link item for the artist detail payload. */
+    public record ArtistLink(String type, String url, boolean isDeleted) {}
 
     /** Song participation item for the artist detail payload. */
     public record ArtistSong(

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.artist.ArtistGroup;
+import com.vocawik.domain.artist.ArtistLink;
 import com.vocawik.domain.playlist.Playlist;
 import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
@@ -29,6 +30,7 @@ import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistGroupRepository;
+import com.vocawik.repository.artist.ArtistLinkRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.playlist.PlaylistRepository;
 import com.vocawik.repository.playlist.PlaylistSongRepository;
@@ -84,6 +86,7 @@ public class ResourceService {
     private final PlaylistRepository playlistRepository;
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
+    private final ArtistLinkRepository artistLinkRepository;
     private final VocalRepository vocalRepository;
     private final VocalLinkRepository vocalLinkRepository;
     private final ResourceHistoryService resourceHistoryService;
@@ -193,6 +196,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
+        List<ArtistLink> links = artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
 
         return new ArtistResourceDetailResponse(
                 resource.getUuid(),
@@ -202,7 +206,7 @@ public class ResourceService {
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
                 artist.getContent(),
-                toJsonValue(artist.getLinks()),
+                links.stream().map(this::toArtistLink).toList(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
@@ -475,6 +479,11 @@ public class ResourceService {
                 artistGroup.getGroupArtist().getResource().getCanonicalName(),
                 artistGroup.getGroupArtist().getResource().getThumbnailUrl(),
                 artistGroup.getSortOrder());
+    }
+
+    private ArtistResourceDetailResponse.ArtistLink toArtistLink(ArtistLink artistLink) {
+        return new ArtistResourceDetailResponse.ArtistLink(
+                artistLink.getArtistLinkType().name(), artistLink.getUrl(), artistLink.isDeleted());
     }
 
     private VocalResourceDetailResponse.VocalSong toVocalSong(SongVocal songVocal) {

@@ -14,6 +14,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistGroupRepository;
+import com.vocawik.repository.artist.ArtistLinkRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
@@ -38,6 +39,7 @@ class ArtistServiceTest {
                 new ArtistService(
                         mock(ArtistRepository.class),
                         mock(ArtistGroupRepository.class),
+                        mock(ArtistLinkRepository.class),
                         mock(ResourceRepository.class),
                         resourceNameRepository,
                         mock(AclRepository.class),

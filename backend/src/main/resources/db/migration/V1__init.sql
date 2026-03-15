@@ -366,6 +366,25 @@ CREATE TABLE artists (
     CONSTRAINT chk_artists_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
 );
 
+-- artist_links
+CREATE TABLE artist_links (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    artist_id BIGINT NOT NULL,
+    artist_link_type VARCHAR(20) NOT NULL,
+    url TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_artist_links_artist FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_artist_links_artist_link_type CHECK (
+        artist_link_type IN (
+            'YOUTUBE', 'NICONICO', 'BILIBILI', 'PIAPRO', 'SOUNDCLOUD', 'VIMEO', 'BANDCAMP', 'VOCADB', 'OTHER'
+        )
+    ),
+    CONSTRAINT chk_artist_links_url_not_blank CHECK (BTRIM(url) <> '')
+);
+
 -- artist_groups
 CREATE TABLE artist_groups (
     id BIGSERIAL PRIMARY KEY,
