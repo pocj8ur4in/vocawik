@@ -260,6 +260,21 @@ CREATE TABLE songs (
     )
 );
 
+-- song_links
+CREATE TABLE song_links (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    song_id BIGINT NOT NULL,
+    song_link_type VARCHAR(20) NOT NULL,
+    url TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_song_links_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_song_links_song_link_type CHECK (song_link_type IN ('VOCADB', 'OTHER')),
+    CONSTRAINT chk_song_links_url_not_blank CHECK (BTRIM(url) <> '')
+);
+
 -- song_lyrics
 CREATE TABLE song_lyrics (
     id BIGSERIAL PRIMARY KEY,

@@ -11,6 +11,7 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongArtist;
+import com.vocawik.domain.song.SongLink;
 import com.vocawik.domain.song.SongLyric;
 import com.vocawik.domain.song.SongPv;
 import com.vocawik.domain.song.SongPvView;
@@ -38,6 +39,7 @@ import com.vocawik.repository.resource.ResourceCriteria;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongArtistRepository;
+import com.vocawik.repository.song.SongLinkRepository;
 import com.vocawik.repository.song.SongLyricRepository;
 import com.vocawik.repository.song.SongPvRepository;
 import com.vocawik.repository.song.SongPvViewRepository;
@@ -76,6 +78,7 @@ public class ResourceService {
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
     private final SongRepository songRepository;
+    private final SongLinkRepository songLinkRepository;
     private final SongLyricRepository songLyricRepository;
     private final SongPvRepository songPvRepository;
     private final SongPvViewRepository songPvViewRepository;
@@ -143,6 +146,7 @@ public class ResourceService {
 
         List<ResourceNameDetailResponse> names = loadResourceNames(resource.getId());
         List<ResourceAclDetailResponse> acls = loadResourceAcls(resource.getId());
+        List<SongLink> links = songLinkRepository.findAllBySongIdOrderByIdAsc(song.getId());
         List<SongLyric> lyrics =
                 songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
         List<SongPv> pvs = songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
@@ -167,7 +171,7 @@ public class ResourceService {
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
                 song.getContent(),
-                toJsonValue(song.getLinks()),
+                links.stream().map(this::toSongLink).toList(),
                 song.getPublishedAt(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt(),
@@ -376,6 +380,11 @@ public class ResourceService {
                 lyric.getSortOrder(),
                 lyric.getCreatedAt(),
                 lyric.getUpdatedAt());
+    }
+
+    private SongResourceDetailResponse.SongLink toSongLink(SongLink songLink) {
+        return new SongResourceDetailResponse.SongLink(
+                songLink.getSongLinkType().name(), songLink.getUrl(), songLink.isDeleted());
     }
 
     private Object toJsonValue(JsonNode jsonNode) {

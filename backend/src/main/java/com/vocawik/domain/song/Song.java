@@ -11,9 +11,12 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -41,6 +44,10 @@ public class Song {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "links", columnDefinition = "jsonb")
     private JsonNode links;
+
+    @Getter(AccessLevel.NONE)
+    @OneToMany(mappedBy = "song")
+    private List<SongLink> songLinks = new ArrayList<>();
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;

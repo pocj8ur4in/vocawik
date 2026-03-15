@@ -17,7 +17,7 @@ public record SongUpdateRequest(
         @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
-        Object links,
+        @Valid List<SongLinkUpdateRequest> links,
         LocalDateTime publishedAt,
         String songType,
         @Valid List<ResourceAliasUpdateRequest> aliases,
@@ -30,6 +30,7 @@ public record SongUpdateRequest(
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public SongUpdateRequest {
+        links = links == null ? null : List.copyOf(links);
         aliases = aliases == null ? null : List.copyOf(aliases);
         acls = acls == null ? null : List.copyOf(acls);
         lyrics = lyrics == null ? null : List.copyOf(lyrics);
@@ -47,6 +48,10 @@ public record SongUpdateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
             @Min(0) Integer sortOrder) {}
+
+    /** External link input. */
+    public record SongLinkUpdateRequest(
+            @NotBlank String type, @NotBlank @Size(max = 2048) String url, boolean isDeleted) {}
 
     /** ACL rule input. */
     public record ResourceAclUpdateRequest(

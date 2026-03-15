@@ -21,6 +21,7 @@ import com.vocawik.repository.playlist.PlaylistSongRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongArtistRepository;
+import com.vocawik.repository.song.SongLinkRepository;
 import com.vocawik.repository.song.SongLyricRepository;
 import com.vocawik.repository.song.SongPvRepository;
 import com.vocawik.repository.song.SongPvViewRepository;
@@ -51,6 +52,7 @@ class ResourceServiceTest {
                         resourceNameRepository,
                         mock(AclRepository.class),
                         mock(SongRepository.class),
+                        mock(SongLinkRepository.class),
                         mock(SongLyricRepository.class),
                         mock(SongPvRepository.class),
                         mock(SongPvViewRepository.class),
