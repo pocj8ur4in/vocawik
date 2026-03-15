@@ -27,7 +27,9 @@ public interface HistoryRepository extends JpaRepository<History, Long> {
             """
             select
                 h.createdAt as createdAt,
+                r.uuid as resourceUuid,
                 r.canonicalName as canonicalName,
+                r.resourceType as resourceType,
                 h.actionType as actionType,
                 u.nickname as actorUserNickname
             from History h
