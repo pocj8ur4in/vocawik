@@ -33,6 +33,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -115,13 +116,13 @@ public class PlaylistService {
                     request.aliases() == null
                             ? toCreateAliasesFromResourceNames(loadAliases(resource))
                             : toCreateAliases(request.aliases());
-            replaceResourceNames(resource, canonicalName, aliases);
+            syncResourceNames(resource, canonicalName, aliases);
         }
         if (request.acls() != null) {
-            replaceAcls(resource, toCreateAcls(request.acls()));
+            syncAcls(resource, toCreateAcls(request.acls()));
         }
         if (request.songs() != null) {
-            replacePlaylistSongs(playlist, toCreateSongs(request.songs()));
+            syncPlaylistSongs(playlist, toCreateSongs(request.songs()));
         }
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(playlist, resource));
@@ -390,12 +391,73 @@ public class PlaylistService {
                 .toList();
     }
 
-    private void replaceResourceNames(
+    private void syncResourceNames(
             Resource resource,
             PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName,
             List<PlaylistCreateRequest.ResourceAliasCreateRequest> aliases) {
-        resourceNameRepository.deleteByResourceId(resource.getId());
-        saveResourceNames(resource, canonicalName, aliases);
+        List<ResourceName> existingNames =
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId());
+
+        HashSet<String> uniqueNames = new HashSet<>();
+        String normalizedCanonicalName = normalizeCanonicalName(canonicalName.name());
+        List<DesiredResourceName> desiredNames = new ArrayList<>();
+        desiredNames.add(
+                new DesiredResourceName(
+                        canonicalName.langCode(), normalizedCanonicalName, true, 0));
+        uniqueNames.add(canonicalName.langCode().name() + "|" + normalizedCanonicalName);
+
+        for (PlaylistCreateRequest.ResourceAliasCreateRequest alias :
+                (aliases == null
+                        ? List.<PlaylistCreateRequest.ResourceAliasCreateRequest>of()
+                        : aliases)) {
+            if (alias == null) {
+                throw new IllegalArgumentException("aliases contains null item");
+            }
+            String normalizedAlias = normalizeCanonicalName(alias.name());
+            String uniqueKey = alias.langCode().name() + "|" + normalizedAlias;
+            if (!uniqueNames.add(uniqueKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate resource name for language and value");
+            }
+            desiredNames.add(
+                    new DesiredResourceName(
+                            alias.langCode(),
+                            normalizedAlias,
+                            false,
+                            alias.sortOrder() == null ? 0 : alias.sortOrder()));
+        }
+
+        Map<ResourceNameKey, ResourceName> existingByKey = new HashMap<>();
+        for (ResourceName existing : existingNames) {
+            existingByKey.put(
+                    new ResourceNameKey(existing.getLangCode(), existing.getName()), existing);
+        }
+
+        List<ResourceName> toCreate = new ArrayList<>();
+        for (DesiredResourceName desired : desiredNames) {
+            ResourceNameKey key = new ResourceNameKey(desired.langCode(), desired.name());
+            ResourceName existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        ResourceName.create(
+                                resource,
+                                desired.langCode(),
+                                desired.name(),
+                                desired.isPrimary(),
+                                desired.sortOrder()));
+                continue;
+            }
+            existing.updateDisplay(desired.isPrimary(), desired.sortOrder());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            resourceNameRepository.deleteAllInBatch(new ArrayList<>(existingByKey.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            resourceNameRepository.saveAll(toCreate);
+        }
+        resourceNameRepository.flush();
     }
 
     private ResourceName loadCanonicalName(Resource resource) {
@@ -424,16 +486,172 @@ public class PlaylistService {
                 .toList();
     }
 
-    private void replaceAcls(
+    private void syncAcls(
             Resource resource, List<PlaylistCreateRequest.ResourceAclCreateRequest> acls) {
-        aclRepository.deleteByResourceId(resource.getId());
-        saveAcls(resource, acls);
+        List<Acl> existingAcls =
+                aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
+        if (acls.isEmpty()) {
+            if (!existingAcls.isEmpty()) {
+                aclRepository.deleteAllInBatch(existingAcls);
+                aclRepository.flush();
+            }
+            return;
+        }
+
+        Map<AclKey, Acl> existingByKey = new HashMap<>();
+        for (Acl existing : existingAcls) {
+            existingByKey.put(
+                    new AclKey(
+                            existing.getAction(),
+                            existing.getSubjectType(),
+                            existing.getSubjectValue(),
+                            existing.getPriority()),
+                    existing);
+        }
+
+        HashSet<AclKey> uniqueKeys = new HashSet<>();
+        List<Acl> toCreate = new ArrayList<>();
+        for (PlaylistCreateRequest.ResourceAclCreateRequest item : acls) {
+            if (item == null) {
+                throw new IllegalArgumentException("acls contains null item");
+            }
+            AclAction action = parseAclAction(item.action());
+            AclSubjectType subjectType = parseAclSubjectType(item.subjectType());
+            String subjectValue = normalizeAclSubjectValue(subjectType, item.subjectValue());
+            int priority = item.priority() == null ? 100 : item.priority();
+            AclKey key = new AclKey(action, subjectType, subjectValue, priority);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate ACL for action/subject/priority combination");
+            }
+
+            AclEffect effect = parseAclEffect(item.effect());
+            Acl existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        Acl.create(
+                                resource,
+                                action,
+                                subjectType,
+                                subjectValue,
+                                effect,
+                                priority,
+                                item.expiresAt()));
+                continue;
+            }
+            existing.updateRule(effect, item.expiresAt());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            aclRepository.deleteAllInBatch(new ArrayList<>(existingByKey.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            aclRepository.saveAll(toCreate);
+        }
+        aclRepository.flush();
     }
 
-    private void replacePlaylistSongs(
+    private void syncPlaylistSongs(
             Playlist playlist, List<PlaylistCreateRequest.PlaylistSongCreateRequest> songs) {
-        playlistSongRepository.deleteByPlaylistId(playlist.getId());
-        savePlaylistSongs(playlist, songs);
+        List<PlaylistSong> existingSongs =
+                playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(
+                        playlist.getId());
+        if (songs.isEmpty()) {
+            if (!existingSongs.isEmpty()) {
+                playlistSongRepository.deleteAllInBatch(existingSongs);
+                playlistSongRepository.flush();
+            }
+            return;
+        }
+
+        HashSet<UUID> uniqueSongUuids = new HashSet<>();
+        HashSet<Integer> uniqueSortOrders = new HashSet<>();
+        for (PlaylistCreateRequest.PlaylistSongCreateRequest item : songs) {
+            if (item == null) {
+                throw new IllegalArgumentException("songs contains null item");
+            }
+            if (!uniqueSongUuids.add(item.songResourceUuid())) {
+                throw new IllegalArgumentException(
+                        "Duplicate songResourceUuid: " + item.songResourceUuid());
+            }
+            if (!uniqueSortOrders.add(item.sortOrder())) {
+                throw new IllegalArgumentException("Duplicate sortOrder in songs");
+            }
+        }
+
+        List<UUID> songUuids =
+                songs.stream()
+                        .map(PlaylistCreateRequest.PlaylistSongCreateRequest::songResourceUuid)
+                        .toList();
+        Map<UUID, Long> songIdsByUuid =
+                songRepository.findResourceRefsByResourceUuids(songUuids).stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        ResourceRefProjection::getResourceUuid,
+                                        ResourceRefProjection::getId));
+        for (UUID songUuid : songUuids) {
+            if (!songIdsByUuid.containsKey(songUuid)) {
+                throw new IllegalArgumentException("Unknown songResourceUuid: " + songUuid);
+            }
+        }
+
+        Map<Long, PlaylistSong> existingBySongId = new HashMap<>();
+        for (PlaylistSong existing : existingSongs) {
+            existingBySongId.put(existing.getSong().getId(), existing);
+        }
+
+        List<PlaylistSongSortUpdate> toUpdateSortOrders = new ArrayList<>();
+        List<PlaylistSong> toCreate = new ArrayList<>();
+        for (PlaylistCreateRequest.PlaylistSongCreateRequest item : songs) {
+            Long songId = songIdsByUuid.get(item.songResourceUuid());
+            PlaylistSong existing = existingBySongId.remove(songId);
+            if (existing == null) {
+                toCreate.add(
+                        PlaylistSong.create(
+                                playlist,
+                                entityManager.getReference(
+                                        com.vocawik.domain.song.Song.class, songId),
+                                item.sortOrder()));
+                continue;
+            }
+            if (existing.getSortOrder() != item.sortOrder()) {
+                toUpdateSortOrders.add(new PlaylistSongSortUpdate(existing, item.sortOrder()));
+            }
+        }
+
+        if (!existingBySongId.isEmpty()) {
+            playlistSongRepository.deleteAllInBatch(new ArrayList<>(existingBySongId.values()));
+            playlistSongRepository.flush();
+        }
+
+        if (!toUpdateSortOrders.isEmpty()) {
+            int maxSortOrder = 0;
+            for (PlaylistSong existing : existingSongs) {
+                if (existing.getSortOrder() > maxSortOrder) {
+                    maxSortOrder = existing.getSortOrder();
+                }
+            }
+            for (PlaylistCreateRequest.PlaylistSongCreateRequest item : songs) {
+                if (item.sortOrder() > maxSortOrder) {
+                    maxSortOrder = item.sortOrder();
+                }
+            }
+
+            int temporarySortOrder = maxSortOrder + 1;
+            for (PlaylistSongSortUpdate update : toUpdateSortOrders) {
+                update.playlistSong().updateSortOrder(temporarySortOrder++);
+            }
+            playlistSongRepository.flush();
+
+            for (PlaylistSongSortUpdate update : toUpdateSortOrders) {
+                update.playlistSong().updateSortOrder(update.targetSortOrder());
+            }
+        }
+
+        if (!toCreate.isEmpty()) {
+            playlistSongRepository.saveAll(toCreate);
+        }
+        playlistSongRepository.flush();
     }
 
     private String normalizeAclSubjectValue(AclSubjectType subjectType, String subjectValue) {
@@ -486,6 +704,16 @@ public class PlaylistService {
             throw new IllegalArgumentException(fieldName + " is invalid: " + rawValue);
         }
     }
+
+    private record ResourceNameKey(Language langCode, String name) {}
+
+    private record DesiredResourceName(
+            Language langCode, String name, boolean isPrimary, int sortOrder) {}
+
+    private record AclKey(
+            AclAction action, AclSubjectType subjectType, String subjectValue, int priority) {}
+
+    private record PlaylistSongSortUpdate(PlaylistSong playlistSong, int targetSortOrder) {}
 
     private JsonNode buildHistorySnapshot(Playlist playlist, Resource resource) {
         ObjectNode data = objectMapper.createObjectNode();
