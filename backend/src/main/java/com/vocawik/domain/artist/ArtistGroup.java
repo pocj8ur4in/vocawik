@@ -67,4 +67,16 @@ public class ArtistGroup extends BaseEntity {
         artistGroup.sortOrder = sortOrder;
         return artistGroup;
     }
+
+    /**
+     * Updates display order in the group.
+     *
+     * @param sortOrder updated sort order
+     */
+    public void updateSortOrder(int sortOrder) {
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.sortOrder = sortOrder;
+    }
 }

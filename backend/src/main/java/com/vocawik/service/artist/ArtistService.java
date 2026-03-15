@@ -36,8 +36,10 @@ import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -128,16 +130,16 @@ public class ArtistService {
                     request.aliases() == null
                             ? toCreateAliasesFromResourceNames(loadAliases(resource))
                             : toCreateAliases(request.aliases());
-            replaceResourceNames(resource, canonicalName, aliases);
+            syncResourceNames(resource, canonicalName, aliases);
         }
         if (request.acls() != null) {
-            replaceAcls(resource, toCreateAcls(request.acls()));
+            syncAcls(resource, toCreateAcls(request.acls()));
         }
         if (request.links() != null) {
-            replaceArtistLinks(artist, request.links());
+            syncArtistLinks(artist, request.links());
         }
         if (request.members() != null) {
-            replaceArtistMemberships(artist, toCreateMembers(request.members()));
+            syncArtistMemberships(artist, toCreateMembers(request.members()));
         }
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(artist, resource));
@@ -464,52 +466,287 @@ public class ArtistService {
                 .toList();
     }
 
-    private List<ResourceName> replaceResourceNames(
+    private List<ResourceName> syncResourceNames(
             Resource resource,
             ArtistCreateRequest.CanonicalNameCreateRequest canonicalName,
             List<ArtistCreateRequest.ResourceAliasCreateRequest> aliases) {
-        resourceNameRepository.deleteByResourceId(resource.getId());
-        return saveResourceNames(resource, canonicalName, aliases);
-    }
+        List<ResourceName> existingNames =
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId());
 
-    private List<Acl> replaceAcls(
-            Resource resource, List<ArtistCreateRequest.ResourceAclCreateRequest> acls) {
-        aclRepository.deleteByResourceId(resource.getId());
-        return saveAcls(resource, acls);
-    }
+        HashSet<String> uniqueNames = new HashSet<>();
+        String normalizedCanonicalName = normalizeCanonicalName(canonicalName.name());
+        List<DesiredResourceName> desiredNames = new ArrayList<>();
+        desiredNames.add(
+                new DesiredResourceName(
+                        canonicalName.langCode(), normalizedCanonicalName, true, 0));
+        uniqueNames.add(canonicalName.langCode().name() + "|" + normalizedCanonicalName);
 
-    private List<ArtistLink> replaceArtistLinks(
-            Artist artist, List<ArtistUpdateRequest.ArtistLinkUpdateRequest> links) {
-        artistLinkRepository.deleteByArtistId(artist.getId());
-        if (links.isEmpty()) {
-            return List.of();
+        for (ArtistCreateRequest.ResourceAliasCreateRequest alias :
+                (aliases == null
+                        ? List.<ArtistCreateRequest.ResourceAliasCreateRequest>of()
+                        : aliases)) {
+            if (alias == null) {
+                throw new IllegalArgumentException("aliases contains null item");
+            }
+            String normalizedAlias = normalizeCanonicalName(alias.name());
+            String uniqueKey = alias.langCode().name() + "|" + normalizedAlias;
+            if (!uniqueNames.add(uniqueKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate resource name for language and value");
+            }
+            desiredNames.add(
+                    new DesiredResourceName(
+                            alias.langCode(),
+                            normalizedAlias,
+                            false,
+                            alias.sortOrder() == null ? 0 : alias.sortOrder()));
         }
 
-        List<ArtistLink> entities =
-                links.stream()
-                        .map(
-                                item -> {
-                                    if (item == null) {
-                                        throw new IllegalArgumentException(
-                                                "links contains null item");
-                                    }
-                                    return ArtistLink.create(
-                                            artist,
-                                            parseArtistLinkType(item.type()),
-                                            normalizeLinkUrl(item.url()),
-                                            item.isDeleted());
-                                })
-                        .toList();
+        Map<ResourceNameKey, ResourceName> existingByKey = new HashMap<>();
+        for (ResourceName existing : existingNames) {
+            existingByKey.put(
+                    new ResourceNameKey(existing.getLangCode(), existing.getName()), existing);
+        }
 
-        return artistLinkRepository.saveAllAndFlush(entities).stream()
-                .sorted(Comparator.comparing(ArtistLink::getId))
+        List<ResourceName> toCreate = new ArrayList<>();
+        for (DesiredResourceName desired : desiredNames) {
+            ResourceNameKey key = new ResourceNameKey(desired.langCode(), desired.name());
+            ResourceName existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        ResourceName.create(
+                                resource,
+                                desired.langCode(),
+                                desired.name(),
+                                desired.isPrimary(),
+                                desired.sortOrder()));
+                continue;
+            }
+            existing.updateDisplay(desired.isPrimary(), desired.sortOrder());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            resourceNameRepository.deleteAllInBatch(new ArrayList<>(existingByKey.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            resourceNameRepository.saveAll(toCreate);
+        }
+        resourceNameRepository.flush();
+        return resourceNameRepository
+                .findAllByResourceIdOrderBySortOrderAscIdAsc(resource.getId())
+                .stream()
+                .sorted(
+                        Comparator.comparingInt(ResourceName::getSortOrder)
+                                .thenComparing(ResourceName::getId))
                 .toList();
     }
 
-    private List<ArtistGroup> replaceArtistMemberships(
+    private List<Acl> syncAcls(
+            Resource resource, List<ArtistCreateRequest.ResourceAclCreateRequest> acls) {
+        List<Acl> existingAcls =
+                aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
+        if (acls.isEmpty()) {
+            if (!existingAcls.isEmpty()) {
+                aclRepository.deleteAllInBatch(existingAcls);
+                aclRepository.flush();
+            }
+            return List.of();
+        }
+
+        Map<AclKey, Acl> existingByKey = new HashMap<>();
+        for (Acl existing : existingAcls) {
+            existingByKey.put(
+                    new AclKey(
+                            existing.getAction(),
+                            existing.getSubjectType(),
+                            existing.getSubjectValue(),
+                            existing.getPriority()),
+                    existing);
+        }
+
+        HashSet<AclKey> uniqueKeys = new HashSet<>();
+        List<Acl> toCreate = new ArrayList<>();
+        for (ArtistCreateRequest.ResourceAclCreateRequest item : acls) {
+            if (item == null) {
+                throw new IllegalArgumentException("acls contains null item");
+            }
+            AclAction action = parseAclAction(item.action());
+            AclSubjectType subjectType = parseAclSubjectType(item.subjectType());
+            String subjectValue = normalizeAclSubjectValue(subjectType, item.subjectValue());
+            int priority = item.priority() == null ? 100 : item.priority();
+            AclKey key = new AclKey(action, subjectType, subjectValue, priority);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate ACL for action/subject/priority combination");
+            }
+
+            AclEffect effect = parseAclEffect(item.effect());
+            Acl existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        Acl.create(
+                                resource,
+                                action,
+                                subjectType,
+                                subjectValue,
+                                effect,
+                                priority,
+                                item.expiresAt()));
+                continue;
+            }
+            existing.updateRule(effect, item.expiresAt());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            aclRepository.deleteAllInBatch(new ArrayList<>(existingByKey.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            aclRepository.saveAll(toCreate);
+        }
+        aclRepository.flush();
+        return aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
+    }
+
+    private List<ArtistLink> syncArtistLinks(
+            Artist artist, List<ArtistUpdateRequest.ArtistLinkUpdateRequest> links) {
+        List<ArtistLink> existingLinks =
+                artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
+        if (links.isEmpty()) {
+            if (!existingLinks.isEmpty()) {
+                artistLinkRepository.deleteAllInBatch(existingLinks);
+                artistLinkRepository.flush();
+            }
+            return List.of();
+        }
+
+        Map<ArtistLinkKey, Deque<ArtistLink>> existingByKey = new HashMap<>();
+        for (ArtistLink existing : existingLinks) {
+            ArtistLinkKey key = new ArtistLinkKey(existing.getArtistLinkType(), existing.getUrl());
+            existingByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).add(existing);
+        }
+
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<ArtistLink> toCreate = new ArrayList<>();
+        for (ArtistUpdateRequest.ArtistLinkUpdateRequest item : links) {
+            if (item == null) {
+                throw new IllegalArgumentException("links contains null item");
+            }
+            ArtistLinkType type = parseArtistLinkType(item.type());
+            String url = normalizeLinkUrl(item.url());
+            ArtistLinkKey key = new ArtistLinkKey(type, url);
+            Deque<ArtistLink> candidates = existingByKey.get(key);
+
+            if (candidates != null && !candidates.isEmpty()) {
+                ArtistLink matched = candidates.removeFirst();
+                matched.updateDeleted(item.isDeleted());
+                matchedIds.add(matched.getId());
+                continue;
+            }
+
+            toCreate.add(ArtistLink.create(artist, type, url, item.isDeleted()));
+        }
+
+        List<ArtistLink> toDelete =
+                existingLinks.stream().filter(item -> !matchedIds.contains(item.getId())).toList();
+        if (!toDelete.isEmpty()) {
+            artistLinkRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            artistLinkRepository.saveAll(toCreate);
+        }
+        artistLinkRepository.flush();
+        return artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
+    }
+
+    private List<ArtistGroup> syncArtistMemberships(
             Artist artist, List<ArtistCreateRequest.ArtistMemberCreateRequest> members) {
-        artistGroupRepository.deleteByMemberArtistId(artist.getId());
-        return saveArtistMemberships(artist, members);
+        List<ArtistGroup> existingMemberships =
+                artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
+                        artist.getId());
+        if (members.isEmpty()) {
+            if (!existingMemberships.isEmpty()) {
+                artistGroupRepository.deleteAllInBatch(existingMemberships);
+                artistGroupRepository.flush();
+            }
+            return List.of();
+        }
+
+        validateNoNullItems("members", members);
+        HashSet<UUID> uniqueGroupArtistUuids = new HashSet<>();
+        for (ArtistCreateRequest.ArtistMemberCreateRequest member : members) {
+            UUID groupArtistResourceUuid = member.groupArtistResourceUuid();
+            if (!uniqueGroupArtistUuids.add(groupArtistResourceUuid)) {
+                throw new IllegalArgumentException(
+                        "Duplicate groupArtistResourceUuid: " + groupArtistResourceUuid);
+            }
+            if (artist.getResource().getUuid().equals(groupArtistResourceUuid)) {
+                throw new IllegalArgumentException(
+                        "groupArtist and memberArtist must be different");
+            }
+        }
+
+        List<UUID> groupArtistUuids =
+                members.stream()
+                        .map(ArtistCreateRequest.ArtistMemberCreateRequest::groupArtistResourceUuid)
+                        .toList();
+        Map<UUID, Long> artistIdsByUuid = fetchArtistIdsByResourceUuid(groupArtistUuids);
+        for (UUID groupArtistUuid : groupArtistUuids) {
+            if (!artistIdsByUuid.containsKey(groupArtistUuid)) {
+                throw new IllegalArgumentException(
+                        "Unknown groupArtistResourceUuid: " + groupArtistUuid);
+            }
+        }
+
+        Map<Long, ArtistGroup> existingByGroupArtistId = new HashMap<>();
+        for (ArtistGroup existing : existingMemberships) {
+            existingByGroupArtistId.put(existing.getGroupArtist().getId(), existing);
+        }
+
+        Map<Long, Set<Integer>> usedSortOrdersByGroupArtistId =
+                loadUsedSortOrdersByGroupArtistId(new ArrayList<>(artistIdsByUuid.values()));
+
+        List<ArtistGroup> toCreate = new ArrayList<>();
+        for (ArtistCreateRequest.ArtistMemberCreateRequest member : members) {
+            Long groupArtistId = artistIdsByUuid.get(member.groupArtistResourceUuid());
+            ArtistGroup existing = existingByGroupArtistId.remove(groupArtistId);
+            int resolvedSortOrder;
+
+            if (existing != null && member.sortOrder() == null) {
+                resolvedSortOrder = existing.getSortOrder();
+            } else {
+                Set<Integer> usedSortOrders =
+                        usedSortOrdersByGroupArtistId.computeIfAbsent(
+                                groupArtistId, ignored -> new HashSet<>());
+                if (existing != null) {
+                    usedSortOrders.remove(existing.getSortOrder());
+                }
+                resolvedSortOrder =
+                        resolveMembershipSortOrder(
+                                usedSortOrdersByGroupArtistId,
+                                groupArtistId,
+                                member.sortOrder(),
+                                member.groupArtistResourceUuid());
+            }
+
+            if (existing == null) {
+                Artist groupArtist = entityManager.getReference(Artist.class, groupArtistId);
+                toCreate.add(ArtistGroup.create(groupArtist, artist, resolvedSortOrder));
+                continue;
+            }
+            existing.updateSortOrder(resolvedSortOrder);
+        }
+
+        if (!existingByGroupArtistId.isEmpty()) {
+            artistGroupRepository.deleteAllInBatch(
+                    new ArrayList<>(existingByGroupArtistId.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            artistGroupRepository.saveAll(toCreate);
+        }
+        artistGroupRepository.flush();
+        return artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
+                artist.getId());
     }
 
     private ArtistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
@@ -711,6 +948,16 @@ public class ArtistService {
         }
         return url.trim();
     }
+
+    private record ResourceNameKey(Language langCode, String name) {}
+
+    private record DesiredResourceName(
+            Language langCode, String name, boolean isPrimary, int sortOrder) {}
+
+    private record AclKey(
+            AclAction action, AclSubjectType subjectType, String subjectValue, int priority) {}
+
+    private record ArtistLinkKey(ArtistLinkType type, String url) {}
 
     private <E extends Enum<E>> E parseEnum(String rawValue, Class<E> enumClass, String fieldName) {
         if (rawValue == null || rawValue.isBlank()) {
