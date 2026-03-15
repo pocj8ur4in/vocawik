@@ -7,6 +7,7 @@ import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongListResponse;
 import com.vocawik.dto.song.SongPvResolveRequest;
 import com.vocawik.dto.song.SongPvResolveResponse;
+import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
@@ -201,6 +202,17 @@ public class SongController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Suggests songs matching the current query. */
+    @GetMapping("/songs/suggestions")
+    @Operation(
+            summary = "Suggest songs",
+            description = "Returns up to 10 song suggestions matching the current query.")
+    public ResponseEntity<SongSuggestionListResponse> suggestSongs(
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
+        return ResponseEntity.ok(songService.suggest(query));
     }
 
     /**
