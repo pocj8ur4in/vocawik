@@ -315,6 +315,7 @@ public class VocalService {
                                             vocal,
                                             parseVocalLinkType(item.type()),
                                             normalizeLinkUrl(item.url()),
+                                            normalizeNullable(item.content()),
                                             item.isDeleted());
                                 })
                         .toList();
@@ -355,12 +356,14 @@ public class VocalService {
 
             if (candidates != null && !candidates.isEmpty()) {
                 VocalLink matched = candidates.removeFirst();
-                matched.updateDeleted(item.isDeleted());
+                matched.update(normalizeNullable(item.content()), item.isDeleted());
                 matchedIds.add(matched.getId());
                 continue;
             }
 
-            toCreate.add(VocalLink.create(vocal, type, url, item.isDeleted()));
+            toCreate.add(
+                    VocalLink.create(
+                            vocal, type, url, normalizeNullable(item.content()), item.isDeleted()));
         }
 
         List<VocalLink> toDelete =
@@ -817,6 +820,7 @@ public class VocalService {
             ObjectNode link = objectMapper.createObjectNode();
             link.put("type", item.getVocalLinkType().name());
             link.put("url", item.getUrl());
+            putNullableText(link, "content", item.getContent());
             link.put("isDeleted", item.isDeleted());
             links.add(link);
         }

@@ -359,6 +359,7 @@ public class ArtistService {
                                             artist,
                                             parseArtistLinkType(item.type()),
                                             normalizeLinkUrl(item.url()),
+                                            normalizeNullable(item.content()),
                                             item.isDeleted());
                                 })
                         .toList();
@@ -639,12 +640,18 @@ public class ArtistService {
 
             if (candidates != null && !candidates.isEmpty()) {
                 ArtistLink matched = candidates.removeFirst();
-                matched.updateDeleted(item.isDeleted());
+                matched.update(normalizeNullable(item.content()), item.isDeleted());
                 matchedIds.add(matched.getId());
                 continue;
             }
 
-            toCreate.add(ArtistLink.create(artist, type, url, item.isDeleted()));
+            toCreate.add(
+                    ArtistLink.create(
+                            artist,
+                            type,
+                            url,
+                            normalizeNullable(item.content()),
+                            item.isDeleted()));
         }
 
         List<ArtistLink> toDelete =
@@ -1141,6 +1148,7 @@ public class ArtistService {
             ObjectNode link = objectMapper.createObjectNode();
             link.put("type", item.getArtistLinkType().name());
             link.put("url", item.getUrl());
+            putNullableText(link, "content", item.getContent());
             link.put("isDeleted", item.isDeleted());
             links.add(link);
         }

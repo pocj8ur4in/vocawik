@@ -384,7 +384,10 @@ public class ResourceService {
 
     private SongResourceDetailResponse.SongLink toSongLink(SongLink songLink) {
         return new SongResourceDetailResponse.SongLink(
-                songLink.getSongLinkType().name(), songLink.getUrl(), songLink.isDeleted());
+                songLink.getSongLinkType().name(),
+                songLink.getUrl(),
+                songLink.getContent(),
+                songLink.isDeleted());
     }
 
     private Object toJsonValue(JsonNode jsonNode) {
@@ -492,7 +495,10 @@ public class ResourceService {
 
     private ArtistResourceDetailResponse.ArtistLink toArtistLink(ArtistLink artistLink) {
         return new ArtistResourceDetailResponse.ArtistLink(
-                artistLink.getArtistLinkType().name(), artistLink.getUrl(), artistLink.isDeleted());
+                artistLink.getArtistLinkType().name(),
+                artistLink.getUrl(),
+                artistLink.getContent(),
+                artistLink.isDeleted());
     }
 
     private VocalResourceDetailResponse.VocalSong toVocalSong(SongVocal songVocal) {
@@ -509,7 +515,10 @@ public class ResourceService {
 
     private VocalResourceDetailResponse.VocalLink toVocalLink(VocalLink vocalLink) {
         return new VocalResourceDetailResponse.VocalLink(
-                vocalLink.getVocalLinkType().name(), vocalLink.getUrl(), vocalLink.isDeleted());
+                vocalLink.getVocalLinkType().name(),
+                vocalLink.getUrl(),
+                vocalLink.getContent(),
+                vocalLink.isDeleted());
     }
 
     private PlaylistResourceDetailResponse.PlaylistSong toPlaylistDetailSong(

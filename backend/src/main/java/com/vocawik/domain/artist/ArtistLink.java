@@ -31,6 +31,9 @@ public class ArtistLink extends BaseEntity {
     @Column(nullable = false)
     private String url;
 
+    @Column(name = "content")
+    private String content;
+
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted;
 
@@ -40,11 +43,16 @@ public class ArtistLink extends BaseEntity {
      * @param artist owner artist
      * @param artistLinkType link type
      * @param url external link url
+     * @param content link note/description
      * @param isDeleted deletion flag
      * @return created artist link
      */
     public static ArtistLink create(
-            Artist artist, ArtistLinkType artistLinkType, String url, boolean isDeleted) {
+            Artist artist,
+            ArtistLinkType artistLinkType,
+            String url,
+            String content,
+            boolean isDeleted) {
         if (artist == null) {
             throw new IllegalArgumentException("artist is required");
         }
@@ -59,6 +67,7 @@ public class ArtistLink extends BaseEntity {
         artistLink.artist = artist;
         artistLink.artistLinkType = artistLinkType;
         artistLink.url = url.trim();
+        artistLink.content = content;
         artistLink.isDeleted = isDeleted;
         return artistLink;
     }
@@ -74,6 +83,17 @@ public class ArtistLink extends BaseEntity {
      * @param isDeleted updated deleted flag
      */
     public void updateDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    /**
+     * Updates content and deleted flag.
+     *
+     * @param content updated link content
+     * @param isDeleted updated deleted flag
+     */
+    public void update(String content, boolean isDeleted) {
+        this.content = content;
         this.isDeleted = isDeleted;
     }
 }

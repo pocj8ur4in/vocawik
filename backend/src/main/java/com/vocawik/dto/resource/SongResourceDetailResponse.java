@@ -46,7 +46,7 @@ public record SongResourceDetailResponse(
     }
 
     /** Song link item in the detailed payload. */
-    public record SongLink(String type, String url, boolean isDeleted) {}
+    public record SongLink(String type, String url, String content, boolean isDeleted) {}
 
     /** Song lyric item in the detailed payload. */
     public record SongLyric(

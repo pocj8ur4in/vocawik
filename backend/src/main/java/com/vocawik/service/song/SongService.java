@@ -667,12 +667,14 @@ public class SongService {
 
             if (candidates != null && !candidates.isEmpty()) {
                 SongLink matched = candidates.removeFirst();
-                matched.updateDeleted(item.isDeleted());
+                matched.update(normalizeNullable(item.content()), item.isDeleted());
                 matchedIds.add(matched.getId());
                 continue;
             }
 
-            toCreate.add(SongLink.create(song, type, url, item.isDeleted()));
+            toCreate.add(
+                    SongLink.create(
+                            song, type, url, normalizeNullable(item.content()), item.isDeleted()));
         }
 
         List<SongLink> toDelete =
@@ -1194,6 +1196,7 @@ public class SongService {
                                             song,
                                             parseSongLinkType(item.type()),
                                             normalizeLinkUrl(item.url()),
+                                            normalizeNullable(item.content()),
                                             item.isDeleted());
                                 })
                         .toList();
@@ -1629,6 +1632,11 @@ public class SongService {
             ObjectNode link = objectMapper.createObjectNode();
             link.put("type", item.getSongLinkType().name());
             link.put("url", item.getUrl());
+            if (item.getContent() == null) {
+                link.putNull("content");
+            } else {
+                link.put("content", item.getContent());
+            }
             link.put("isDeleted", item.isDeleted());
             links.add(link);
         }

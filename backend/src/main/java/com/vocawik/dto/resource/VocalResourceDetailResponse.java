@@ -32,7 +32,7 @@ public record VocalResourceDetailResponse(
     }
 
     /** Link item for the vocal detail payload. */
-    public record VocalLink(String type, String url, boolean isDeleted) {}
+    public record VocalLink(String type, String url, String content, boolean isDeleted) {}
 
     /** Song mapping item for the vocal detail payload. */
     public record VocalSong(
