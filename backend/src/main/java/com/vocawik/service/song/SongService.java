@@ -28,6 +28,8 @@ import com.vocawik.dto.song.SongElementResponse;
 import com.vocawik.dto.song.SongListResponse;
 import com.vocawik.dto.song.SongPvResolveRequest;
 import com.vocawik.dto.song.SongPvResolveResponse;
+import com.vocawik.dto.song.SongSuggestionElementResponse;
+import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.infrastructure.pv.model.DetectedPv;
 import com.vocawik.repository.acl.AclRepository;
@@ -55,6 +57,7 @@ import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +77,7 @@ import org.springframework.transaction.annotation.Transactional;
         justification =
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class SongService {
+    private static final int SONG_SUGGESTION_LIMIT = 10;
 
     private final SongRepository songRepository;
     private final ResourceRepository resourceRepository;
@@ -137,6 +141,34 @@ public class SongService {
 
         return new SongListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public SongSuggestionListResponse suggest(String query) {
+        String normalizedQuery = normalizeQuery(query);
+        if (normalizedQuery == null) {
+            return new SongSuggestionListResponse(List.of());
+        }
+
+        LinkedHashMap<UUID, SongSuggestionElementResponse> suggestionsByUuid =
+                new LinkedHashMap<>();
+        resourceNameRepository
+                .findSongSuggestionCandidates(
+                        ResourceStatus.ACTIVE,
+                        normalizedQuery,
+                        org.springframework.data.domain.PageRequest.of(
+                                0, SONG_SUGGESTION_LIMIT * 3))
+                .forEach(
+                        resourceName -> {
+                            UUID resourceUuid = resourceName.getResource().getUuid();
+                            suggestionsByUuid.putIfAbsent(
+                                    resourceUuid,
+                                    new SongSuggestionElementResponse(
+                                            resourceUuid, resourceName.getName()));
+                        });
+
+        return new SongSuggestionListResponse(
+                suggestionsByUuid.values().stream().limit(SONG_SUGGESTION_LIMIT).toList());
     }
 
     /**
