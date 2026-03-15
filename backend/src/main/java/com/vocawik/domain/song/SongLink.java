@@ -67,4 +67,13 @@ public class SongLink extends BaseEntity {
     public void softDelete() {
         this.isDeleted = true;
     }
+
+    /**
+     * Updates deleted flag.
+     *
+     * @param isDeleted updated deleted flag
+     */
+    public void updateDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
 }

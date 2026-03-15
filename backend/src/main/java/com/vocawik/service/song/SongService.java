@@ -58,7 +58,11 @@ import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -301,29 +305,29 @@ public class SongService {
                     request.aliases() == null
                             ? toCreateAliasesFromResourceNames(loadAliases(resource))
                             : toCreateAliases(request.aliases());
-            replaceResourceNames(resource, canonicalName, aliases);
+            syncResourceNames(resource, canonicalName, aliases);
         }
         if (request.acls() != null) {
-            replaceAcls(resource, toCreateAcls(request.acls()));
+            syncAcls(resource, toCreateAcls(request.acls()));
         }
         if (request.links() != null) {
-            replaceSongLinks(song, request.links());
+            syncSongLinks(song, request.links());
         }
         if (request.lyrics() != null) {
-            replaceSongLyrics(song, toCreateLyrics(request.lyrics()));
+            syncSongLyrics(song, toCreateLyrics(request.lyrics()));
         }
         if (request.pvs() != null) {
-            replaceSongPvs(song, toCreatePvs(request.pvs()));
+            syncSongPvs(song, toCreatePvs(request.pvs()));
         }
         if (request.artists() != null) {
-            replaceSongArtists(song, toCreateArtists(request.artists()));
+            syncSongArtists(song, toCreateArtists(request.artists()));
         }
         List<SongVocal> vocals =
                 request.vocals() == null
                         ? songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
-                        : replaceSongVocals(song, toCreateVocals(request.vocals()));
+                        : syncSongVocals(song, toCreateVocals(request.vocals()));
         if (request.relationsTargetSongResourceUuid() != null) {
-            replaceSongRelation(song, request.relationsTargetSongResourceUuid());
+            syncSongRelation(song, request.relationsTargetSongResourceUuid());
         }
         validateSongParticipationPresent(vocals);
 
@@ -427,79 +431,521 @@ public class SongService {
         song.update(content, song.getLinks(), publishedAt, songType);
     }
 
-    private List<ResourceName> replaceResourceNames(
+    private List<ResourceName> syncResourceNames(
             Resource resource,
             SongCreateRequest.CanonicalNameCreateRequest canonicalName,
             List<SongCreateRequest.ResourceAliasCreateRequest> aliases) {
-        resourceNameRepository.deleteByResourceId(resource.getId());
-        return saveResourceNames(resource, canonicalName, aliases);
-    }
+        List<ResourceName> existingNames =
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId());
 
-    private List<Acl> replaceAcls(
-            Resource resource, List<SongCreateRequest.ResourceAclCreateRequest> acls) {
-        aclRepository.deleteByResourceId(resource.getId());
-        return saveAcls(resource, acls);
-    }
+        HashSet<String> uniqueNames = new HashSet<>();
+        String normalizedCanonicalName = normalizeCanonicalName(canonicalName.name());
+        List<DesiredResourceName> desiredNames = new ArrayList<>();
+        desiredNames.add(
+                new DesiredResourceName(
+                        canonicalName.langCode(), normalizedCanonicalName, true, 0));
+        uniqueNames.add(canonicalName.langCode().name() + "|" + normalizedCanonicalName);
 
-    private List<SongLyric> replaceSongLyrics(
-            Song song, List<SongCreateRequest.SongLyricCreateRequest> lyrics) {
-        songLyricRepository.deleteBySongId(song.getId());
-        return saveSongLyrics(song, lyrics);
-    }
-
-    private List<SongLink> replaceSongLinks(
-            Song song, List<SongUpdateRequest.SongLinkUpdateRequest> links) {
-        songLinkRepository.deleteBySongId(song.getId());
-        if (links.isEmpty()) {
-            return List.of();
+        for (SongCreateRequest.ResourceAliasCreateRequest alias :
+                (aliases == null
+                        ? List.<SongCreateRequest.ResourceAliasCreateRequest>of()
+                        : aliases)) {
+            if (alias == null) {
+                throw new IllegalArgumentException("aliases contains null item");
+            }
+            String normalizedAlias = normalizeCanonicalName(alias.name());
+            String uniqueKey = alias.langCode().name() + "|" + normalizedAlias;
+            if (!uniqueNames.add(uniqueKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate resource name for language and value");
+            }
+            desiredNames.add(
+                    new DesiredResourceName(
+                            alias.langCode(),
+                            normalizedAlias,
+                            false,
+                            alias.sortOrder() == null ? 0 : alias.sortOrder()));
         }
 
-        List<SongLink> entities =
-                links.stream()
-                        .map(
-                                item -> {
-                                    if (item == null) {
-                                        throw new IllegalArgumentException(
-                                                "links contains null item");
-                                    }
-                                    return SongLink.create(
-                                            song,
-                                            parseSongLinkType(item.type()),
-                                            normalizeLinkUrl(item.url()),
-                                            item.isDeleted());
-                                })
-                        .toList();
+        Map<ResourceNameKey, ResourceName> existingByKey = new HashMap<>();
+        for (ResourceName existing : existingNames) {
+            existingByKey.put(
+                    new ResourceNameKey(existing.getLangCode(), existing.getName()), existing);
+        }
 
-        return songLinkRepository.saveAllAndFlush(entities).stream()
-                .sorted(Comparator.comparing(SongLink::getId))
+        List<ResourceName> toCreate = new ArrayList<>();
+        for (DesiredResourceName desired : desiredNames) {
+            ResourceNameKey key = new ResourceNameKey(desired.langCode(), desired.name());
+            ResourceName existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        ResourceName.create(
+                                resource,
+                                desired.langCode(),
+                                desired.name(),
+                                desired.isPrimary(),
+                                desired.sortOrder()));
+                continue;
+            }
+            existing.updateDisplay(desired.isPrimary(), desired.sortOrder());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            resourceNameRepository.deleteAllInBatch(new ArrayList<>(existingByKey.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            resourceNameRepository.saveAll(toCreate);
+        }
+        resourceNameRepository.flush();
+        return resourceNameRepository
+                .findAllByResourceIdOrderBySortOrderAscIdAsc(resource.getId())
+                .stream()
+                .sorted(
+                        Comparator.comparingInt(ResourceName::getSortOrder)
+                                .thenComparing(ResourceName::getId))
                 .toList();
     }
 
-    private List<SongPv> replaceSongPvs(
-            Song song, List<SongCreateRequest.SongPvCreateRequest> pvs) {
-        List<Long> existingSongPvIds = songPvRepository.findIdsBySongId(song.getId());
-        if (!existingSongPvIds.isEmpty()) {
-            songPvViewRepository.deleteBySongPvIds(existingSongPvIds);
+    private List<Acl> syncAcls(
+            Resource resource, List<SongCreateRequest.ResourceAclCreateRequest> acls) {
+        List<Acl> existingAcls =
+                aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
+        if (acls.isEmpty()) {
+            if (!existingAcls.isEmpty()) {
+                aclRepository.deleteAllInBatch(existingAcls);
+                aclRepository.flush();
+            }
+            return List.of();
         }
-        songPvRepository.deleteBySongId(song.getId());
-        return saveSongPvs(song, pvs);
+
+        Map<AclKey, Acl> existingByKey = new HashMap<>();
+        for (Acl existing : existingAcls) {
+            existingByKey.put(
+                    new AclKey(
+                            existing.getAction(),
+                            existing.getSubjectType(),
+                            existing.getSubjectValue(),
+                            existing.getPriority()),
+                    existing);
+        }
+
+        HashSet<AclKey> uniqueKeys = new HashSet<>();
+        List<Acl> toCreate = new ArrayList<>();
+        for (SongCreateRequest.ResourceAclCreateRequest item : acls) {
+            if (item == null) {
+                throw new IllegalArgumentException("acls contains null item");
+            }
+            AclAction action = parseAclAction(item.action());
+            AclSubjectType subjectType = parseAclSubjectType(item.subjectType());
+            String subjectValue = normalizeAclSubjectValue(subjectType, item.subjectValue());
+            int priority = item.priority() == null ? 100 : item.priority();
+            AclKey key = new AclKey(action, subjectType, subjectValue, priority);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate ACL for action/subject/priority combination");
+            }
+
+            AclEffect effect = parseAclEffect(item.effect());
+            Acl existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        Acl.create(
+                                resource,
+                                action,
+                                subjectType,
+                                subjectValue,
+                                effect,
+                                priority,
+                                item.expiresAt()));
+                continue;
+            }
+            existing.updateRule(effect, item.expiresAt());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            aclRepository.deleteAllInBatch(new ArrayList<>(existingByKey.values()));
+        }
+        if (!toCreate.isEmpty()) {
+            aclRepository.saveAll(toCreate);
+        }
+        aclRepository.flush();
+        return aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
     }
 
-    private List<SongArtist> replaceSongArtists(
+    private List<SongLyric> syncSongLyrics(
+            Song song, List<SongCreateRequest.SongLyricCreateRequest> lyrics) {
+        List<SongLyric> existingLyrics =
+                songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        if (lyrics.isEmpty()) {
+            if (!existingLyrics.isEmpty()) {
+                songLyricRepository.deleteAllInBatch(existingLyrics);
+                songLyricRepository.flush();
+            }
+            return List.of();
+        }
+
+        Map<SongLyricKey, Deque<SongLyric>> existingByKey = new HashMap<>();
+        for (SongLyric existing : existingLyrics) {
+            SongLyricKey key =
+                    new SongLyricKey(
+                            lyricLangCodesKey(existing.getLangCodes()),
+                            existing.isPrimary(),
+                            existing.getSortOrder());
+            existingByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).add(existing);
+        }
+
+        HashSet<SongLyricKey> uniqueKeys = new HashSet<>();
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<SongLyric> toCreate = new ArrayList<>();
+        for (SongCreateRequest.SongLyricCreateRequest item : lyrics) {
+            if (item == null) {
+                throw new IllegalArgumentException("lyrics contains null item");
+            }
+            Set<Language> langCodes = item.langCodes();
+            JsonNode lyricJson = toRequiredJsonNode(item.lyrics(), "lyrics.lyrics");
+            int sortOrder = item.sortOrder() == null ? 0 : item.sortOrder();
+            SongLyricKey key =
+                    new SongLyricKey(lyricLangCodesKey(langCodes), item.isPrimary(), sortOrder);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate lyric for langCodes/isPrimary/sortOrder combination");
+            }
+
+            Deque<SongLyric> candidates = existingByKey.get(key);
+            if (candidates != null && !candidates.isEmpty()) {
+                SongLyric matched = candidates.removeFirst();
+                matched.updateLangCodes(langCodes);
+                matched.updateLyrics(lyricJson);
+                matched.updateDisplay(item.isPrimary(), sortOrder);
+                matchedIds.add(matched.getId());
+                continue;
+            }
+
+            toCreate.add(SongLyric.create(song, langCodes, lyricJson, item.isPrimary(), sortOrder));
+        }
+
+        List<SongLyric> toDelete =
+                existingLyrics.stream().filter(item -> !matchedIds.contains(item.getId())).toList();
+        if (!toDelete.isEmpty()) {
+            songLyricRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            songLyricRepository.saveAll(toCreate);
+        }
+        songLyricRepository.flush();
+        return songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+    }
+
+    private List<SongLink> syncSongLinks(
+            Song song, List<SongUpdateRequest.SongLinkUpdateRequest> links) {
+        List<SongLink> existingLinks = songLinkRepository.findAllBySongIdOrderByIdAsc(song.getId());
+        if (links.isEmpty()) {
+            if (!existingLinks.isEmpty()) {
+                songLinkRepository.deleteAllInBatch(existingLinks);
+                songLinkRepository.flush();
+            }
+            return List.of();
+        }
+
+        Map<SongLinkKey, Deque<SongLink>> existingByKey = new HashMap<>();
+        for (SongLink existing : existingLinks) {
+            SongLinkKey key = new SongLinkKey(existing.getSongLinkType(), existing.getUrl());
+            existingByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).add(existing);
+        }
+
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<SongLink> toCreate = new ArrayList<>();
+        for (SongUpdateRequest.SongLinkUpdateRequest item : links) {
+            if (item == null) {
+                throw new IllegalArgumentException("links contains null item");
+            }
+            SongLinkType type = parseSongLinkType(item.type());
+            String url = normalizeLinkUrl(item.url());
+            SongLinkKey key = new SongLinkKey(type, url);
+            Deque<SongLink> candidates = existingByKey.get(key);
+
+            if (candidates != null && !candidates.isEmpty()) {
+                SongLink matched = candidates.removeFirst();
+                matched.updateDeleted(item.isDeleted());
+                matchedIds.add(matched.getId());
+                continue;
+            }
+
+            toCreate.add(SongLink.create(song, type, url, item.isDeleted()));
+        }
+
+        List<SongLink> toDelete =
+                existingLinks.stream().filter(item -> !matchedIds.contains(item.getId())).toList();
+        if (!toDelete.isEmpty()) {
+            songLinkRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            songLinkRepository.saveAll(toCreate);
+        }
+        songLinkRepository.flush();
+        return songLinkRepository.findAllBySongIdOrderByIdAsc(song.getId());
+    }
+
+    private List<SongPv> syncSongPvs(Song song, List<SongCreateRequest.SongPvCreateRequest> pvs) {
+        List<SongPv> existingPvs =
+                songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        if (pvs.isEmpty()) {
+            List<Long> existingIds = existingPvs.stream().map(SongPv::getId).toList();
+            if (!existingIds.isEmpty()) {
+                songPvViewRepository.deleteBySongPvIds(existingIds);
+                songPvRepository.deleteAllInBatch(existingPvs);
+                songPvRepository.flush();
+            }
+            return List.of();
+        }
+
+        Map<SongPvKey, Deque<SongPv>> existingByKey = new HashMap<>();
+        for (SongPv existing : existingPvs) {
+            SongPvKey key = new SongPvKey(existing.getService(), existing.getVideoKey());
+            existingByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).add(existing);
+        }
+
+        HashSet<SongPvKey> uniqueKeys = new HashSet<>();
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<SongPv> toCreate = new ArrayList<>();
+        for (SongCreateRequest.SongPvCreateRequest item : pvs) {
+            if (item == null) {
+                throw new IllegalArgumentException("pvs contains null item");
+            }
+            SongPvProvider service = parseSongPvProvider(item.service());
+            String videoKey = normalizeRequired(item.videoKey(), "videoKey");
+            SongPvKey key = new SongPvKey(service, videoKey);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException("Duplicate pvs.service + pvs.videoKey");
+            }
+
+            String title = normalizeNullable(item.title());
+            String thumbnailUrl = normalizeNullable(item.thumbnailUrl());
+            String uploaderKey = normalizeNullable(item.uploaderKey());
+            int sortOrder = item.sortOrder() == null ? 0 : item.sortOrder();
+
+            Deque<SongPv> candidates = existingByKey.get(key);
+            if (candidates != null && !candidates.isEmpty()) {
+                SongPv matched = candidates.removeFirst();
+                matched.updateMetadata(
+                        title,
+                        thumbnailUrl,
+                        uploaderKey,
+                        item.durationSeconds(),
+                        item.isOfficial(),
+                        item.publishedAt(),
+                        sortOrder);
+                matchedIds.add(matched.getId());
+                continue;
+            }
+
+            toCreate.add(
+                    SongPv.create(
+                            song,
+                            service,
+                            videoKey,
+                            title,
+                            thumbnailUrl,
+                            uploaderKey,
+                            item.durationSeconds(),
+                            item.isOfficial(),
+                            item.publishedAt(),
+                            sortOrder));
+        }
+
+        List<SongPv> toDelete =
+                existingPvs.stream().filter(item -> !matchedIds.contains(item.getId())).toList();
+        if (!toDelete.isEmpty()) {
+            List<Long> toDeleteIds = toDelete.stream().map(SongPv::getId).toList();
+            songPvViewRepository.deleteBySongPvIds(toDeleteIds);
+            songPvRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            songPvRepository.saveAll(toCreate);
+        }
+        songPvRepository.flush();
+        return songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+    }
+
+    private List<SongArtist> syncSongArtists(
             Song song, List<SongCreateRequest.SongArtistCreateRequest> artists) {
-        songArtistRepository.deleteBySongId(song.getId());
-        return saveSongArtists(song, artists);
+        List<SongArtist> existingArtists =
+                songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        if (artists.isEmpty()) {
+            if (!existingArtists.isEmpty()) {
+                songArtistRepository.deleteAllInBatch(existingArtists);
+                songArtistRepository.flush();
+            }
+            return List.of();
+        }
+
+        validateNoNullItems("artists", artists);
+        List<UUID> artistUuids =
+                artists.stream()
+                        .map(SongCreateRequest.SongArtistCreateRequest::artistResourceUuid)
+                        .distinct()
+                        .toList();
+        Map<UUID, Long> artistIdsByUuid = fetchArtistIdsByResourceUuid(artistUuids);
+
+        Map<SongArtistKey, Deque<SongArtist>> existingByKey = new HashMap<>();
+        for (SongArtist existing : existingArtists) {
+            SongArtistKey key =
+                    new SongArtistKey(
+                            existing.getArtist().getId(), songArtistRolesKey(existing.getRoles()));
+            existingByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).add(existing);
+        }
+
+        HashSet<SongArtistKey> uniqueKeys = new HashSet<>();
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<SongArtist> toCreate = new ArrayList<>();
+        for (SongCreateRequest.SongArtistCreateRequest item : artists) {
+            if (item == null) {
+                throw new IllegalArgumentException("artists contains null item");
+            }
+            Long artistId = artistIdsByUuid.get(item.artistResourceUuid());
+            if (artistId == null) {
+                throw new IllegalArgumentException(
+                        "Unknown artistResourceUuid: " + item.artistResourceUuid());
+            }
+            Set<SongArtistRole> roles = parseSongArtistRoles(item.roles());
+            SongArtistKey key = new SongArtistKey(artistId, songArtistRolesKey(roles));
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate song artist for artistResourceUuid + roles");
+            }
+
+            int sortOrder = item.sortOrder() == null ? 0 : item.sortOrder();
+            Deque<SongArtist> candidates = existingByKey.get(key);
+            if (candidates != null && !candidates.isEmpty()) {
+                SongArtist matched = candidates.removeFirst();
+                matched.updateParticipation(item.isMain(), sortOrder);
+                matchedIds.add(matched.getId());
+                continue;
+            }
+
+            Artist artist = entityManager.getReference(Artist.class, artistId);
+            toCreate.add(SongArtist.create(song, artist, roles, item.isMain(), sortOrder));
+        }
+
+        List<SongArtist> toDelete =
+                existingArtists.stream()
+                        .filter(item -> !matchedIds.contains(item.getId()))
+                        .toList();
+        if (!toDelete.isEmpty()) {
+            songArtistRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            songArtistRepository.saveAll(toCreate);
+        }
+        songArtistRepository.flush();
+        return songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
     }
 
-    private List<SongVocal> replaceSongVocals(
+    private List<SongVocal> syncSongVocals(
             Song song, List<SongCreateRequest.SongVocalCreateRequest> vocals) {
-        songVocalRepository.deleteBySongId(song.getId());
-        return saveSongVocals(song, vocals);
+        List<SongVocal> existingVocals =
+                songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        if (vocals.isEmpty()) {
+            if (!existingVocals.isEmpty()) {
+                songVocalRepository.deleteAllInBatch(existingVocals);
+                songVocalRepository.flush();
+            }
+            return List.of();
+        }
+
+        validateNoNullItems("vocals", vocals);
+        List<UUID> vocalUuids =
+                vocals.stream()
+                        .map(SongCreateRequest.SongVocalCreateRequest::vocalResourceUuid)
+                        .distinct()
+                        .toList();
+        Map<UUID, Long> vocalIdsByUuid = fetchVocalIdsByResourceUuid(vocalUuids);
+
+        Map<SongVocalKey, SongVocal> existingByKey = new HashMap<>();
+        for (SongVocal existing : existingVocals) {
+            existingByKey.put(new SongVocalKey(existing.getVocal().getId()), existing);
+        }
+
+        HashSet<SongVocalKey> uniqueKeys = new HashSet<>();
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<SongVocal> toCreate = new ArrayList<>();
+        for (SongCreateRequest.SongVocalCreateRequest item : vocals) {
+            if (item == null) {
+                throw new IllegalArgumentException("vocals contains null item");
+            }
+            Long vocalId = vocalIdsByUuid.get(item.vocalResourceUuid());
+            if (vocalId == null) {
+                throw new IllegalArgumentException(
+                        "Unknown vocalResourceUuid: " + item.vocalResourceUuid());
+            }
+            SongVocalKey key = new SongVocalKey(vocalId);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate vocalResourceUuid: " + item.vocalResourceUuid());
+            }
+
+            int sortOrder = item.sortOrder() == null ? 0 : item.sortOrder();
+            SongVocal existing = existingByKey.get(key);
+            if (existing != null) {
+                existing.updateParticipation(item.isMain(), sortOrder);
+                matchedIds.add(existing.getId());
+                continue;
+            }
+
+            Vocal vocal = entityManager.getReference(Vocal.class, vocalId);
+            toCreate.add(SongVocal.create(song, vocal, item.isMain(), sortOrder));
+        }
+
+        List<SongVocal> toDelete =
+                existingVocals.stream().filter(item -> !matchedIds.contains(item.getId())).toList();
+        if (!toDelete.isEmpty()) {
+            songVocalRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            songVocalRepository.saveAll(toCreate);
+        }
+        songVocalRepository.flush();
+        return songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
     }
 
-    private void replaceSongRelation(Song song, UUID targetSongResourceUuid) {
-        songRelationRepository.deleteBySourceSongId(song.getId());
-        saveSongRelation(song, targetSongResourceUuid);
+    private void syncSongRelation(Song song, UUID targetSongResourceUuid) {
+        if (targetSongResourceUuid == null) {
+            return;
+        }
+
+        UUID sourceSongResourceUuid = song.getResource().getUuid();
+        if (sourceSongResourceUuid.equals(targetSongResourceUuid)) {
+            throw new IllegalArgumentException("sourceSong and targetSong must be different");
+        }
+
+        Map<UUID, Long> songIdsByUuid = fetchSongIdsByResourceUuid(List.of(targetSongResourceUuid));
+        Long targetSongId = songIdsByUuid.get(targetSongResourceUuid);
+        if (targetSongId == null) {
+            throw new IllegalArgumentException(
+                    "Unknown targetSongResourceUuid: " + targetSongResourceUuid);
+        }
+
+        List<SongRelation> existingRelations =
+                songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
+        List<SongRelation> toDelete = new ArrayList<>();
+        boolean matched = false;
+        for (SongRelation existing : existingRelations) {
+            if (!matched && existing.getTargetSong().getId().equals(targetSongId)) {
+                matched = true;
+                continue;
+            }
+            toDelete.add(existing);
+        }
+
+        if (!toDelete.isEmpty()) {
+            songRelationRepository.deleteAllInBatch(toDelete);
+        }
+        if (!matched) {
+            Song targetSong = entityManager.getReference(Song.class, targetSongId);
+            songRelationRepository.save(SongRelation.create(song, targetSong));
+        }
+        songRelationRepository.flush();
     }
 
     private SongCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
@@ -1004,10 +1450,44 @@ public class SongService {
         if (roles == null || roles.isEmpty()) {
             throw new IllegalArgumentException("artists.roles is required");
         }
-        return roles.stream()
-                .map(role -> parseEnum(role, SongArtistRole.class, "artists.roles"))
-                .collect(java.util.stream.Collectors.toSet());
+        return new LinkedHashSet<>(
+                roles.stream()
+                        .map(role -> parseEnum(role, SongArtistRole.class, "artists.roles"))
+                        .sorted(Comparator.comparing(Enum::name))
+                        .toList());
     }
+
+    private String lyricLangCodesKey(Set<Language> langCodes) {
+        if (langCodes == null || langCodes.isEmpty()) {
+            throw new IllegalArgumentException("lyrics.langCodes is required");
+        }
+        return String.join("|", langCodes.stream().map(Enum::name).sorted().toList());
+    }
+
+    private String songArtistRolesKey(Set<SongArtistRole> roles) {
+        if (roles == null || roles.isEmpty()) {
+            throw new IllegalArgumentException("artists.roles is required");
+        }
+        return String.join("|", roles.stream().map(Enum::name).sorted().toList());
+    }
+
+    private record ResourceNameKey(Language langCode, String name) {}
+
+    private record DesiredResourceName(
+            Language langCode, String name, boolean isPrimary, int sortOrder) {}
+
+    private record AclKey(
+            AclAction action, AclSubjectType subjectType, String subjectValue, int priority) {}
+
+    private record SongLinkKey(SongLinkType songLinkType, String url) {}
+
+    private record SongLyricKey(String langCodesKey, boolean isPrimary, int sortOrder) {}
+
+    private record SongPvKey(SongPvProvider service, String videoKey) {}
+
+    private record SongArtistKey(Long artistId, String rolesKey) {}
+
+    private record SongVocalKey(Long vocalId) {}
 
     private <E extends Enum<E>> E parseEnum(String rawValue, Class<E> enumClass, String fieldName) {
         if (rawValue == null || rawValue.isBlank()) {

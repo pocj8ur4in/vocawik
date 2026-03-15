@@ -114,6 +114,20 @@ public class SongLyric extends BaseEntity {
         this.lyrics = lyrics;
     }
 
+    /**
+     * Updates display flags.
+     *
+     * @param isPrimary updated primary flag
+     * @param sortOrder updated sort order
+     */
+    public void updateDisplay(boolean isPrimary, int sortOrder) {
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.isPrimary = isPrimary;
+        this.sortOrder = sortOrder;
+    }
+
     private static String[] normalizeLangCodes(Set<Language> langCodes) {
         if (langCodes == null || langCodes.isEmpty()) {
             throw new IllegalArgumentException("langCodes is required");
