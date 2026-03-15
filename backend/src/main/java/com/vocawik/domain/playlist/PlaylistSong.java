@@ -65,4 +65,16 @@ public class PlaylistSong extends BaseEntity {
         playlistSong.sortOrder = sortOrder;
         return playlistSong;
     }
+
+    /**
+     * Updates playlist order.
+     *
+     * @param sortOrder updated sort order
+     */
+    public void updateSortOrder(int sortOrder) {
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.sortOrder = sortOrder;
+    }
 }
