@@ -26,7 +26,10 @@ import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongElementResponse;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongPvResolveRequest;
+import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
+import com.vocawik.infrastructure.pv.model.DetectedPv;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
@@ -42,6 +45,9 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.history.ResourceHistoryService;
+import com.vocawik.service.pv.client.PvMetaApiClient;
+import com.vocawik.service.pv.client.PvMetaApiClientResolver;
+import com.vocawik.service.pv.detector.PvUrlDetector;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -84,6 +90,8 @@ public class SongService {
     private final ResourceHistoryService resourceHistoryService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
+    private final PvUrlDetector pvUrlDetector;
+    private final PvMetaApiClientResolver pvMetaApiClientResolver;
 
     /**
      * Searches songs with optional filters.
@@ -129,6 +137,49 @@ public class SongService {
 
         return new SongListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    /**
+     * Resolves song PV metadata from URL.
+     *
+     * @param request pv resolve request
+     * @return resolved pv metadata
+     */
+    public SongPvResolveResponse resolveSongPv(SongPvResolveRequest request) {
+        String url = request == null ? null : normalizeNullable(request.url());
+        if (url == null) {
+            throw new IllegalArgumentException("url is required");
+        }
+        DetectedPv detectedPv =
+                pvUrlDetector
+                        .detect(url)
+                        .orElse(new DetectedPv(SongPvProvider.OTHER, "unknown", url));
+        return pvMetaApiClientResolver
+                .resolve(detectedPv.provider())
+                .map(client -> toResolveResponse(detectedPv, client.fetch(detectedPv)))
+                .orElseGet(() -> toFallbackResponse(detectedPv));
+    }
+
+    private SongPvResolveResponse toResolveResponse(
+            DetectedPv detectedPv, PvMetaApiClient.PvMetaResult metaResult) {
+        String videoKey = normalizeNullable(metaResult.videoKey());
+        if (videoKey == null) {
+            videoKey = detectedPv.videoKey();
+        }
+
+        return new SongPvResolveResponse(
+                detectedPv.provider().name(),
+                videoKey,
+                normalizeNullable(metaResult.title()),
+                normalizeNullable(metaResult.thumbnailUrl()),
+                normalizeNullable(metaResult.uploaderKey()),
+                metaResult.durationSeconds(),
+                normalizeNullable(metaResult.publishedAt()));
+    }
+
+    private SongPvResolveResponse toFallbackResponse(DetectedPv detectedPv) {
+        return new SongPvResolveResponse(
+                detectedPv.provider().name(), detectedPv.videoKey(), null, null, null, null, null);
     }
 
     /**
