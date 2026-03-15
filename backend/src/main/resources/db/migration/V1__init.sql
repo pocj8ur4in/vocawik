@@ -269,6 +269,7 @@ CREATE TABLE song_links (
     song_id BIGINT NOT NULL,
     song_link_type VARCHAR(20) NOT NULL,
     url TEXT NOT NULL,
+    content TEXT,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_song_links_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
     CONSTRAINT chk_song_links_song_link_type CHECK (song_link_type IN ('VOCADB', 'OTHER')),
@@ -390,6 +391,7 @@ CREATE TABLE artist_links (
     artist_id BIGINT NOT NULL,
     artist_link_type VARCHAR(20) NOT NULL,
     url TEXT NOT NULL,
+    content TEXT,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_artist_links_artist FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
     CONSTRAINT chk_artist_links_artist_link_type CHECK (
@@ -456,6 +458,7 @@ CREATE TABLE vocal_links (
     vocal_id BIGINT NOT NULL,
     vocal_link_type VARCHAR(20) NOT NULL,
     url TEXT NOT NULL,
+    content TEXT,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_vocal_links_vocal FOREIGN KEY (vocal_id) REFERENCES vocals (id) ON DELETE RESTRICT,
     CONSTRAINT chk_vocal_links_vocal_link_type CHECK (vocal_link_type IN ('VOCADB', 'OTHER')),

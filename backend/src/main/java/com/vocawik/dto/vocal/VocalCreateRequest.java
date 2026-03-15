@@ -37,7 +37,10 @@ public record VocalCreateRequest(
 
     /** External link input. */
     public record VocalLinkCreateRequest(
-            @NotBlank String type, @NotBlank @Size(max = 2048) String url, boolean isDeleted) {}
+            @NotBlank String type,
+            @NotBlank @Size(max = 2048) String url,
+            String content,
+            boolean isDeleted) {}
 
     /** ACL rule input. */
     public record ResourceAclCreateRequest(

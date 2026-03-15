@@ -36,7 +36,7 @@ public record ArtistResourceDetailResponse(
     }
 
     /** Link item for the artist detail payload. */
-    public record ArtistLink(String type, String url, boolean isDeleted) {}
+    public record ArtistLink(String type, String url, String content, boolean isDeleted) {}
 
     /** Song participation item for the artist detail payload. */
     public record ArtistSong(

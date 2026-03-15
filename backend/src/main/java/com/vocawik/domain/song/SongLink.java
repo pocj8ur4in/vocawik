@@ -31,6 +31,9 @@ public class SongLink extends BaseEntity {
     @Column(nullable = false)
     private String url;
 
+    @Column(name = "content")
+    private String content;
+
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted;
 
@@ -40,11 +43,12 @@ public class SongLink extends BaseEntity {
      * @param song owner song
      * @param songLinkType link type
      * @param url external link url
+     * @param content link note/description
      * @param isDeleted deletion flag
      * @return created song link
      */
     public static SongLink create(
-            Song song, SongLinkType songLinkType, String url, boolean isDeleted) {
+            Song song, SongLinkType songLinkType, String url, String content, boolean isDeleted) {
         if (song == null) {
             throw new IllegalArgumentException("song is required");
         }
@@ -59,6 +63,7 @@ public class SongLink extends BaseEntity {
         songLink.song = song;
         songLink.songLinkType = songLinkType;
         songLink.url = url.trim();
+        songLink.content = content;
         songLink.isDeleted = isDeleted;
         return songLink;
     }
@@ -74,6 +79,17 @@ public class SongLink extends BaseEntity {
      * @param isDeleted updated deleted flag
      */
     public void updateDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    /**
+     * Updates content and deleted flag.
+     *
+     * @param content updated link content
+     * @param isDeleted updated deleted flag
+     */
+    public void update(String content, boolean isDeleted) {
+        this.content = content;
         this.isDeleted = isDeleted;
     }
 }

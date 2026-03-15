@@ -31,6 +31,9 @@ public class VocalLink extends BaseEntity {
     @Column(nullable = false)
     private String url;
 
+    @Column(name = "content")
+    private String content;
+
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted;
 
@@ -40,11 +43,16 @@ public class VocalLink extends BaseEntity {
      * @param vocal owner vocal
      * @param vocalLinkType link type
      * @param url external link url
+     * @param content link note/description
      * @param isDeleted deletion flag
      * @return created vocal link
      */
     public static VocalLink create(
-            Vocal vocal, VocalLinkType vocalLinkType, String url, boolean isDeleted) {
+            Vocal vocal,
+            VocalLinkType vocalLinkType,
+            String url,
+            String content,
+            boolean isDeleted) {
         if (vocal == null) {
             throw new IllegalArgumentException("vocal is required");
         }
@@ -59,6 +67,7 @@ public class VocalLink extends BaseEntity {
         vocalLink.vocal = vocal;
         vocalLink.vocalLinkType = vocalLinkType;
         vocalLink.url = url.trim();
+        vocalLink.content = content;
         vocalLink.isDeleted = isDeleted;
         return vocalLink;
     }
@@ -74,6 +83,17 @@ public class VocalLink extends BaseEntity {
      * @param isDeleted updated deleted flag
      */
     public void updateDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    /**
+     * Updates content and deleted flag.
+     *
+     * @param content updated link content
+     * @param isDeleted updated deleted flag
+     */
+    public void update(String content, boolean isDeleted) {
+        this.content = content;
         this.isDeleted = isDeleted;
     }
 }
