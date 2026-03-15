@@ -265,7 +265,7 @@ public class SongService {
         saveSongPvs(song, request.pvs());
         saveSongArtists(song, request.artists());
         List<SongVocal> vocals = saveSongVocals(song, request.vocals());
-        saveSongRelations(song, request.relations());
+        saveSongRelation(song, request.relationsTargetSongResourceUuid());
         validateSongParticipationPresent(vocals);
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(song, resource));
@@ -317,8 +317,8 @@ public class SongService {
                 request.vocals() == null
                         ? songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
                         : replaceSongVocals(song, toCreateVocals(request.vocals()));
-        if (request.relations() != null) {
-            replaceSongRelations(song, toCreateRelations(request.relations()));
+        if (request.relationsTargetSongResourceUuid() != null) {
+            replaceSongRelation(song, request.relationsTargetSongResourceUuid());
         }
         validateSongParticipationPresent(vocals);
 
@@ -472,10 +472,9 @@ public class SongService {
         return saveSongVocals(song, vocals);
     }
 
-    private List<SongRelation> replaceSongRelations(
-            Song song, List<SongCreateRequest.SongRelationCreateRequest> relations) {
+    private void replaceSongRelation(Song song, UUID targetSongResourceUuid) {
         songRelationRepository.deleteBySourceSongId(song.getId());
-        return saveSongRelations(song, relations);
+        saveSongRelation(song, targetSongResourceUuid);
     }
 
     private SongCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
@@ -579,14 +578,25 @@ public class SongService {
                 .toList();
     }
 
-    private List<SongCreateRequest.SongRelationCreateRequest> toCreateRelations(
-            List<SongUpdateRequest.SongRelationUpdateRequest> relations) {
-        return relations.stream()
-                .map(
-                        item ->
-                                new SongCreateRequest.SongRelationCreateRequest(
-                                        item.targetSongResourceUuid()))
-                .toList();
+    private void saveSongRelation(Song song, UUID targetSongResourceUuid) {
+        if (targetSongResourceUuid == null) {
+            return;
+        }
+
+        UUID sourceSongResourceUuid = song.getResource().getUuid();
+        if (sourceSongResourceUuid.equals(targetSongResourceUuid)) {
+            throw new IllegalArgumentException("sourceSong and targetSong must be different");
+        }
+
+        Map<UUID, Long> songIdsByUuid = fetchSongIdsByResourceUuid(List.of(targetSongResourceUuid));
+        Long targetSongId = songIdsByUuid.get(targetSongResourceUuid);
+        if (targetSongId == null) {
+            throw new IllegalArgumentException(
+                    "Unknown targetSongResourceUuid: " + targetSongResourceUuid);
+        }
+
+        Song targetSong = entityManager.getReference(Song.class, targetSongId);
+        songRelationRepository.saveAndFlush(SongRelation.create(song, targetSong));
     }
 
     private List<ResourceName> saveResourceNames(
@@ -843,59 +853,6 @@ public class SongService {
                         Comparator.comparingInt(SongVocal::getSortOrder)
                                 .thenComparing(SongVocal::getId))
                 .toList();
-    }
-
-    private List<SongRelation> saveSongRelations(
-            Song song, List<SongCreateRequest.SongRelationCreateRequest> relations) {
-        if (relations == null || relations.isEmpty()) {
-            return List.of();
-        }
-        validateNoNullItems("relations", relations);
-
-        HashSet<UUID> uniqueTargetSongUuids = new HashSet<>();
-        for (SongCreateRequest.SongRelationCreateRequest relation : relations) {
-            UUID targetSongResourceUuid = relation.targetSongResourceUuid();
-            if (!uniqueTargetSongUuids.add(targetSongResourceUuid)) {
-                throw new IllegalArgumentException(
-                        "Duplicate targetSongResourceUuid: " + targetSongResourceUuid);
-            }
-        }
-
-        List<UUID> relationUuids =
-                relations.stream()
-                        .map(SongCreateRequest.SongRelationCreateRequest::targetSongResourceUuid)
-                        .distinct()
-                        .toList();
-        Map<UUID, Long> songIdsByUuid = fetchSongIdsByResourceUuid(relationUuids);
-        UUID sourceSongResourceUuid = song.getResource().getUuid();
-
-        List<SongRelation> entities =
-                relations.stream()
-                        .map(
-                                item -> {
-                                    if (item == null) {
-                                        throw new IllegalArgumentException(
-                                                "relations contains null item");
-                                    }
-                                    if (sourceSongResourceUuid.equals(
-                                            item.targetSongResourceUuid())) {
-                                        throw new IllegalArgumentException(
-                                                "sourceSong and targetSong must be different");
-                                    }
-                                    Long targetSongId =
-                                            songIdsByUuid.get(item.targetSongResourceUuid());
-                                    if (targetSongId == null) {
-                                        throw new IllegalArgumentException(
-                                                "Unknown targetSongResourceUuid: "
-                                                        + item.targetSongResourceUuid());
-                                    }
-                                    Song targetSong =
-                                            entityManager.getReference(Song.class, targetSongId);
-                                    return SongRelation.create(song, targetSong);
-                                })
-                        .toList();
-
-        return songRelationRepository.saveAllAndFlush(entities);
     }
 
     private Map<UUID, Long> fetchArtistIdsByResourceUuid(List<UUID> resourceUuids) {
