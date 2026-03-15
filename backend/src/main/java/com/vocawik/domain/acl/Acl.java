@@ -77,4 +77,18 @@ public class Acl extends BaseEntity {
         acl.expiresAt = expiresAt;
         return acl;
     }
+
+    /**
+     * Updates mutable rule fields.
+     *
+     * @param effect updated effect
+     * @param expiresAt updated expiration time
+     */
+    public void updateRule(AclEffect effect, LocalDateTime expiresAt) {
+        if (effect == null) {
+            throw new IllegalArgumentException("effect is required");
+        }
+        this.effect = effect;
+        this.expiresAt = expiresAt;
+    }
 }
