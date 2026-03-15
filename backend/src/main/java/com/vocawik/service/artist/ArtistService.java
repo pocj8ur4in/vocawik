@@ -11,6 +11,8 @@ import com.vocawik.domain.acl.AclEffect;
 import com.vocawik.domain.acl.AclSubjectType;
 import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.artist.ArtistGroup;
+import com.vocawik.domain.artist.ArtistLink;
+import com.vocawik.domain.artist.ArtistLinkType;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
@@ -23,6 +25,7 @@ import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistCriteria;
 import com.vocawik.repository.artist.ArtistGroupRepository;
+import com.vocawik.repository.artist.ArtistLinkRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.resource.ResourceNameRepository;
@@ -40,6 +43,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -61,6 +65,7 @@ public class ArtistService {
 
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
+    private final ArtistLinkRepository artistLinkRepository;
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
@@ -76,21 +81,19 @@ public class ArtistService {
      */
     @Transactional
     public UUID create(ArtistCreateRequest request) {
-        JsonNode links = toJsonNode(request.links());
-        validateLinks(links);
-
         ArtistCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
         Artist artist =
                 Artist.create(
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
-                        links);
+                        null);
 
         Resource resource = resourceRepository.save(artist.getResource());
         artistRepository.saveAndFlush(artist);
 
         saveResourceNames(resource, canonicalName, request.aliases());
+        saveArtistLinks(artist, request.links());
         saveAcls(resource, request.acls());
         saveArtistMemberships(artist, request.members());
 
@@ -129,6 +132,9 @@ public class ArtistService {
         }
         if (request.acls() != null) {
             replaceAcls(resource, toCreateAcls(request.acls()));
+        }
+        if (request.links() != null) {
+            replaceArtistLinks(artist, request.links());
         }
         if (request.members() != null) {
             replaceArtistMemberships(artist, toCreateMembers(request.members()));
@@ -255,12 +261,6 @@ public class ArtistService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private void validateLinks(JsonNode links) {
-        if (links != null && !links.isArray()) {
-            throw new IllegalArgumentException("links must be a JSON array");
-        }
-    }
-
     private void updateArtistFields(Artist artist, Resource resource, ArtistUpdateRequest request) {
         String canonicalName =
                 request.canonicalName() == null
@@ -274,12 +274,10 @@ public class ArtistService {
                 request.content() == null
                         ? artist.getContent()
                         : normalizeNullable(request.content());
-        JsonNode links = request.links() == null ? artist.getLinks() : toJsonNode(request.links());
-        validateLinks(links);
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        artist.update(content, links);
+        artist.update(content, artist.getLinks());
     }
 
     private List<UUID> normalizeUuids(List<UUID> uuids) {
@@ -338,6 +336,33 @@ public class ArtistService {
                 .sorted(
                         Comparator.comparingInt(ResourceName::getSortOrder)
                                 .thenComparing(ResourceName::getId))
+                .toList();
+    }
+
+    private List<ArtistLink> saveArtistLinks(
+            Artist artist, List<ArtistCreateRequest.ArtistLinkCreateRequest> links) {
+        if (links == null || links.isEmpty()) {
+            return List.of();
+        }
+
+        List<ArtistLink> entities =
+                links.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "links contains null item");
+                                    }
+                                    return ArtistLink.create(
+                                            artist,
+                                            parseArtistLinkType(item.type()),
+                                            normalizeLinkUrl(item.url()),
+                                            item.isDeleted());
+                                })
+                        .toList();
+
+        return artistLinkRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparing(ArtistLink::getId))
                 .toList();
     }
 
@@ -451,6 +476,34 @@ public class ArtistService {
             Resource resource, List<ArtistCreateRequest.ResourceAclCreateRequest> acls) {
         aclRepository.deleteByResourceId(resource.getId());
         return saveAcls(resource, acls);
+    }
+
+    private List<ArtistLink> replaceArtistLinks(
+            Artist artist, List<ArtistUpdateRequest.ArtistLinkUpdateRequest> links) {
+        artistLinkRepository.deleteByArtistId(artist.getId());
+        if (links.isEmpty()) {
+            return List.of();
+        }
+
+        List<ArtistLink> entities =
+                links.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "links contains null item");
+                                    }
+                                    return ArtistLink.create(
+                                            artist,
+                                            parseArtistLinkType(item.type()),
+                                            normalizeLinkUrl(item.url()),
+                                            item.isDeleted());
+                                })
+                        .toList();
+
+        return artistLinkRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparing(ArtistLink::getId))
+                .toList();
     }
 
     private List<ArtistGroup> replaceArtistMemberships(
@@ -636,11 +689,34 @@ public class ArtistService {
         return parseEnum(value, AclEffect.class, "acls.effect");
     }
 
+    private ArtistLinkType parseArtistLinkType(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("links.type is required");
+        }
+        // Backward-compatible alias for client typo.
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if ("SOUNDCLO".equals(normalized)) {
+            normalized = ArtistLinkType.SOUNDCLOUD.name();
+        }
+        try {
+            return ArtistLinkType.valueOf(normalized);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("links.type is invalid: " + value);
+        }
+    }
+
+    private String normalizeLinkUrl(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("links.url is required");
+        }
+        return url.trim();
+    }
+
     private <E extends Enum<E>> E parseEnum(String rawValue, Class<E> enumClass, String fieldName) {
         if (rawValue == null || rawValue.isBlank()) {
             throw new IllegalArgumentException(fieldName + " is required");
         }
-        String normalized = rawValue.trim().toUpperCase(java.util.Locale.ROOT);
+        String normalized = rawValue.trim().toUpperCase(Locale.ROOT);
         try {
             return Enum.valueOf(enumClass, normalized);
         } catch (IllegalArgumentException e) {
@@ -675,9 +751,7 @@ public class ArtistService {
         data.put("viewCount", resource.getViewCount());
         putNullableText(data, "thumbnailUrl", resource.getThumbnailUrl());
         putNullableText(data, "content", artist.getContent());
-        data.set(
-                "links",
-                artist.getLinks() == null ? objectMapper.createArrayNode() : artist.getLinks());
+        data.set("links", buildArtistLinksSnapshot(artist.getId()));
         putNullableText(data, "createdAt", formatDateTime(resource.getCreatedAt()));
         putNullableText(data, "updatedAt", formatDateTime(resource.getUpdatedAt()));
         data.set("names", buildNamesProjection(names));
@@ -807,11 +881,23 @@ public class ArtistService {
         } else {
             snapshot.put("content", artist.getContent());
         }
-        snapshot.set("links", toSnapshotJson(artist.getLinks()));
+        snapshot.set("links", buildArtistLinksSnapshot(artist.getId()));
         snapshot.set("names", buildNamesSnapshot(resource));
         snapshot.set("acls", buildAclsSnapshot(resource));
         snapshot.set("members", buildMembersSnapshot(artist));
         return snapshot;
+    }
+
+    private ArrayNode buildArtistLinksSnapshot(Long artistId) {
+        ArrayNode links = objectMapper.createArrayNode();
+        for (ArtistLink item : artistLinkRepository.findAllByArtistIdOrderByIdAsc(artistId)) {
+            ObjectNode link = objectMapper.createObjectNode();
+            link.put("type", item.getArtistLinkType().name());
+            link.put("url", item.getUrl());
+            link.put("isDeleted", item.isDeleted());
+            links.add(link);
+        }
+        return links;
     }
 
     private ArrayNode buildNamesSnapshot(Resource resource) {

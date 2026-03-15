@@ -15,13 +15,14 @@ public record ArtistUpdateRequest(
         @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
-        Object links,
+        @Valid List<ArtistLinkUpdateRequest> links,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
         @Valid List<ArtistMemberUpdateRequest> members) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public ArtistUpdateRequest {
+        links = links == null ? null : List.copyOf(links);
         aliases = aliases == null ? null : List.copyOf(aliases);
         acls = acls == null ? null : List.copyOf(acls);
         members = members == null ? null : List.copyOf(members);
@@ -36,6 +37,10 @@ public record ArtistUpdateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
             @Min(0) Integer sortOrder) {}
+
+    /** External link input. */
+    public record ArtistLinkUpdateRequest(
+            @NotBlank String type, @NotBlank @Size(max = 2048) String url, boolean isDeleted) {}
 
     /** ACL rule input. */
     public record ResourceAclUpdateRequest(
