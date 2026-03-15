@@ -413,6 +413,21 @@ CREATE TABLE vocals (
     CONSTRAINT chk_vocals_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
 );
 
+-- vocal_links
+CREATE TABLE vocal_links (
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    vocal_id BIGINT NOT NULL,
+    vocal_link_type VARCHAR(20) NOT NULL,
+    url TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_vocal_links_vocal FOREIGN KEY (vocal_id) REFERENCES vocals (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_vocal_links_vocal_link_type CHECK (vocal_link_type IN ('VOCADB', 'OTHER')),
+    CONSTRAINT chk_vocal_links_url_not_blank CHECK (BTRIM(url) <> '')
+);
+
 -- song_vocals
 CREATE TABLE song_vocals (
     id BIGSERIAL PRIMARY KEY,

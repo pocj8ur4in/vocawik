@@ -14,12 +14,13 @@ public record VocalUpdateRequest(
         @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
-        Object links,
+        @Valid List<VocalLinkUpdateRequest> links,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public VocalUpdateRequest {
+        links = links == null ? null : List.copyOf(links);
         aliases = aliases == null ? null : List.copyOf(aliases);
         acls = acls == null ? null : List.copyOf(acls);
     }
@@ -33,6 +34,10 @@ public record VocalUpdateRequest(
             @NotNull Language langCode,
             @NotBlank @Size(max = 255) String name,
             @Min(0) Integer sortOrder) {}
+
+    /** External link input. */
+    public record VocalLinkUpdateRequest(
+            @NotBlank String type, @NotBlank @Size(max = 2048) String url, boolean isDeleted) {}
 
     /** ACL rule input. */
     public record ResourceAclUpdateRequest(

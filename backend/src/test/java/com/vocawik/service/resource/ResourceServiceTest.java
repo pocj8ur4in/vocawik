@@ -26,6 +26,7 @@ import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
+import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.history.ResourceHistoryService;
 import java.util.ArrayList;
@@ -60,6 +61,7 @@ class ResourceServiceTest {
                         mock(ArtistRepository.class),
                         mock(ArtistGroupRepository.class),
                         mock(VocalRepository.class),
+                        mock(VocalLinkRepository.class),
                         mock(ResourceHistoryService.class),
                         mock(ResourcePopularityService.class),
                         new ObjectMapper());

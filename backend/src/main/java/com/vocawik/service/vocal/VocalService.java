@@ -13,6 +13,8 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.vocal.Vocal;
+import com.vocawik.domain.vocal.VocalLink;
+import com.vocawik.domain.vocal.VocalLinkType;
 import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalElementResponse;
 import com.vocawik.dto.vocal.VocalListResponse;
@@ -23,6 +25,7 @@ import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.vocal.VocalCriteria;
+import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
@@ -35,6 +38,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -56,6 +60,7 @@ public class VocalService {
     private final VocalRepository vocalRepository;
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
+    private final VocalLinkRepository vocalLinkRepository;
     private final AclRepository aclRepository;
     private final ResourceHistoryService resourceHistoryService;
     private final ObjectMapper objectMapper;
@@ -68,21 +73,19 @@ public class VocalService {
      */
     @Transactional
     public UUID create(VocalCreateRequest request) {
-        JsonNode links = toJsonNode(request.links());
-        validateLinks(links);
-
         VocalCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
         Vocal vocal =
                 Vocal.create(
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
-                        links);
+                        null);
 
         Resource resource = resourceRepository.save(vocal.getResource());
         vocalRepository.save(vocal);
 
         saveResourceNames(resource, canonicalName, request.aliases());
+        saveVocalLinks(vocal, request.links());
         saveAcls(resource, request.acls());
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(vocal, resource));
@@ -120,6 +123,9 @@ public class VocalService {
         }
         if (request.acls() != null) {
             replaceAcls(resource, toCreateAcls(request.acls()));
+        }
+        if (request.links() != null) {
+            replaceVocalLinks(vocal, request.links());
         }
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(vocal, resource));
@@ -228,12 +234,6 @@ public class VocalService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private void validateLinks(JsonNode links) {
-        if (links != null && !links.isArray()) {
-            throw new IllegalArgumentException("links must be a JSON array");
-        }
-    }
-
     private List<UUID> normalizeUuids(List<UUID> uuids) {
         if (uuids == null || uuids.isEmpty()) {
             return List.of();
@@ -293,6 +293,61 @@ public class VocalService {
                 .toList();
     }
 
+    private List<VocalLink> saveVocalLinks(
+            Vocal vocal, List<VocalCreateRequest.VocalLinkCreateRequest> links) {
+        if (links == null || links.isEmpty()) {
+            return List.of();
+        }
+
+        List<VocalLink> entities =
+                links.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "links contains null item");
+                                    }
+                                    return VocalLink.create(
+                                            vocal,
+                                            parseVocalLinkType(item.type()),
+                                            normalizeLinkUrl(item.url()),
+                                            item.isDeleted());
+                                })
+                        .toList();
+
+        return vocalLinkRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparing(VocalLink::getId))
+                .toList();
+    }
+
+    private List<VocalLink> replaceVocalLinks(
+            Vocal vocal, List<VocalUpdateRequest.VocalLinkUpdateRequest> links) {
+        vocalLinkRepository.deleteByVocalId(vocal.getId());
+        if (links.isEmpty()) {
+            return List.of();
+        }
+
+        List<VocalLink> entities =
+                links.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "links contains null item");
+                                    }
+                                    return VocalLink.create(
+                                            vocal,
+                                            parseVocalLinkType(item.type()),
+                                            normalizeLinkUrl(item.url()),
+                                            item.isDeleted());
+                                })
+                        .toList();
+
+        return vocalLinkRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparing(VocalLink::getId))
+                .toList();
+    }
+
     private List<Acl> saveAcls(
             Resource resource, List<VocalCreateRequest.ResourceAclCreateRequest> acls) {
         if (acls == null || acls.isEmpty()) {
@@ -341,12 +396,10 @@ public class VocalService {
                 request.content() == null
                         ? vocal.getContent()
                         : normalizeNullable(request.content());
-        JsonNode links = request.links() == null ? vocal.getLinks() : toJsonNode(request.links());
-        validateLinks(links);
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        vocal.update(content, links);
+        vocal.update(content, vocal.getLinks());
     }
 
     private List<ResourceName> replaceResourceNames(
@@ -475,23 +528,27 @@ public class VocalService {
         return parseEnum(value, AclEffect.class, "acls.effect");
     }
 
+    private VocalLinkType parseVocalLinkType(String value) {
+        return parseEnum(value, VocalLinkType.class, "links.type");
+    }
+
+    private String normalizeLinkUrl(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("links.url is required");
+        }
+        return url.trim();
+    }
+
     private <E extends Enum<E>> E parseEnum(String rawValue, Class<E> enumClass, String fieldName) {
         if (rawValue == null || rawValue.isBlank()) {
             throw new IllegalArgumentException(fieldName + " is required");
         }
-        String normalized = rawValue.trim().toUpperCase(java.util.Locale.ROOT);
+        String normalized = rawValue.trim().toUpperCase(Locale.ROOT);
         try {
             return Enum.valueOf(enumClass, normalized);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(fieldName + " is invalid: " + rawValue);
         }
-    }
-
-    private JsonNode toJsonNode(Object value) {
-        if (value == null) {
-            return null;
-        }
-        return objectMapper.valueToTree(value);
     }
 
     private JsonNode buildVocalProjection(
@@ -503,9 +560,7 @@ public class VocalService {
         data.put("viewCount", resource.getViewCount());
         putNullableText(data, "thumbnailUrl", resource.getThumbnailUrl());
         putNullableText(data, "content", vocal.getContent());
-        data.set(
-                "links",
-                vocal.getLinks() == null ? objectMapper.createArrayNode() : vocal.getLinks());
+        data.set("links", buildVocalLinksSnapshot(vocal.getId()));
         putNullableText(data, "createdAt", formatDateTime(resource.getCreatedAt()));
         putNullableText(data, "updatedAt", formatDateTime(resource.getUpdatedAt()));
         data.set("names", buildNamesProjection(names));
@@ -585,10 +640,22 @@ public class VocalService {
         } else {
             snapshot.put("content", vocal.getContent());
         }
-        snapshot.set("links", toSnapshotJson(vocal.getLinks()));
+        snapshot.set("links", buildVocalLinksSnapshot(vocal.getId()));
         snapshot.set("names", buildNamesSnapshot(resource));
         snapshot.set("acls", buildAclsSnapshot(resource));
         return snapshot;
+    }
+
+    private ArrayNode buildVocalLinksSnapshot(Long vocalId) {
+        ArrayNode links = objectMapper.createArrayNode();
+        for (VocalLink item : vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocalId)) {
+            ObjectNode link = objectMapper.createObjectNode();
+            link.put("type", item.getVocalLinkType().name());
+            link.put("url", item.getUrl());
+            link.put("isDeleted", item.isDeleted());
+            links.add(link);
+        }
+        return links;
     }
 
     private ArrayNode buildNamesSnapshot(Resource resource) {
@@ -624,9 +691,5 @@ public class VocalService {
             acls.add(acl);
         }
         return acls;
-    }
-
-    private JsonNode toSnapshotJson(JsonNode value) {
-        return value == null ? objectMapper.nullNode() : value.deepCopy();
     }
 }
