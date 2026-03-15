@@ -32,13 +32,17 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -119,13 +123,13 @@ public class VocalService {
                     request.aliases() == null
                             ? toCreateAliasesFromResourceNames(loadAliases(resource))
                             : toCreateAliases(request.aliases());
-            replaceResourceNames(resource, canonicalName, aliases);
+            syncResourceNames(resource, canonicalName, aliases);
         }
         if (request.acls() != null) {
-            replaceAcls(resource, toCreateAcls(request.acls()));
+            syncAcls(resource, toCreateAcls(request.acls()));
         }
         if (request.links() != null) {
-            replaceVocalLinks(vocal, request.links());
+            syncVocalLinks(vocal, request.links());
         }
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(vocal, resource));
@@ -320,32 +324,55 @@ public class VocalService {
                 .toList();
     }
 
-    private List<VocalLink> replaceVocalLinks(
+    private List<VocalLink> syncVocalLinks(
             Vocal vocal, List<VocalUpdateRequest.VocalLinkUpdateRequest> links) {
-        vocalLinkRepository.deleteByVocalId(vocal.getId());
+        List<VocalLink> existingLinks =
+                vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
         if (links.isEmpty()) {
+            if (!existingLinks.isEmpty()) {
+                vocalLinkRepository.deleteAllInBatch(existingLinks);
+                vocalLinkRepository.flush();
+            }
             return List.of();
         }
 
-        List<VocalLink> entities =
-                links.stream()
-                        .map(
-                                item -> {
-                                    if (item == null) {
-                                        throw new IllegalArgumentException(
-                                                "links contains null item");
-                                    }
-                                    return VocalLink.create(
-                                            vocal,
-                                            parseVocalLinkType(item.type()),
-                                            normalizeLinkUrl(item.url()),
-                                            item.isDeleted());
-                                })
-                        .toList();
+        Map<VocalLinkKey, Deque<VocalLink>> existingByKey = new HashMap<>();
+        for (VocalLink existing : existingLinks) {
+            VocalLinkKey key = new VocalLinkKey(existing.getVocalLinkType(), existing.getUrl());
+            existingByKey.computeIfAbsent(key, ignored -> new ArrayDeque<>()).add(existing);
+        }
 
-        return vocalLinkRepository.saveAllAndFlush(entities).stream()
-                .sorted(Comparator.comparing(VocalLink::getId))
-                .toList();
+        HashSet<Long> matchedIds = new HashSet<>();
+        List<VocalLink> toCreate = new ArrayList<>();
+        for (VocalUpdateRequest.VocalLinkUpdateRequest item : links) {
+            if (item == null) {
+                throw new IllegalArgumentException("links contains null item");
+            }
+            VocalLinkType type = parseVocalLinkType(item.type());
+            String url = normalizeLinkUrl(item.url());
+            VocalLinkKey key = new VocalLinkKey(type, url);
+            Deque<VocalLink> candidates = existingByKey.get(key);
+
+            if (candidates != null && !candidates.isEmpty()) {
+                VocalLink matched = candidates.removeFirst();
+                matched.updateDeleted(item.isDeleted());
+                matchedIds.add(matched.getId());
+                continue;
+            }
+
+            toCreate.add(VocalLink.create(vocal, type, url, item.isDeleted()));
+        }
+
+        List<VocalLink> toDelete =
+                existingLinks.stream().filter(item -> !matchedIds.contains(item.getId())).toList();
+        if (!toDelete.isEmpty()) {
+            vocalLinkRepository.deleteAllInBatch(toDelete);
+        }
+        if (!toCreate.isEmpty()) {
+            vocalLinkRepository.saveAll(toCreate);
+        }
+        vocalLinkRepository.flush();
+        return vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
     }
 
     private List<Acl> saveAcls(
@@ -402,18 +429,146 @@ public class VocalService {
         vocal.update(content, vocal.getLinks());
     }
 
-    private List<ResourceName> replaceResourceNames(
+    private List<ResourceName> syncResourceNames(
             Resource resource,
             VocalCreateRequest.CanonicalNameCreateRequest canonicalName,
             List<VocalCreateRequest.ResourceAliasCreateRequest> aliases) {
-        resourceNameRepository.deleteByResourceId(resource.getId());
-        return saveResourceNames(resource, canonicalName, aliases);
+        List<ResourceName> existingNames =
+                resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(
+                        resource.getId());
+
+        HashSet<String> uniqueNames = new HashSet<>();
+        String normalizedCanonicalName = normalizeCanonicalName(canonicalName.name());
+        List<DesiredResourceName> desiredNames = new ArrayList<>();
+        desiredNames.add(
+                new DesiredResourceName(
+                        canonicalName.langCode(), normalizedCanonicalName, true, 0));
+        uniqueNames.add(canonicalName.langCode().name() + "|" + normalizedCanonicalName);
+
+        for (VocalCreateRequest.ResourceAliasCreateRequest alias :
+                (aliases == null
+                        ? List.<VocalCreateRequest.ResourceAliasCreateRequest>of()
+                        : aliases)) {
+            if (alias == null) {
+                throw new IllegalArgumentException("aliases contains null item");
+            }
+            String normalizedAlias = normalizeCanonicalName(alias.name());
+            String uniqueKey = alias.langCode().name() + "|" + normalizedAlias;
+            if (!uniqueNames.add(uniqueKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate resource name for language and value");
+            }
+            desiredNames.add(
+                    new DesiredResourceName(
+                            alias.langCode(),
+                            normalizedAlias,
+                            false,
+                            alias.sortOrder() == null ? 0 : alias.sortOrder()));
+        }
+
+        Map<ResourceNameKey, ResourceName> existingByKey = new HashMap<>();
+        for (ResourceName existing : existingNames) {
+            existingByKey.put(
+                    new ResourceNameKey(existing.getLangCode(), existing.getName()), existing);
+        }
+
+        List<ResourceName> toCreate = new ArrayList<>();
+        for (DesiredResourceName desired : desiredNames) {
+            ResourceNameKey key = new ResourceNameKey(desired.langCode(), desired.name());
+            ResourceName existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        ResourceName.create(
+                                resource,
+                                desired.langCode(),
+                                desired.name(),
+                                desired.isPrimary(),
+                                desired.sortOrder()));
+                continue;
+            }
+            existing.updateDisplay(desired.isPrimary(), desired.sortOrder());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            resourceNameRepository.deleteAllInBatch(existingByKey.values());
+        }
+        if (!toCreate.isEmpty()) {
+            resourceNameRepository.saveAll(toCreate);
+        }
+        resourceNameRepository.flush();
+        return resourceNameRepository
+                .findAllByResourceIdOrderBySortOrderAscIdAsc(resource.getId())
+                .stream()
+                .sorted(
+                        Comparator.comparingInt(ResourceName::getSortOrder)
+                                .thenComparing(ResourceName::getId))
+                .toList();
     }
 
-    private List<Acl> replaceAcls(
+    private List<Acl> syncAcls(
             Resource resource, List<VocalCreateRequest.ResourceAclCreateRequest> acls) {
-        aclRepository.deleteByResourceId(resource.getId());
-        return saveAcls(resource, acls);
+        List<Acl> existingAcls =
+                aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
+        if (acls.isEmpty()) {
+            if (!existingAcls.isEmpty()) {
+                aclRepository.deleteAllInBatch(existingAcls);
+                aclRepository.flush();
+            }
+            return List.of();
+        }
+
+        Map<AclKey, Acl> existingByKey = new HashMap<>();
+        for (Acl existing : existingAcls) {
+            existingByKey.put(
+                    new AclKey(
+                            existing.getAction(),
+                            existing.getSubjectType(),
+                            existing.getSubjectValue(),
+                            existing.getPriority()),
+                    existing);
+        }
+
+        HashSet<AclKey> uniqueKeys = new HashSet<>();
+        List<Acl> toCreate = new ArrayList<>();
+        for (VocalCreateRequest.ResourceAclCreateRequest item : acls) {
+            if (item == null) {
+                throw new IllegalArgumentException("acls contains null item");
+            }
+            AclAction action = parseAclAction(item.action());
+            AclSubjectType subjectType = parseAclSubjectType(item.subjectType());
+            String subjectValue = normalizeAclSubjectValue(subjectType, item.subjectValue());
+            int priority = item.priority() == null ? 100 : item.priority();
+            AclKey key = new AclKey(action, subjectType, subjectValue, priority);
+            if (!uniqueKeys.add(key)) {
+                throw new IllegalArgumentException(
+                        "Duplicate ACL for action/subject/priority combination");
+            }
+
+            AclEffect effect = parseAclEffect(item.effect());
+            Acl existing = existingByKey.remove(key);
+            if (existing == null) {
+                toCreate.add(
+                        Acl.create(
+                                resource,
+                                action,
+                                subjectType,
+                                subjectValue,
+                                effect,
+                                priority,
+                                item.expiresAt()));
+                continue;
+            }
+            existing.updateRule(effect, item.expiresAt());
+        }
+
+        if (!existingByKey.isEmpty()) {
+            aclRepository.deleteAllInBatch(existingByKey.values());
+        }
+        if (!toCreate.isEmpty()) {
+            aclRepository.saveAll(toCreate);
+        }
+        aclRepository.flush();
+        return aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(resource.getId());
     }
 
     private VocalCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
@@ -538,6 +693,16 @@ public class VocalService {
         }
         return url.trim();
     }
+
+    private record ResourceNameKey(Language langCode, String name) {}
+
+    private record DesiredResourceName(
+            Language langCode, String name, boolean isPrimary, int sortOrder) {}
+
+    private record AclKey(
+            AclAction action, AclSubjectType subjectType, String subjectValue, int priority) {}
+
+    private record VocalLinkKey(VocalLinkType type, String url) {}
 
     private <E extends Enum<E>> E parseEnum(String rawValue, Class<E> enumClass, String fieldName) {
         if (rawValue == null || rawValue.isBlank()) {

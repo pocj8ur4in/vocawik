@@ -92,4 +92,18 @@ public class ResourceName extends BaseEntity {
         }
         this.name = name;
     }
+
+    /**
+     * Updates primary flag and display order.
+     *
+     * @param isPrimary updated primary flag
+     * @param sortOrder updated sort order
+     */
+    public void updateDisplay(boolean isPrimary, int sortOrder) {
+        if (sortOrder < 0) {
+            throw new IllegalArgumentException("sortOrder must be >= 0");
+        }
+        this.isPrimary = isPrimary;
+        this.sortOrder = sortOrder;
+    }
 }
