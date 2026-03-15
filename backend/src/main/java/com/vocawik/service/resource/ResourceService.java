@@ -16,6 +16,7 @@ import com.vocawik.domain.song.SongPvView;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongVocal;
 import com.vocawik.domain.vocal.Vocal;
+import com.vocawik.domain.vocal.VocalLink;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
@@ -41,6 +42,7 @@ import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
+import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
@@ -83,6 +85,7 @@ public class ResourceService {
     private final ArtistRepository artistRepository;
     private final ArtistGroupRepository artistGroupRepository;
     private final VocalRepository vocalRepository;
+    private final VocalLinkRepository vocalLinkRepository;
     private final ResourceHistoryService resourceHistoryService;
     private final ResourcePopularityService resourcePopularityService;
     private final ObjectMapper objectMapper;
@@ -235,6 +238,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();
+        List<VocalLink> links = vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
 
         return new VocalResourceDetailResponse(
                 resource.getUuid(),
@@ -244,7 +248,7 @@ public class ResourceService {
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
                 vocal.getContent(),
-                toJsonValue(vocal.getLinks()),
+                links.stream().map(this::toVocalLink).toList(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
@@ -483,6 +487,11 @@ public class ResourceService {
                 song.getPublishedAt(),
                 songVocal.isMain(),
                 songVocal.getSortOrder());
+    }
+
+    private VocalResourceDetailResponse.VocalLink toVocalLink(VocalLink vocalLink) {
+        return new VocalResourceDetailResponse.VocalLink(
+                vocalLink.getVocalLinkType().name(), vocalLink.getUrl(), vocalLink.isDeleted());
     }
 
     private PlaylistResourceDetailResponse.PlaylistSong toPlaylistDetailSong(

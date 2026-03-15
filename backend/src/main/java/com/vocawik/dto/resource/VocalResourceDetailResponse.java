@@ -14,7 +14,7 @@ public record VocalResourceDetailResponse(
         long viewCount,
         String thumbnailUrl,
         String content,
-        Object links,
+        List<VocalLink> links,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
@@ -24,11 +24,15 @@ public record VocalResourceDetailResponse(
 
     /** Creates an immutable vocal detail response. */
     public VocalResourceDetailResponse {
+        links = List.copyOf(links);
         names = List.copyOf(names);
         acls = List.copyOf(acls);
         histories = List.copyOf(histories);
         songs = List.copyOf(songs);
     }
+
+    /** Link item for the vocal detail payload. */
+    public record VocalLink(String type, String url, boolean isDeleted) {}
 
     /** Song mapping item for the vocal detail payload. */
     public record VocalSong(

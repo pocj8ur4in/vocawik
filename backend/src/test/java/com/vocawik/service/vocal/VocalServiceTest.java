@@ -15,6 +15,7 @@ import com.vocawik.dto.vocal.VocalSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.history.ResourceHistoryService;
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ class VocalServiceTest {
                         mock(VocalRepository.class),
                         mock(ResourceRepository.class),
                         resourceNameRepository,
+                        mock(VocalLinkRepository.class),
                         mock(AclRepository.class),
                         mock(ResourceHistoryService.class),
                         new ObjectMapper());
