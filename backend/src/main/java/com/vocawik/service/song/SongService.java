@@ -166,6 +166,7 @@ public class SongService {
         if (videoKey == null) {
             videoKey = detectedPv.videoKey();
         }
+        boolean isDuplicated = isDuplicatedPv(detectedPv.provider(), videoKey);
 
         return new SongPvResolveResponse(
                 detectedPv.provider().name(),
@@ -174,12 +175,32 @@ public class SongService {
                 normalizeNullable(metaResult.thumbnailUrl()),
                 normalizeNullable(metaResult.uploaderKey()),
                 metaResult.durationSeconds(),
-                normalizeNullable(metaResult.publishedAt()));
+                normalizeNullable(metaResult.publishedAt()),
+                isDuplicated);
     }
 
     private SongPvResolveResponse toFallbackResponse(DetectedPv detectedPv) {
+        boolean isDuplicated = isDuplicatedPv(detectedPv.provider(), detectedPv.videoKey());
         return new SongPvResolveResponse(
-                detectedPv.provider().name(), detectedPv.videoKey(), null, null, null, null, null);
+                detectedPv.provider().name(),
+                detectedPv.videoKey(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                isDuplicated);
+    }
+
+    private boolean isDuplicatedPv(SongPvProvider provider, String videoKey) {
+        if (provider == null || provider == SongPvProvider.OTHER) {
+            return false;
+        }
+        String normalizedVideoKey = normalizeNullable(videoKey);
+        if (normalizedVideoKey == null) {
+            return false;
+        }
+        return songPvRepository.existsByServiceAndVideoKey(provider, normalizedVideoKey);
     }
 
     /**
