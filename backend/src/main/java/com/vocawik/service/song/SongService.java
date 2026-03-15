@@ -16,6 +16,8 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongArtist;
 import com.vocawik.domain.song.SongArtistRole;
+import com.vocawik.domain.song.SongLink;
+import com.vocawik.domain.song.SongLinkType;
 import com.vocawik.domain.song.SongLyric;
 import com.vocawik.domain.song.SongPv;
 import com.vocawik.domain.song.SongPvProvider;
@@ -39,6 +41,7 @@ import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongArtistRepository;
 import com.vocawik.repository.song.SongCriteria;
+import com.vocawik.repository.song.SongLinkRepository;
 import com.vocawik.repository.song.SongLyricRepository;
 import com.vocawik.repository.song.SongPvRepository;
 import com.vocawik.repository.song.SongPvViewRepository;
@@ -83,6 +86,7 @@ public class SongService {
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
+    private final SongLinkRepository songLinkRepository;
     private final SongLyricRepository songLyricRepository;
     private final SongPvRepository songPvRepository;
     private final SongPvViewRepository songPvViewRepository;
@@ -243,16 +247,13 @@ public class SongService {
      */
     @Transactional
     public UUID create(SongCreateRequest request) {
-        JsonNode links = toJsonNode(request.links());
-        validateLinks(links);
-
         SongCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
         Song song =
                 Song.create(
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
-                        links,
+                        null,
                         request.publishedAt(),
                         parseSongType(request.songType()));
 
@@ -261,6 +262,7 @@ public class SongService {
 
         saveResourceNames(resource, canonicalName, request.aliases());
         saveAcls(resource, request.acls());
+        saveSongLinks(song, request.links());
         saveSongLyrics(song, request.lyrics());
         saveSongPvs(song, request.pvs());
         saveSongArtists(song, request.artists());
@@ -303,6 +305,9 @@ public class SongService {
         }
         if (request.acls() != null) {
             replaceAcls(resource, toCreateAcls(request.acls()));
+        }
+        if (request.links() != null) {
+            replaceSongLinks(song, request.links());
         }
         if (request.lyrics() != null) {
             replaceSongLyrics(song, toCreateLyrics(request.lyrics()));
@@ -399,12 +404,6 @@ public class SongService {
         return trimmed;
     }
 
-    private void validateLinks(JsonNode links) {
-        if (links != null && !links.isArray()) {
-            throw new IllegalArgumentException("links must be a JSON array");
-        }
-    }
-
     private void updateSongFields(Song song, Resource resource, SongUpdateRequest request) {
         String canonicalName =
                 request.canonicalName() == null
@@ -418,8 +417,6 @@ public class SongService {
                 request.content() == null
                         ? song.getContent()
                         : normalizeNullable(request.content());
-        JsonNode links = request.links() == null ? song.getLinks() : toJsonNode(request.links());
-        validateLinks(links);
         LocalDateTime publishedAt =
                 request.publishedAt() == null ? song.getPublishedAt() : request.publishedAt();
         SongType songType =
@@ -427,7 +424,7 @@ public class SongService {
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        song.update(content, links, publishedAt, songType);
+        song.update(content, song.getLinks(), publishedAt, songType);
     }
 
     private List<ResourceName> replaceResourceNames(
@@ -448,6 +445,34 @@ public class SongService {
             Song song, List<SongCreateRequest.SongLyricCreateRequest> lyrics) {
         songLyricRepository.deleteBySongId(song.getId());
         return saveSongLyrics(song, lyrics);
+    }
+
+    private List<SongLink> replaceSongLinks(
+            Song song, List<SongUpdateRequest.SongLinkUpdateRequest> links) {
+        songLinkRepository.deleteBySongId(song.getId());
+        if (links.isEmpty()) {
+            return List.of();
+        }
+
+        List<SongLink> entities =
+                links.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "links contains null item");
+                                    }
+                                    return SongLink.create(
+                                            song,
+                                            parseSongLinkType(item.type()),
+                                            normalizeLinkUrl(item.url()),
+                                            item.isDeleted());
+                                })
+                        .toList();
+
+        return songLinkRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparing(SongLink::getId))
+                .toList();
     }
 
     private List<SongPv> replaceSongPvs(
@@ -705,6 +730,33 @@ public class SongService {
                 .toList();
     }
 
+    private List<SongLink> saveSongLinks(
+            Song song, List<SongCreateRequest.SongLinkCreateRequest> links) {
+        if (links == null || links.isEmpty()) {
+            return List.of();
+        }
+
+        List<SongLink> entities =
+                links.stream()
+                        .map(
+                                item -> {
+                                    if (item == null) {
+                                        throw new IllegalArgumentException(
+                                                "links contains null item");
+                                    }
+                                    return SongLink.create(
+                                            song,
+                                            parseSongLinkType(item.type()),
+                                            normalizeLinkUrl(item.url()),
+                                            item.isDeleted());
+                                })
+                        .toList();
+
+        return songLinkRepository.saveAllAndFlush(entities).stream()
+                .sorted(Comparator.comparing(SongLink::getId))
+                .toList();
+    }
+
     private List<SongLyric> saveSongLyrics(
             Song song, List<SongCreateRequest.SongLyricCreateRequest> lyrics) {
         if (lyrics == null || lyrics.isEmpty()) {
@@ -922,6 +974,10 @@ public class SongService {
         return parseEnum(value, SongPvProvider.class, "pvs.service");
     }
 
+    private SongLinkType parseSongLinkType(String value) {
+        return parseEnum(value, SongLinkType.class, "links.type");
+    }
+
     private AclAction parseAclAction(String value) {
         return parseEnum(value, AclAction.class, "acls.action");
     }
@@ -935,6 +991,13 @@ public class SongService {
             return AclEffect.ALLOW;
         }
         return parseEnum(value, AclEffect.class, "acls.effect");
+    }
+
+    private String normalizeLinkUrl(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("links.url is required");
+        }
+        return url.trim();
     }
 
     private Set<SongArtistRole> parseSongArtistRoles(Set<String> roles) {
@@ -1012,7 +1075,7 @@ public class SongService {
         } else {
             snapshot.put("content", song.getContent());
         }
-        snapshot.set("links", toSnapshotJson(song.getLinks()));
+        snapshot.set("links", buildSongLinksSnapshot(song));
         if (song.getPublishedAt() == null) {
             snapshot.putNull("publishedAt");
         } else {
@@ -1078,6 +1141,18 @@ public class SongService {
             lyrics.add(lyric);
         }
         return lyrics;
+    }
+
+    private ArrayNode buildSongLinksSnapshot(Song song) {
+        ArrayNode links = objectMapper.createArrayNode();
+        for (SongLink item : songLinkRepository.findAllBySongIdOrderByIdAsc(song.getId())) {
+            ObjectNode link = objectMapper.createObjectNode();
+            link.put("type", item.getSongLinkType().name());
+            link.put("url", item.getUrl());
+            link.put("isDeleted", item.isDeleted());
+            links.add(link);
+        }
+        return links;
     }
 
     private ArrayNode buildPvsSnapshot(Song song) {

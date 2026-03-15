@@ -15,7 +15,7 @@ public record SongResourceDetailResponse(
         long viewCount,
         String thumbnailUrl,
         String content,
-        Object links,
+        List<SongLink> links,
         LocalDateTime publishedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
@@ -32,6 +32,7 @@ public record SongResourceDetailResponse(
 
     /** Creates an immutable song detail response. */
     public SongResourceDetailResponse {
+        links = List.copyOf(links);
         names = List.copyOf(names);
         acls = List.copyOf(acls);
         histories = List.copyOf(histories);
@@ -43,6 +44,9 @@ public record SongResourceDetailResponse(
         incomingRelations = List.copyOf(incomingRelations);
         playlists = List.copyOf(playlists);
     }
+
+    /** Song link item in the detailed payload. */
+    public record SongLink(String type, String url, boolean isDeleted) {}
 
     /** Song lyric item in the detailed payload. */
     public record SongLyric(
