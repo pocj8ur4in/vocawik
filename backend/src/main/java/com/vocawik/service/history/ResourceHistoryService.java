@@ -173,7 +173,9 @@ public class ResourceHistoryService {
     private RecentChangeElementResponse toRecentChange(RecentChangeProjection projection) {
         return new RecentChangeElementResponse(
                 projection.getCreatedAt(),
+                projection.getResourceUuid(),
                 projection.getCanonicalName(),
+                projection.getResourceType().name(),
                 projection.getActionType().name(),
                 projection.getActorUserNickname());
     }
