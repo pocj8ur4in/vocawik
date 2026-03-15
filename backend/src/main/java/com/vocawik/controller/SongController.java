@@ -5,6 +5,8 @@ import com.vocawik.domain.song.SongType;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongPvResolveRequest;
+import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
@@ -199,6 +201,21 @@ public class SongController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /**
+     * Resolves PV metadata from a PV URL.
+     *
+     * @param request pv resolve request
+     * @return resolved pv metadata
+     */
+    @PostMapping("/songs/pvs")
+    @Operation(
+            summary = "Resolve song PV",
+            description = "Returns parsed/normalized PV metadata from URL.")
+    public ResponseEntity<SongPvResolveResponse> resolveSongPv(
+            @Valid @RequestBody SongPvResolveRequest request) {
+        return ResponseEntity.ok(songService.resolveSongPv(request));
     }
 
     private void validatePublishedRange(LocalDateTime publishedFrom, LocalDateTime publishedTo) {
