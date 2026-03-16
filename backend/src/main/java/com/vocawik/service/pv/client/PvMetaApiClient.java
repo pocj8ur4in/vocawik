@@ -19,5 +19,20 @@ public interface PvMetaApiClient {
             String thumbnailUrl,
             String uploaderKey,
             Integer durationSeconds,
-            String publishedAt) {}
+            String publishedAt,
+            PvMetaExtra extra) {
+
+        public PvMetaResult(
+                String videoKey,
+                String title,
+                String thumbnailUrl,
+                String uploaderKey,
+                Integer durationSeconds,
+                String publishedAt) {
+            this(videoKey, title, thumbnailUrl, uploaderKey, durationSeconds, publishedAt, null);
+        }
+    }
+
+    /** Optional provider-specific metadata payload. */
+    record PvMetaExtra(String audioUrl, Long cid, String externalUrl) {}
 }

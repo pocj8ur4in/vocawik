@@ -27,6 +27,8 @@ public class PiaproPvMetaApiClient implements PvMetaApiClient {
 
     private static final DateTimeFormatter PIAPRO_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+    private static final DateTimeFormatter PIAPRO_TIMESTAMP_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private static final Pattern TITLE_PATTERN =
             Pattern.compile(
@@ -51,6 +53,8 @@ public class PiaproPvMetaApiClient implements PvMetaApiClient {
             Pattern.compile("/content_list_recommend/\\?id=([\\w\\-]+)");
     private static final Pattern CONTENT_ID_TREE_PATTERN =
             Pattern.compile("/content/tree_list/([\\w\\-]+)");
+    private static final Pattern AUDIO_URL_TIMESTAMP_PATTERN =
+            Pattern.compile("[\\w\\-]+_([0-9]{14})_audition\\.mp3");
 
     private final PvApiProperties pvApiProperties;
     private final PvHttpClientSupport pvHttpClientSupport;
@@ -95,10 +99,14 @@ public class PiaproPvMetaApiClient implements PvMetaApiClient {
         String uploaderKey = cleanText(extractFirstGroup(responseBody, AUTHOR_ID_PATTERN));
         Integer durationSeconds =
                 parseDurationSeconds(extractFirstGroup(responseBody, LENGTH_PATTERN));
-        String publishedAt = parsePublishedAt(extractFirstGroup(responseBody, DATE_PATTERN));
+        String rawPublishedAt = extractFirstGroup(responseBody, DATE_PATTERN);
+        String publishedAt = parsePublishedAt(rawPublishedAt);
+        String timestamp = extractAudioTimestamp(rawPublishedAt, responseBody);
+        String audioUrl = buildAudioUrl(videoKey, timestamp);
+        PvMetaExtra extra = audioUrl == null ? null : new PvMetaExtra(audioUrl, null, null);
 
         return new PvMetaResult(
-                videoKey, title, thumbnailUrl, uploaderKey, durationSeconds, publishedAt);
+                videoKey, title, thumbnailUrl, uploaderKey, durationSeconds, publishedAt, extra);
     }
 
     private String buildRequestUrl(DetectedPv detectedPv) {
@@ -200,6 +208,56 @@ public class PiaproPvMetaApiClient implements PvMetaApiClient {
         } catch (RuntimeException ex) {
             return null;
         }
+    }
+
+    private String extractAudioTimestamp(String rawPublishedAt, String html) {
+        String fromPublishedAt = parseTimestampFromPublishedAt(rawPublishedAt);
+        if (fromPublishedAt != null) {
+            return fromPublishedAt;
+        }
+
+        String source = nullIfBlank(html);
+        if (source == null) {
+            return null;
+        }
+        Matcher matcher = AUDIO_URL_TIMESTAMP_PATTERN.matcher(source);
+        if (!matcher.find() || matcher.groupCount() < 1) {
+            return null;
+        }
+        return nullIfBlank(matcher.group(1));
+    }
+
+    private String parseTimestampFromPublishedAt(String rawPublishedAt) {
+        String normalized = nullIfBlank(rawPublishedAt);
+        if (normalized == null) {
+            return null;
+        }
+
+        try {
+            return LocalDateTime.parse(normalized, PIAPRO_DATE_FORMATTER)
+                    .format(PIAPRO_TIMESTAMP_FORMATTER);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private String buildAudioUrl(String videoKey, String timestamp) {
+        String normalizedVideoKey = nullIfBlank(videoKey);
+        String normalizedTimestamp = nullIfBlank(timestamp);
+        if (normalizedVideoKey == null || normalizedTimestamp == null) {
+            return null;
+        }
+        if (normalizedVideoKey.length() < 2) {
+            return null;
+        }
+        String prefix = normalizedVideoKey.substring(0, 2);
+        return "https://cdn.piapro.jp/mp3_a/"
+                + prefix
+                + "/"
+                + normalizedVideoKey
+                + "_"
+                + normalizedTimestamp
+                + "_audition.mp3";
     }
 
     private String cleanText(String value) {

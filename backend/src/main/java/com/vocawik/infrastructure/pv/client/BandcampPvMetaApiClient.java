@@ -45,6 +45,9 @@ public class BandcampPvMetaApiClient implements PvMetaApiClient {
     private static final Pattern OG_IMAGE_PATTERN =
             Pattern.compile(
                     "(?is)<meta[^>]*property\\s*=\\s*['\"]og:image['\"][^>]*content\\s*=\\s*['\"]([^'\"]+)['\"][^>]*>");
+    private static final Pattern OG_URL_PATTERN =
+            Pattern.compile(
+                    "(?is)<meta[^>]*property\\s*=\\s*['\"]og:url['\"][^>]*content\\s*=\\s*['\"]([^'\"]+)['\"][^>]*>");
 
     private final PvHttpClientSupport pvHttpClientSupport;
     private final ObjectMapper objectMapper;
@@ -102,10 +105,13 @@ public class BandcampPvMetaApiClient implements PvMetaApiClient {
         String finalTitle = buildTitle(title, artist);
 
         String thumbnailUrl = extractMetaContent(responseBody, OG_IMAGE_PATTERN);
+        String externalUrl =
+                firstNonBlank(extractMetaContent(responseBody, OG_URL_PATTERN), requestUrl);
         String uploaderKey = extractUploaderKey(requestUrl, artist);
         Integer durationSeconds =
                 parseDurationSeconds(track == null ? null : track.get("duration"));
         String publishedAt = parsePublishedAt(extractPublishDate(tralbum));
+        PvMetaExtra extra = externalUrl == null ? null : new PvMetaExtra(null, null, externalUrl);
 
         if (finalTitle == null) {
             throw new IllegalArgumentException(
@@ -118,7 +124,8 @@ public class BandcampPvMetaApiClient implements PvMetaApiClient {
                 thumbnailUrl,
                 uploaderKey,
                 durationSeconds,
-                publishedAt);
+                publishedAt,
+                extra);
     }
 
     private String normalizeSourceUrl(DetectedPv detectedPv) {

@@ -216,7 +216,8 @@ public class SongService {
                 normalizeNullable(metaResult.uploaderKey()),
                 metaResult.durationSeconds(),
                 normalizeNullable(metaResult.publishedAt()),
-                isDuplicated);
+                isDuplicated,
+                toResolveExtra(metaResult.extra()));
     }
 
     private SongPvResolveResponse toFallbackResponse(DetectedPv detectedPv) {
@@ -229,7 +230,23 @@ public class SongService {
                 null,
                 null,
                 null,
-                isDuplicated);
+                isDuplicated,
+                null);
+    }
+
+    private SongPvResolveResponse.SongPvResolveExtra toResolveExtra(
+            PvMetaApiClient.PvMetaExtra extra) {
+        if (extra == null) {
+            return null;
+        }
+
+        String audioUrl = normalizeNullable(extra.audioUrl());
+        Long cid = extra.cid();
+        String externalUrl = normalizeNullable(extra.externalUrl());
+        if (audioUrl == null && cid == null && externalUrl == null) {
+            return null;
+        }
+        return new SongPvResolveResponse.SongPvResolveExtra(audioUrl, cid, externalUrl);
     }
 
     private boolean isDuplicatedPv(SongPvProvider provider, String videoKey) {
@@ -724,6 +741,7 @@ public class SongService {
             String title = normalizeNullable(item.title());
             String thumbnailUrl = normalizeNullable(item.thumbnailUrl());
             String uploaderKey = normalizeNullable(item.uploaderKey());
+            SongPvExtraValues extra = normalizeSongPvExtra(service, item.extra());
             int sortOrder = item.sortOrder() == null ? 0 : item.sortOrder();
 
             Deque<SongPv> candidates = existingByKey.get(key);
@@ -736,6 +754,9 @@ public class SongService {
                         item.durationSeconds(),
                         item.isOfficial(),
                         item.publishedAt(),
+                        extra.audioUrl(),
+                        extra.cid(),
+                        extra.externalUrl(),
                         sortOrder);
                 matchedIds.add(matched.getId());
                 continue;
@@ -752,6 +773,9 @@ public class SongService {
                             item.durationSeconds(),
                             item.isOfficial(),
                             item.publishedAt(),
+                            extra.audioUrl(),
+                            extra.cid(),
+                            extra.externalUrl(),
                             sortOrder));
         }
 
@@ -1023,6 +1047,12 @@ public class SongService {
                                         item.durationSeconds(),
                                         item.isOfficial(),
                                         item.publishedAt(),
+                                        item.extra() == null
+                                                ? null
+                                                : new SongCreateRequest.SongPvExtraCreateRequest(
+                                                        item.extra().audioUrl(),
+                                                        item.extra().cid(),
+                                                        item.extra().externalUrl()),
                                         item.sortOrder()))
                 .toList();
     }
@@ -1248,9 +1278,12 @@ public class SongService {
                                         throw new IllegalArgumentException(
                                                 "pvs contains null item");
                                     }
+                                    SongPvProvider service = parseSongPvProvider(item.service());
+                                    SongPvExtraValues extra =
+                                            normalizeSongPvExtra(service, item.extra());
                                     return SongPv.create(
                                             song,
-                                            parseSongPvProvider(item.service()),
+                                            service,
                                             normalizeRequired(item.videoKey(), "videoKey"),
                                             normalizeNullable(item.title()),
                                             normalizeNullable(item.thumbnailUrl()),
@@ -1258,6 +1291,9 @@ public class SongService {
                                             item.durationSeconds(),
                                             item.isOfficial(),
                                             item.publishedAt(),
+                                            extra.audioUrl(),
+                                            extra.cid(),
+                                            extra.externalUrl(),
                                             item.sortOrder() == null ? 0 : item.sortOrder());
                                 })
                         .toList();
@@ -1422,6 +1458,27 @@ public class SongService {
         return parseEnum(value, SongPvProvider.class, "pvs.service");
     }
 
+    private SongPvExtraValues normalizeSongPvExtra(
+            SongPvProvider service, SongCreateRequest.SongPvExtraCreateRequest extra) {
+        if (extra == null || service == null) {
+            return SongPvExtraValues.empty();
+        }
+
+        String audioUrl = normalizeNullable(extra.audioUrl());
+        Long cid = extra.cid();
+        if (cid != null && cid < 0) {
+            throw new IllegalArgumentException("pvs.extra.cid must be >= 0");
+        }
+        String externalUrl = normalizeNullable(extra.externalUrl());
+
+        return switch (service) {
+            case PIAPRO -> new SongPvExtraValues(audioUrl, null, null);
+            case BILIBILI -> new SongPvExtraValues(null, cid, null);
+            case BANDCAMP -> new SongPvExtraValues(null, null, externalUrl);
+            default -> SongPvExtraValues.empty();
+        };
+    }
+
     private SongLinkType parseSongLinkType(String value) {
         return parseEnum(value, SongLinkType.class, "links.type");
     }
@@ -1486,6 +1543,12 @@ public class SongService {
     private record SongLyricKey(String langCodesKey, boolean isPrimary, int sortOrder) {}
 
     private record SongPvKey(SongPvProvider service, String videoKey) {}
+
+    private record SongPvExtraValues(String audioUrl, Long cid, String externalUrl) {
+        private static SongPvExtraValues empty() {
+            return new SongPvExtraValues(null, null, null);
+        }
+    }
 
     private record SongArtistKey(Long artistId, String rolesKey) {}
 
@@ -1674,10 +1737,43 @@ public class SongService {
             } else {
                 pv.put("publishedAt", item.getPublishedAt().toString());
             }
+            ObjectNode extra = buildSongPvExtraSnapshot(item);
+            if (extra == null) {
+                pv.putNull("extra");
+            } else {
+                pv.set("extra", extra);
+            }
             pv.put("sortOrder", item.getSortOrder());
             pvs.add(pv);
         }
         return pvs;
+    }
+
+    private ObjectNode buildSongPvExtraSnapshot(SongPv item) {
+        String audioUrl = normalizeNullable(item.getPiaproAudioUrl());
+        Long cid = item.getBilibiliCid();
+        String externalUrl = normalizeNullable(item.getBandcampExternalUrl());
+        if (audioUrl == null && cid == null && externalUrl == null) {
+            return null;
+        }
+
+        ObjectNode extra = objectMapper.createObjectNode();
+        if (audioUrl == null) {
+            extra.putNull("audioUrl");
+        } else {
+            extra.put("audioUrl", audioUrl);
+        }
+        if (cid == null) {
+            extra.putNull("cid");
+        } else {
+            extra.put("cid", cid);
+        }
+        if (externalUrl == null) {
+            extra.putNull("externalUrl");
+        } else {
+            extra.put("externalUrl", externalUrl);
+        }
+        return extra;
     }
 
     private ArrayNode buildArtistsSnapshot(Song song) {

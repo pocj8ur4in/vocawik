@@ -53,6 +53,15 @@ public class SongPv extends BaseEntity {
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
+    @Column(name = "piapro_audio_url")
+    private String piaproAudioUrl;
+
+    @Column(name = "bilibili_cid")
+    private Long bilibiliCid;
+
+    @Column(name = "bandcamp_external_url")
+    private String bandcampExternalUrl;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
@@ -65,7 +74,8 @@ public class SongPv extends BaseEntity {
      * @return created song pv
      */
     public static SongPv create(Song song, SongPvProvider service, String videoKey) {
-        return create(song, service, videoKey, null, null, null, null, true, null, 0);
+        return create(
+                song, service, videoKey, null, null, null, null, true, null, null, null, null, 0);
     }
 
     /**
@@ -80,6 +90,9 @@ public class SongPv extends BaseEntity {
      * @param durationSeconds duration in seconds
      * @param isOfficial whether official upload
      * @param publishedAt published datetime
+     * @param piaproAudioUrl piapro generated audio URL
+     * @param bilibiliCid bilibili cid
+     * @param bandcampExternalUrl bandcamp track page URL
      * @param sortOrder display order
      * @return created song pv
      */
@@ -93,6 +106,9 @@ public class SongPv extends BaseEntity {
             Integer durationSeconds,
             boolean isOfficial,
             LocalDateTime publishedAt,
+            String piaproAudioUrl,
+            Long bilibiliCid,
+            String bandcampExternalUrl,
             int sortOrder) {
         if (song == null) {
             throw new IllegalArgumentException("song is required");
@@ -105,6 +121,9 @@ public class SongPv extends BaseEntity {
         }
         if (durationSeconds != null && durationSeconds < 0) {
             throw new IllegalArgumentException("durationSeconds must be >= 0");
+        }
+        if (bilibiliCid != null && bilibiliCid < 0) {
+            throw new IllegalArgumentException("bilibiliCid must be >= 0");
         }
         if (sortOrder < 0) {
             throw new IllegalArgumentException("sortOrder must be >= 0");
@@ -120,6 +139,9 @@ public class SongPv extends BaseEntity {
         songPv.durationSeconds = durationSeconds;
         songPv.isOfficial = isOfficial;
         songPv.publishedAt = publishedAt;
+        songPv.piaproAudioUrl = piaproAudioUrl;
+        songPv.bilibiliCid = bilibiliCid;
+        songPv.bandcampExternalUrl = bandcampExternalUrl;
         songPv.sortOrder = sortOrder;
         return songPv;
     }
@@ -133,6 +155,9 @@ public class SongPv extends BaseEntity {
      * @param durationSeconds updated duration in seconds
      * @param isOfficial updated official flag
      * @param publishedAt updated published datetime
+     * @param piaproAudioUrl updated piapro audio URL
+     * @param bilibiliCid updated bilibili cid
+     * @param bandcampExternalUrl updated bandcamp external URL
      * @param sortOrder updated sort order
      */
     public void updateMetadata(
@@ -142,9 +167,15 @@ public class SongPv extends BaseEntity {
             Integer durationSeconds,
             boolean isOfficial,
             LocalDateTime publishedAt,
+            String piaproAudioUrl,
+            Long bilibiliCid,
+            String bandcampExternalUrl,
             int sortOrder) {
         if (durationSeconds != null && durationSeconds < 0) {
             throw new IllegalArgumentException("durationSeconds must be >= 0");
+        }
+        if (bilibiliCid != null && bilibiliCid < 0) {
+            throw new IllegalArgumentException("bilibiliCid must be >= 0");
         }
         if (sortOrder < 0) {
             throw new IllegalArgumentException("sortOrder must be >= 0");
@@ -155,6 +186,9 @@ public class SongPv extends BaseEntity {
         this.durationSeconds = durationSeconds;
         this.isOfficial = isOfficial;
         this.publishedAt = publishedAt;
+        this.piaproAudioUrl = piaproAudioUrl;
+        this.bilibiliCid = bilibiliCid;
+        this.bandcampExternalUrl = bandcampExternalUrl;
         this.sortOrder = sortOrder;
     }
 }

@@ -88,7 +88,14 @@ public record SongCreateRequest(
             @Min(0) Integer durationSeconds,
             boolean isOfficial,
             LocalDateTime publishedAt,
+            @Valid SongPvExtraCreateRequest extra,
             @Min(0) Integer sortOrder) {}
+
+    /** Song PV provider-specific extra metadata input. */
+    public record SongPvExtraCreateRequest(
+            @Size(max = 2048) String audioUrl,
+            @Min(0) Long cid,
+            @Size(max = 2048) String externalUrl) {}
 
     /** Song-artist mapping input. */
     public record SongArtistCreateRequest(

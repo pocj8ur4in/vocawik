@@ -9,4 +9,9 @@ public record SongPvResolveResponse(
         String uploaderKey,
         Integer durationSeconds,
         String publishedAt,
-        boolean isDuplicated) {}
+        boolean isDuplicated,
+        SongPvResolveExtra extra) {
+
+    /** Provider-specific metadata payload. */
+    public record SongPvResolveExtra(String audioUrl, Long cid, String externalUrl) {}
+}

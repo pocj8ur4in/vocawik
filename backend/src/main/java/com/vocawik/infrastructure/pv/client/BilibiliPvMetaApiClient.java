@@ -79,6 +79,8 @@ public class BilibiliPvMetaApiClient implements PvMetaApiClient {
 
         BilibiliData data = responseBody.data();
         String normalizedVideoKey = firstNonBlank(nullIfBlank(data.bvid()), videoKey);
+        Long cid = toCid(data.cid());
+        PvMetaExtra extra = cid == null ? null : new PvMetaExtra(null, cid, null);
 
         return new PvMetaResult(
                 normalizedVideoKey,
@@ -86,7 +88,8 @@ public class BilibiliPvMetaApiClient implements PvMetaApiClient {
                 nullIfBlank(data.pic()),
                 toUploaderKey(data.owner()),
                 toDurationSeconds(data.duration()),
-                toPublishedAt(data.pubdate()));
+                toPublishedAt(data.pubdate()),
+                extra);
     }
 
     private String buildViewApiUrl(String baseUrl, NormalizedVideoKey normalizedVideoKey) {
@@ -144,6 +147,13 @@ public class BilibiliPvMetaApiClient implements PvMetaApiClient {
         return Instant.ofEpochSecond(pubdate).toString();
     }
 
+    private Long toCid(Long cid) {
+        if (cid == null || cid <= 0L) {
+            return null;
+        }
+        return cid;
+    }
+
     private String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
             return first;
@@ -171,6 +181,7 @@ public class BilibiliPvMetaApiClient implements PvMetaApiClient {
             String pic,
             Integer duration,
             Long pubdate,
+            Long cid,
             BilibiliOwner owner) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
