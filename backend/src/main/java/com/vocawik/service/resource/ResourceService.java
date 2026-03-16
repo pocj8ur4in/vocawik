@@ -408,6 +408,7 @@ public class ResourceService {
                 pv.getDurationSeconds(),
                 pv.isOfficial(),
                 pv.getPublishedAt(),
+                toSongPvExtra(pv),
                 pv.getSortOrder(),
                 (views == null ? List.<SongPvView>of() : views)
                         .stream()
@@ -418,6 +419,16 @@ public class ResourceService {
                                 .toList(),
                 pv.getCreatedAt(),
                 pv.getUpdatedAt());
+    }
+
+    private SongResourceDetailResponse.SongPvExtra toSongPvExtra(SongPv pv) {
+        String audioUrl = pv.getPiaproAudioUrl();
+        Long cid = pv.getBilibiliCid();
+        String externalUrl = pv.getBandcampExternalUrl();
+        if (audioUrl == null && cid == null && externalUrl == null) {
+            return null;
+        }
+        return new SongResourceDetailResponse.SongPvExtra(audioUrl, cid, externalUrl);
     }
 
     private SongResourceDetailResponse.SongPvView toSongPvView(SongPvView view) {

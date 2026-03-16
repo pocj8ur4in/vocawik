@@ -348,6 +348,9 @@ CREATE TABLE song_pvs (
     is_official BOOLEAN NOT NULL DEFAULT TRUE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     published_at TIMESTAMPTZ,
+    piapro_audio_url TEXT,
+    bilibili_cid BIGINT,
+    bandcamp_external_url TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_pvs_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
     CONSTRAINT chk_song_pvs_service CHECK (
@@ -356,7 +359,8 @@ CREATE TABLE song_pvs (
     CONSTRAINT chk_song_pvs_duration_seconds CHECK (
         duration_seconds IS NULL OR duration_seconds >= 0
     ),
-    CONSTRAINT chk_song_pvs_sort_order CHECK (sort_order >= 0)
+    CONSTRAINT chk_song_pvs_sort_order CHECK (sort_order >= 0),
+    CONSTRAINT chk_song_pvs_bilibili_cid CHECK (bilibili_cid IS NULL OR bilibili_cid >= 0)
 );
 
 -- song_pv_views

@@ -75,6 +75,7 @@ public record SongResourceDetailResponse(
             Integer durationSeconds,
             boolean isOfficial,
             LocalDateTime publishedAt,
+            SongPvExtra extra,
             int sortOrder,
             List<SongPvView> views,
             LocalDateTime createdAt,
@@ -84,6 +85,9 @@ public record SongResourceDetailResponse(
             views = List.copyOf(views);
         }
     }
+
+    /** Song PV provider-specific extra metadata item. */
+    public record SongPvExtra(String audioUrl, Long cid, String externalUrl) {}
 
     /** Song PV view item in the detailed payload. */
     public record SongPvView(
