@@ -257,7 +257,6 @@ public class SongService {
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
-                        null,
                         request.publishedAt(),
                         parseSongType(request.songType()));
 
@@ -428,7 +427,7 @@ public class SongService {
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        song.update(content, song.getLinks(), publishedAt, songType);
+        song.update(content, publishedAt, songType);
     }
 
     private List<ResourceName> syncResourceNames(

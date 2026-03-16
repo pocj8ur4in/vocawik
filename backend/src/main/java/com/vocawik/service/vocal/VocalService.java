@@ -82,8 +82,7 @@ public class VocalService {
                 Vocal.create(
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
-                        normalizeNullable(request.content()),
-                        null);
+                        normalizeNullable(request.content()));
 
         Resource resource = resourceRepository.save(vocal.getResource());
         vocalRepository.save(vocal);
@@ -429,7 +428,7 @@ public class VocalService {
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        vocal.update(content, vocal.getLinks());
+        vocal.update(content);
     }
 
     private List<ResourceName> syncResourceNames(
