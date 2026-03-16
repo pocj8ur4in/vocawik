@@ -88,8 +88,7 @@ public class ArtistService {
                 Artist.create(
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
-                        normalizeNullable(request.content()),
-                        null);
+                        normalizeNullable(request.content()));
 
         Resource resource = resourceRepository.save(artist.getResource());
         artistRepository.saveAndFlush(artist);
@@ -279,7 +278,7 @@ public class ArtistService {
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
-        artist.update(content, artist.getLinks());
+        artist.update(content);
     }
 
     private List<UUID> normalizeUuids(List<UUID> uuids) {

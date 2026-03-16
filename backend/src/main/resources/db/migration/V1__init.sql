@@ -250,11 +250,9 @@ CREATE TABLE histories (
 CREATE TABLE songs (
     id BIGINT PRIMARY KEY,
     content TEXT,
-    links JSONB,
     published_at TIMESTAMPTZ,
     song_type VARCHAR(20) NOT NULL DEFAULT 'OTHER',
     CONSTRAINT fk_songs_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_songs_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array'),
     CONSTRAINT chk_songs_song_type CHECK (
         song_type IN ('ORIGINAL', 'COVER', 'REMIX', 'REMASTER', 'MASHUP', 'OTHER')
     )
@@ -377,9 +375,7 @@ CREATE TABLE song_pv_views (
 CREATE TABLE artists (
     id BIGINT PRIMARY KEY,
     content TEXT,
-    links JSONB,
-    CONSTRAINT fk_artists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_artists_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
+    CONSTRAINT fk_artists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
 );
 
 -- artist_links
@@ -444,9 +440,7 @@ CREATE TABLE song_artists (
 CREATE TABLE vocals (
     id BIGINT PRIMARY KEY,
     content TEXT,
-    links JSONB,
-    CONSTRAINT fk_vocals_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_vocals_links_array CHECK (links IS NULL OR jsonb_typeof(links) = 'array')
+    CONSTRAINT fk_vocals_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
 );
 
 -- vocal_links

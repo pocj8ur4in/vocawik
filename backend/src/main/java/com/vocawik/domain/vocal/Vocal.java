@@ -1,6 +1,5 @@
 package com.vocawik.domain.vocal;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceType;
 import jakarta.persistence.Column;
@@ -17,8 +16,6 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /** Vocal detail entity using shared PK with {@link Resource}. */
 @Getter
@@ -38,10 +35,6 @@ public class Vocal {
 
     @Column private String content;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "links", columnDefinition = "jsonb")
-    private JsonNode links;
-
     @Getter(AccessLevel.NONE)
     @OneToMany(mappedBy = "vocal")
     private List<VocalLink> vocalLinks = new ArrayList<>();
@@ -52,15 +45,12 @@ public class Vocal {
      * @param canonicalName representative display name
      * @param thumbnailUrl representative thumbnail url (nullable)
      * @param content vocal description (nullable)
-     * @param links external links payload (nullable JSON array)
      * @return created vocal
      */
-    public static Vocal create(
-            String canonicalName, String thumbnailUrl, String content, JsonNode links) {
+    public static Vocal create(String canonicalName, String thumbnailUrl, String content) {
         Vocal vocal = new Vocal();
         vocal.resource = Resource.create(ResourceType.VOCAL, canonicalName, thumbnailUrl);
         vocal.content = content;
-        vocal.links = links;
         return vocal;
     }
 
@@ -68,10 +58,8 @@ public class Vocal {
      * Updates vocal detail fields.
      *
      * @param content updated description
-     * @param links updated external links
      */
-    public void update(String content, JsonNode links) {
+    public void update(String content) {
         this.content = content;
-        this.links = links;
     }
 }
