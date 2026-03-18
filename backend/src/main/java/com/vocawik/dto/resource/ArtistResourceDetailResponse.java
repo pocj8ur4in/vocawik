@@ -18,7 +18,7 @@ public record ArtistResourceDetailResponse(
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
         List<ResourceAclDetailResponse> acls,
-        List<ArtistSong> songs,
+        ArtistSongs songs,
         List<ArtistGroup> groups,
         List<ArtistMember> members) {
 
@@ -27,13 +27,21 @@ public record ArtistResourceDetailResponse(
         links = List.copyOf(links);
         names = List.copyOf(names);
         acls = List.copyOf(acls);
-        songs = List.copyOf(songs);
         groups = List.copyOf(groups);
         members = List.copyOf(members);
     }
 
     /** Link item for the artist detail payload. */
     public record ArtistLink(String type, String url, String content, boolean isDeleted) {}
+
+    /** Song participation item for the artist detail payload. */
+    public record ArtistSongs(
+            long count, List<ArtistSong> recentSongs, List<ArtistSong> popularSongs) {
+        public ArtistSongs {
+            recentSongs = List.copyOf(recentSongs);
+            popularSongs = List.copyOf(popularSongs);
+        }
+    }
 
     /** Song participation item for the artist detail payload. */
     public record ArtistSong(
