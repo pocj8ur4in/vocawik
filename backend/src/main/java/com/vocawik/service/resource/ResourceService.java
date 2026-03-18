@@ -203,6 +203,21 @@ public class ResourceService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
         List<ArtistLink> links = artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
+        long songCount = songArtistRepository.countByArtistId(artist.getId());
+        List<ArtistResourceDetailResponse.ArtistSong> recentSongs =
+                songArtistRepository
+                        .findRecentByArtistId(
+                                artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
+                        .stream()
+                        .map(this::toArtistSong)
+                        .toList();
+        List<ArtistResourceDetailResponse.ArtistSong> popularSongs =
+                songArtistRepository
+                        .findPopularByArtistId(
+                                artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
+                        .stream()
+                        .map(this::toArtistSong)
+                        .toList();
 
         return new ArtistResourceDetailResponse(
                 resource.getUuid(),
@@ -217,11 +232,7 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                songArtistRepository
-                        .findAllByArtistIdOrderBySortOrderAscIdAsc(artist.getId())
-                        .stream()
-                        .map(this::toArtistSong)
-                        .toList(),
+                new ArtistResourceDetailResponse.ArtistSongs(songCount, recentSongs, popularSongs),
                 artistGroupRepository
                         .findAllByGroupArtistIdOrderBySortOrderAscIdAsc(artist.getId())
                         .stream()
