@@ -61,6 +61,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +75,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResourceService {
 
     private static final int RESOURCE_SUGGESTION_LIMIT = 10;
+    private static final int RELATED_SONG_SECTION_LIMIT = 10;
 
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
@@ -247,6 +249,22 @@ public class ResourceService {
         Resource resource = vocal.getResource();
         List<VocalLink> links = vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
 
+        long songCount = songVocalRepository.countByVocalId(vocal.getId());
+        List<VocalResourceDetailResponse.VocalSong> recentSongs =
+                songVocalRepository
+                        .findRecentByVocalId(
+                                vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
+                        .stream()
+                        .map(this::toVocalSong)
+                        .toList();
+        List<VocalResourceDetailResponse.VocalSong> popularSongs =
+                songVocalRepository
+                        .findPopularByVocalId(
+                                vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
+                        .stream()
+                        .map(this::toVocalSong)
+                        .toList();
+
         return new VocalResourceDetailResponse(
                 resource.getUuid(),
                 resource.isDeleted(),
@@ -260,9 +278,7 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
-                        .map(this::toVocalSong)
-                        .toList());
+                new VocalResourceDetailResponse.VocalSongs(songCount, recentSongs, popularSongs));
     }
 
     @Transactional

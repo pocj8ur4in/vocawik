@@ -42,10 +42,6 @@ CREATE TABLE users (
     )
 );
 
-CREATE UNIQUE INDEX uk_users_email_lower_live
-    ON users (LOWER(email))
-    WHERE is_deleted = FALSE;
-
 -- user_auth_providers
 CREATE TABLE user_auth_providers (
     id BIGSERIAL PRIMARY KEY,
@@ -70,13 +66,9 @@ CREATE TABLE guests (
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     last_seen_at TIMESTAMP,
-    ip_hash VARCHAR(64) NOT NULL,
+    ip INET NOT NULL,
     CONSTRAINT chk_guests_status CHECK (status IN ('ACTIVE', 'BLOCKED'))
 );
-
-CREATE UNIQUE INDEX uk_guests_ip_hash_live
-    ON guests (ip_hash)
-    WHERE is_deleted = FALSE;
 
 -- resources
 CREATE TABLE resources (
