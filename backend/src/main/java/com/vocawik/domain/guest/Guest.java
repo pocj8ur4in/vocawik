@@ -25,20 +25,20 @@ public class Guest extends BaseEntity {
     @Column(nullable = false, length = 20)
     private GuestStatus status = GuestStatus.ACTIVE;
 
-    @Column(name = "ip_hash", nullable = false, length = 64)
-    private String ipHash;
+    @Column(name = "ip", columnDefinition = "inet")
+    private String ip;
 
     @Column private LocalDateTime lastSeenAt;
 
     /**
-     * Creates a new guest from client IP hash.
+     * Creates a new guest from client IP address.
      *
-     * @param ipHash hashed client IP
+     * @param ip client IP address
      * @return created guest instance
      */
-    public static Guest create(String ipHash) {
+    public static Guest create(String ip) {
         Guest guest = new Guest();
-        guest.ipHash = ipHash;
+        guest.ip = ip;
         guest.lastSeenAt = LocalDateTime.now();
         return guest;
     }

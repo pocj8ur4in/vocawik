@@ -166,16 +166,12 @@ public class ResourceHistoryService {
 
     private HistoryActorResponse toActor(History history) {
         if (history.getActorUser() != null) {
-            return new HistoryActorResponse(
-                    "USER",
-                    history.getActorUser().getUuid(),
-                    history.getActorUser().getNickname(),
-                    null);
+            return new HistoryActorResponse("USER", history.getActorUser().getNickname(), null);
         }
         if (history.getActorGuest() != null) {
-            return new HistoryActorResponse("GUEST", null, null, history.getActorGuest().getUuid());
+            return new HistoryActorResponse("GUEST", null, history.getActorGuest().getIp());
         }
-        return new HistoryActorResponse("SYSTEM", null, null, null);
+        return new HistoryActorResponse("SYSTEM", null, null);
     }
 
     private RecentChangeElementResponse toRecentChange(RecentChangeProjection projection) {
