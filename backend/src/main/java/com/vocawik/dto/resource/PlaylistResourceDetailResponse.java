@@ -1,6 +1,5 @@
 package com.vocawik.dto.resource;
 
-import com.vocawik.dto.history.ResourceHistoryElementResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -19,14 +18,12 @@ public record PlaylistResourceDetailResponse(
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
         List<ResourceAclDetailResponse> acls,
-        List<ResourceHistoryElementResponse> histories,
         List<PlaylistSong> songs) {
 
     /** Creates an immutable playlist detail response. */
     public PlaylistResourceDetailResponse {
         names = List.copyOf(names);
         acls = List.copyOf(acls);
-        histories = List.copyOf(histories);
         songs = List.copyOf(songs);
     }
 
