@@ -18,18 +18,26 @@ public record VocalResourceDetailResponse(
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
         List<ResourceAclDetailResponse> acls,
-        List<VocalSong> songs) {
+        VocalSongs songs) {
 
     /** Creates an immutable vocal detail response. */
     public VocalResourceDetailResponse {
         links = List.copyOf(links);
         names = List.copyOf(names);
         acls = List.copyOf(acls);
-        songs = List.copyOf(songs);
     }
 
     /** Link item for the vocal detail payload. */
     public record VocalLink(String type, String url, String content, boolean isDeleted) {}
+
+    /** Aggregated song section for vocal detail payload. */
+    public record VocalSongs(
+            long count, List<VocalSong> recentSongs, List<VocalSong> popularSongs) {
+        public VocalSongs {
+            recentSongs = List.copyOf(recentSongs);
+            popularSongs = List.copyOf(popularSongs);
+        }
+    }
 
     /** Song mapping item for the vocal detail payload. */
     public record VocalSong(
