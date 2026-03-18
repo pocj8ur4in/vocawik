@@ -6,6 +6,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Component;
 public class ClientIpResolver {
 
     private static final String X_FORWARDED_FOR = "X-Forwarded-For";
+    private static final String X_REAL_IP = "X-Real-IP";
+    private static final String FORWARDED = "Forwarded";
 
     private final List<CidrRange> trustedProxyRanges;
 
@@ -38,16 +41,99 @@ public class ClientIpResolver {
      * @return resolved client IP
      */
     public String resolve(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
+        String remoteAddr = normalizeIpLiteral(request.getRemoteAddr());
+        if (remoteAddr == null) {
+            return null;
+        }
         if (!isTrustedProxy(remoteAddr)) {
             return remoteAddr;
         }
 
+        String forwarded = request.getHeader(FORWARDED);
+        String fromForwarded = extractIpFromForwarded(forwarded);
+        if (fromForwarded != null) {
+            return fromForwarded;
+        }
+
         String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
+            for (String token : xForwardedFor.split(",")) {
+                String candidate = normalizeIpLiteral(token);
+                if (candidate != null) {
+                    return candidate;
+                }
+            }
+        }
+
+        String xRealIp = normalizeIpLiteral(request.getHeader(X_REAL_IP));
+        if (xRealIp != null) {
+            return xRealIp;
         }
         return remoteAddr;
+    }
+
+    private String extractIpFromForwarded(String forwarded) {
+        if (forwarded == null || forwarded.isBlank()) {
+            return null;
+        }
+        String[] entries = forwarded.split(",");
+        for (String entry : entries) {
+            String[] params = entry.split(";");
+            for (String param : params) {
+                String trimmed = param.trim();
+                if (!trimmed.toLowerCase(Locale.ROOT).startsWith("for=")) {
+                    continue;
+                }
+                String value = trimmed.substring(4).trim();
+                String candidate = normalizeIpLiteral(value);
+                if (candidate != null) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String normalizeIpLiteral(String rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+        String value = rawValue.trim();
+        if (value.isEmpty() || value.equalsIgnoreCase("unknown")) {
+            return null;
+        }
+
+        // RFC 7239 quoted-string support: for="[2001:db8::1]:4711"
+        if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
+            value = value.substring(1, value.length() - 1).trim();
+        }
+
+        String host = value;
+        if (host.startsWith("[")) {
+            int closing = host.indexOf(']');
+            if (closing <= 1) {
+                return null;
+            }
+            host = host.substring(1, closing);
+        } else if (host.chars().filter(ch -> ch == ':').count() == 1 && host.contains(".")) {
+            // IPv4 with port (e.g. 203.0.113.10:443)
+            host = host.substring(0, host.lastIndexOf(':'));
+        }
+
+        int zoneIndex = host.indexOf('%');
+        if (zoneIndex > 0) {
+            host = host.substring(0, zoneIndex);
+        }
+        if (host.isBlank()) {
+            return null;
+        }
+
+        try {
+            InetAddress address = InetAddress.getByName(host);
+            return address.getHostAddress();
+        } catch (UnknownHostException e) {
+            return null;
+        }
     }
 
     private List<CidrRange> parseTrustedProxyCidrs(String raw) {

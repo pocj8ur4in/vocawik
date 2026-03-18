@@ -9,7 +9,6 @@ import com.vocawik.dto.resource.PopularResourceListResponse;
 import com.vocawik.repository.playlist.PlaylistRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.security.ip.ClientIpResolver;
-import com.vocawik.security.ip.IpHashService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
@@ -57,7 +56,6 @@ public class ResourcePopularityService {
     private final PlaylistRepository playlistRepository;
     private final StringRedisTemplate stringRedisTemplate;
     private final ClientIpResolver clientIpResolver;
-    private final IpHashService ipHashService;
 
     /**
      * Records a view when the current request is eligible for popularity tracking.
@@ -85,7 +83,7 @@ public class ResourcePopularityService {
             return;
         }
 
-        String dedupKey = dedupKey(ipHashService.hash(clientIp), resource.getUuid());
+        String dedupKey = dedupKey(clientIp, resource.getUuid());
         boolean firstRecentView =
                 Boolean.TRUE.equals(
                         stringRedisTemplate
@@ -232,7 +230,7 @@ public class ResourcePopularityService {
         return BUCKET_KEY_PREFIX + bucketTime.format(BUCKET_FORMATTER);
     }
 
-    private String dedupKey(String ipHash, UUID resourceUuid) {
-        return DEDUP_KEY_PREFIX + ipHash + ":resource:" + resourceUuid;
+    private String dedupKey(String ip, UUID resourceUuid) {
+        return DEDUP_KEY_PREFIX + ip + ":resource:" + resourceUuid;
     }
 }
