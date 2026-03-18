@@ -4,6 +4,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.resource.PopularResourceListResponse;
+import com.vocawik.dto.resource.ResourceInfoResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceSuggestionListResponse;
 import com.vocawik.service.history.ResourceHistoryService;
@@ -116,6 +117,15 @@ public class ResourceController {
             @Parameter(description = "Suggestion query") @RequestParam(name = "query")
                     String query) {
         return ResponseEntity.ok(resourceService.suggest(query));
+    }
+
+    /** Returns resource ACL and history metadata. */
+    @GetMapping("/resources/{resourceUuid}/info")
+    @Operation(
+            summary = "Get resource info",
+            description = "Returns shared resource ACL and history metadata.")
+    public ResponseEntity<ResourceInfoResponse> getResourceInfo(@PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(resourceService.getResourceInfoByResourceUuid(resourceUuid));
     }
 
     /** Lists the most recent resource changes across all resource types. */

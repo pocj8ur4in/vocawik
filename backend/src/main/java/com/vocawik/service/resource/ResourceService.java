@@ -23,6 +23,7 @@ import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
 import com.vocawik.dto.resource.ResourceElementResponse;
+import com.vocawik.dto.resource.ResourceInfoResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceNameDetailResponse;
 import com.vocawik.dto.resource.ResourceSuggestionElementResponse;
@@ -177,7 +178,6 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 names,
                 acls,
-                resourceHistoryService.listByResourceId(resource.getId()),
                 lyrics.stream().map(this::toSongLyric).toList(),
                 pvs.stream().map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()))).toList(),
                 artists.stream().map(this::toSongArtist).toList(),
@@ -215,7 +215,6 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                resourceHistoryService.listByResourceId(resource.getId()),
                 songArtistRepository
                         .findAllByArtistIdOrderBySortOrderAscIdAsc(artist.getId())
                         .stream()
@@ -261,7 +260,6 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                resourceHistoryService.listByResourceId(resource.getId()),
                 songVocalRepository.findAllByVocalIdOrderBySortOrderAscIdAsc(vocal.getId()).stream()
                         .map(this::toVocalSong)
                         .toList());
@@ -294,7 +292,6 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                resourceHistoryService.listByResourceId(resource.getId()),
                 playlistSongRepository
                         .findAllByPlaylistIdOrderBySortOrderAscIdAsc(playlist.getId())
                         .stream()
@@ -306,6 +303,18 @@ public class ResourceService {
     public PlaylistResourceDetailResponse getPlaylistByResourceUuidWithTracking(UUID resourceUuid) {
         resourcePopularityService.trackView(resourceUuid);
         return getPlaylistByResourceUuid(resourceUuid);
+    }
+
+    @Transactional(readOnly = true)
+    public ResourceInfoResponse getResourceInfoByResourceUuid(UUID resourceUuid) {
+        Resource resource =
+                resourceRepository
+                        .findByUuid(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        return new ResourceInfoResponse(
+                resource.getUuid(),
+                loadResourceAcls(resource.getId()),
+                resourceHistoryService.listByResourceId(resource.getId()));
     }
 
     private String normalizeQuery(String query) {

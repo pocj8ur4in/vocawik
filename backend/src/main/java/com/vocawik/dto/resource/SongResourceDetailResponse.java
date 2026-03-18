@@ -1,6 +1,5 @@
 package com.vocawik.dto.resource;
 
-import com.vocawik.dto.history.ResourceHistoryElementResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -21,7 +20,6 @@ public record SongResourceDetailResponse(
         LocalDateTime updatedAt,
         List<ResourceNameDetailResponse> names,
         List<ResourceAclDetailResponse> acls,
-        List<ResourceHistoryElementResponse> histories,
         List<SongLyric> lyrics,
         List<SongPv> pvs,
         List<SongArtist> artists,
@@ -35,7 +33,6 @@ public record SongResourceDetailResponse(
         links = List.copyOf(links);
         names = List.copyOf(names);
         acls = List.copyOf(acls);
-        histories = List.copyOf(histories);
         lyrics = List.copyOf(lyrics);
         pvs = List.copyOf(pvs);
         artists = List.copyOf(artists);

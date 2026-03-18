@@ -7,6 +7,7 @@ import com.vocawik.domain.history.History;
 import com.vocawik.domain.history.HistoryActionType;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.user.User;
+import com.vocawik.dto.history.HistoryActorResponse;
 import com.vocawik.dto.history.RecentChangeElementResponse;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
@@ -146,13 +147,10 @@ public class ResourceHistoryService {
 
         return new ResourceHistoryDetailResponse(
                 history.getUuid(),
-                history.getResource().getUuid(),
                 history.getRevision(),
                 history.getBaseRevision(),
                 history.getActionType().name(),
-                history.getActorUser() == null ? null : history.getActorUser().getUuid(),
-                history.getActorGuest() == null ? null : history.getActorGuest().getUuid(),
-                history.getContentHash(),
+                toActor(history),
                 history.getCreatedAt(),
                 objectMapper.convertValue(history.getSnapshotData(), Object.class));
     }
@@ -160,14 +158,24 @@ public class ResourceHistoryService {
     private ResourceHistoryElementResponse toSummary(History history) {
         return new ResourceHistoryElementResponse(
                 history.getUuid(),
-                history.getResource().getUuid(),
                 history.getRevision(),
-                history.getBaseRevision(),
                 history.getActionType().name(),
-                history.getActorUser() == null ? null : history.getActorUser().getUuid(),
-                history.getActorGuest() == null ? null : history.getActorGuest().getUuid(),
-                history.getContentHash(),
+                toActor(history),
                 history.getCreatedAt());
+    }
+
+    private HistoryActorResponse toActor(History history) {
+        if (history.getActorUser() != null) {
+            return new HistoryActorResponse(
+                    "USER",
+                    history.getActorUser().getUuid(),
+                    history.getActorUser().getNickname(),
+                    null);
+        }
+        if (history.getActorGuest() != null) {
+            return new HistoryActorResponse("GUEST", null, null, history.getActorGuest().getUuid());
+        }
+        return new HistoryActorResponse("SYSTEM", null, null, null);
     }
 
     private RecentChangeElementResponse toRecentChange(RecentChangeProjection projection) {
