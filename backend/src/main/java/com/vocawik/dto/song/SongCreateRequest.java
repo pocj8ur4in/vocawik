@@ -81,7 +81,7 @@ public record SongCreateRequest(
     /** Song PV input. */
     public record SongPvCreateRequest(
             @NotBlank String service,
-            @NotBlank @Size(max = 100) String videoKey,
+            @NotBlank String videoKey,
             @Size(max = 255) String title,
             String thumbnailUrl,
             @Size(max = 100) String uploaderKey,

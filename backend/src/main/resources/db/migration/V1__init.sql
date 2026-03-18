@@ -340,7 +340,7 @@ CREATE TABLE song_pvs (
     updated_at TIMESTAMPTZ NOT NULL,
     song_id BIGINT NOT NULL,
     service VARCHAR(20) NOT NULL,
-    video_key VARCHAR(100) NOT NULL,
+    video_key TEXT NOT NULL,
     title VARCHAR(255),
     thumbnail_url TEXT,
     uploader_key VARCHAR(100),

@@ -29,7 +29,7 @@ public class SongPv extends BaseEntity {
     @Column(name = "service", nullable = false, length = 20)
     private SongPvProvider service;
 
-    @Column(name = "video_key", nullable = false, length = 100)
+    @Column(name = "video_key", nullable = false, columnDefinition = "TEXT")
     private String videoKey;
 
     @Column(length = 255)
