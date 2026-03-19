@@ -193,8 +193,10 @@ class SongServiceTest {
     @Test
     @DisplayName("Suggest should return resource uuid when name maps to a single resource")
     void suggest_withSingleResourceName_shouldReturnUuid() {
+        LocaleContextHolder.setLocale(Locale.KOREAN);
         UUID resourceUuid = UUID.randomUUID();
-        ResourceName candidate = candidate(resourceUuid, "메스머라이저");
+        ResourceName candidate = candidate(1L, resourceUuid, "메스머라이저");
+        ResourceName koreanName = localizedName(1L, "메스머라이저", Language.KO);
         when(resourceNameRepository.findSongSuggestionCandidates(
                         eq(ResourceStatus.ACTIVE),
                         eq("mes"),
@@ -203,13 +205,16 @@ class SongServiceTest {
                                         pageable.getPageNumber() == 0
                                                 && pageable.getPageSize() == 30)))
                 .thenReturn(List.of(candidate));
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(koreanName));
 
         SongSuggestionListResponse result = songService.suggest(" mes ");
 
         assertThat(result.items())
                 .containsExactly(
                         new com.vocawik.dto.song.SongSuggestionElementResponse(
-                                resourceUuid, "메스머라이저", false));
+                                resourceUuid, "메스머라이저", "메스머라이저", false));
     }
 
     @Test
@@ -233,7 +238,7 @@ class SongServiceTest {
         assertThat(result.items())
                 .containsExactly(
                         new com.vocawik.dto.song.SongSuggestionElementResponse(
-                                null, "메스머라이저", true));
+                                null, "메스머라이저", null, true));
     }
 
     private Song song(
@@ -268,7 +273,12 @@ class SongServiceTest {
     }
 
     private ResourceName candidate(UUID uuid, String name) {
+        return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
+    }
+
+    private ResourceName candidate(Long resourceId, UUID uuid, String name) {
         Resource resource = mock(Resource.class);
+        when(resource.getId()).thenReturn(resourceId);
         when(resource.getUuid()).thenReturn(uuid);
 
         ResourceName resourceName = mock(ResourceName.class);

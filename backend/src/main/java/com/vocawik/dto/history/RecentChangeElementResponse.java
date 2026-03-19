@@ -8,6 +8,7 @@ public record RecentChangeElementResponse(
         LocalDateTime createdAt,
         UUID resourceUuid,
         String canonicalName,
+        String localizedName,
         String resourceType,
         String actionType,
         String actorUserNickname) {}

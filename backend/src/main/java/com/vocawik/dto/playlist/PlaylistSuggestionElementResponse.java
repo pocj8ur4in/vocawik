@@ -4,4 +4,4 @@ import java.util.UUID;
 
 /** Suggestion item for playlist autocomplete results. */
 public record PlaylistSuggestionElementResponse(
-        UUID resourceUuid, String name, boolean hasMultipleResources) {}
+        UUID resourceUuid, String name, String localizedName, boolean hasMultipleResources) {}

@@ -91,10 +91,12 @@ class ResourceServiceTest {
     @Test
     @DisplayName("Suggest should return up to 10 distinct resources")
     void suggest_shouldReturnUpToTenDistinctResources() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
         List<ResourceName> candidates = new ArrayList<>();
         UUID duplicatedUuid = UUID.randomUUID();
-        candidates.add(candidate(duplicatedUuid, "Miku"));
-        candidates.add(candidate(duplicatedUuid, "Hatsune Miku"));
+        ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
+        candidates.add(candidate(1L, duplicatedUuid, "Miku"));
+        candidates.add(candidate(1L, duplicatedUuid, "Hatsune Miku"));
         for (int i = 0; i < 10; i++) {
             candidates.add(candidate(UUID.randomUUID(), "Candidate " + i));
         }
@@ -106,12 +108,18 @@ class ResourceServiceTest {
                                         pageable.getPageNumber() == 0
                                                 && pageable.getPageSize() == 30)))
                 .thenReturn(candidates);
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 11 && resourceIds.contains(1L))))
+                .thenReturn(List.of(japaneseName));
 
         ResourceSuggestionListResponse result = resourceService.suggest(" mik ");
 
         assertThat(result.items()).hasSize(10);
         assertThat(result.items().getFirst().resourceUuid()).isEqualTo(duplicatedUuid);
         assertThat(result.items().getFirst().name()).isEqualTo("Miku");
+        assertThat(result.items().getFirst().localizedName()).isEqualTo("初音ミク");
         assertThat(result.items().getFirst().hasMultipleResources()).isFalse();
     }
 
@@ -136,7 +144,7 @@ class ResourceServiceTest {
         assertThat(result.items())
                 .containsExactly(
                         new com.vocawik.dto.resource.ResourceSuggestionElementResponse(
-                                null, "메스머라이저", true));
+                                null, "메스머라이저", null, true));
     }
 
     @Test
@@ -208,7 +216,12 @@ class ResourceServiceTest {
     }
 
     private ResourceName candidate(UUID uuid, String name) {
+        return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
+    }
+
+    private ResourceName candidate(Long resourceId, UUID uuid, String name) {
         Resource resource = mock(Resource.class);
+        when(resource.getId()).thenReturn(resourceId);
         when(resource.getUuid()).thenReturn(uuid);
 
         ResourceName resourceName = mock(ResourceName.class);

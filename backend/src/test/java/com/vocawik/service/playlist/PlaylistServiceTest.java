@@ -126,10 +126,12 @@ class PlaylistServiceTest {
     @Test
     @DisplayName("Suggest should return up to 10 distinct playlists")
     void suggest_shouldReturnUpToTenDistinctPlaylists() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
         List<ResourceName> candidates = new java.util.ArrayList<>();
         UUID duplicatedUuid = UUID.randomUUID();
-        candidates.add(candidate(duplicatedUuid, "Miku Favorites"));
-        candidates.add(candidate(duplicatedUuid, "Miku Best"));
+        ResourceName japaneseName = localizedName(1L, "初音ミクのお気に入り", Language.JA);
+        candidates.add(candidate(1L, duplicatedUuid, "Miku Favorites"));
+        candidates.add(candidate(1L, duplicatedUuid, "Miku Best"));
         for (int i = 0; i < 10; i++) {
             candidates.add(candidate(UUID.randomUUID(), "Candidate " + i));
         }
@@ -141,12 +143,18 @@ class PlaylistServiceTest {
                                         pageable.getPageNumber() == 0
                                                 && pageable.getPageSize() == 30)))
                 .thenReturn(candidates);
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 11 && resourceIds.contains(1L))))
+                .thenReturn(List.of(japaneseName));
 
         PlaylistSuggestionListResponse result = playlistService.suggest(" mik ");
 
         assertThat(result.items()).hasSize(10);
         assertThat(result.items().getFirst().resourceUuid()).isEqualTo(duplicatedUuid);
         assertThat(result.items().getFirst().name()).isEqualTo("Miku Favorites");
+        assertThat(result.items().getFirst().localizedName()).isEqualTo("初音ミクのお気に入り");
         assertThat(result.items().getFirst().hasMultipleResources()).isFalse();
     }
 
@@ -171,7 +179,7 @@ class PlaylistServiceTest {
         assertThat(result.items())
                 .containsExactly(
                         new com.vocawik.dto.playlist.PlaylistSuggestionElementResponse(
-                                null, "메스머라이저", true));
+                                null, "메스머라이저", null, true));
     }
 
     @Test
@@ -184,7 +192,12 @@ class PlaylistServiceTest {
     }
 
     private ResourceName candidate(UUID uuid, String name) {
+        return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
+    }
+
+    private ResourceName candidate(Long resourceId, UUID uuid, String name) {
         Resource resource = mock(Resource.class);
+        when(resource.getId()).thenReturn(resourceId);
         when(resource.getUuid()).thenReturn(uuid);
 
         ResourceName resourceName = mock(ResourceName.class);
