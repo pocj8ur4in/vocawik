@@ -40,7 +40,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
                 "StringRedisTemplate is a Spring-managed infrastructure bean and is not exposed externally.")
 public class ResourcePopularityService {
 
-    private static final int POPULAR_WINDOW_MINUTES = 10;
+    private static final int POPULAR_WINDOW_MINUTES = 60;
     private static final int MAX_POPULAR_SIZE = 10;
     private static final int POPULAR_CANDIDATE_SIZE = 100;
     private static final Duration VIEW_DEDUP_TTL = Duration.ofMinutes(POPULAR_WINDOW_MINUTES);
@@ -102,7 +102,7 @@ public class ResourcePopularityService {
     }
 
     /**
-     * Returns the recent popularity ranking for the last 10 minutes.
+     * Returns the recent popularity ranking for the last 60 minutes.
      *
      * @param size requested item count
      * @return ranked resource summaries

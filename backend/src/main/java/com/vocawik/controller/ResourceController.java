@@ -146,11 +146,11 @@ public class ResourceController {
         return ResponseEntity.ok(resourceHistoryService.listRecentChanges(size));
     }
 
-    /** Lists popular resources over the last 10 minutes. */
+    /** Lists popular resources over the last 60 minutes. */
     @GetMapping("/resources/popular")
     @Operation(
             summary = "List popular resources",
-            description = "Returns the most viewed public resources during the last 10 minutes.")
+            description = "Returns the most viewed public resources during the last 60 minutes.")
     @Parameters({
         @Parameter(
                 name = "size",
