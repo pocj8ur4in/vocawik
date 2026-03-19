@@ -722,7 +722,8 @@ public class ResourceService {
                 resource.getUuid(),
                 resource.getCanonicalName(),
                 localizedNamesByResourceId.get(resource.getId()),
-                relation.getTargetSong().getSongType().name());
+                relation.getTargetSong().getSongType().name(),
+                resource.getThumbnailUrl());
     }
 
     private SongResourceDetailResponse.SongIncomingRelation toSongIncomingRelation(
@@ -732,7 +733,8 @@ public class ResourceService {
                 resource.getUuid(),
                 resource.getCanonicalName(),
                 localizedNamesByResourceId.get(resource.getId()),
-                relation.getSourceSong().getSongType().name());
+                relation.getSourceSong().getSongType().name(),
+                resource.getThumbnailUrl());
     }
 
     private SongResourceDetailResponse.SongPlaylist toSongPlaylist(
