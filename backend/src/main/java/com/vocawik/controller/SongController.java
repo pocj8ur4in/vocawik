@@ -58,7 +58,8 @@ public class SongController {
                     "updatedAt", "resource.updatedAt",
                     "createdAt", "resource.createdAt",
                     "publishedAt", "publishedAt",
-                    "name", "resource.canonicalName");
+                    "name", "resource.canonicalName",
+                    "match", "match");
 
     private final SongService songService;
     private final ResourceService resourceService;
@@ -157,7 +158,8 @@ public class SongController {
                                     "publishedAt,asc",
                                     "publishedAt,desc",
                                     "name,asc",
-                                    "name,desc"
+                                    "name,desc",
+                                    "match,asc"
                                 }))
     })
     public ResponseEntity<SongListResponse> searchSongs(
@@ -248,6 +250,9 @@ public class SongController {
 
         ArrayList<Sort.Order> allowedOrders = new ArrayList<>();
         for (Sort.Order order : sort) {
+            if ("match".equals(order.getProperty()) && order.isDescending()) {
+                throw new IllegalArgumentException("match sort only supports ascending order");
+            }
             String internalProperty = ALLOWED_SORT_PROPERTIES.get(order.getProperty());
             if (internalProperty == null) {
                 throw new IllegalArgumentException(

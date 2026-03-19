@@ -50,7 +50,8 @@ public class PlaylistController {
             Map.of(
                     "updatedAt", "resource.updatedAt",
                     "createdAt", "resource.createdAt",
-                    "name", "resource.canonicalName");
+                    "name", "resource.canonicalName",
+                    "match", "match");
 
     private final PlaylistService playlistService;
     private final ResourceService resourceService;
@@ -125,7 +126,8 @@ public class PlaylistController {
                                     "createdAt,asc",
                                     "createdAt,desc",
                                     "name,asc",
-                                    "name,desc"
+                                    "name,desc",
+                                    "match,asc"
                                 }))
     })
     public ResponseEntity<PlaylistListResponse> searchPlaylists(
@@ -170,6 +172,9 @@ public class PlaylistController {
 
         ArrayList<Sort.Order> allowedOrders = new ArrayList<>();
         for (Sort.Order order : sort) {
+            if ("match".equals(order.getProperty()) && order.isDescending()) {
+                throw new IllegalArgumentException("match sort only supports ascending order");
+            }
             String internalProperty = ALLOWED_SORT_PROPERTIES.get(order.getProperty());
             if (internalProperty == null) {
                 throw new IllegalArgumentException(
