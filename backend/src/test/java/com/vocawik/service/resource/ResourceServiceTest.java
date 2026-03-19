@@ -164,6 +164,7 @@ class ResourceServiceTest {
         assertThat(result.items().getFirst().resourceUuid()).isEqualTo(duplicatedUuid);
         assertThat(result.items().getFirst().name()).isEqualTo("Miku");
         assertThat(result.items().getFirst().localizedName()).isEqualTo("初音ミク");
+        assertThat(result.items().getFirst().resourceType()).isEqualTo(ResourceType.SONG.name());
         assertThat(result.items().getFirst().hasMultipleResources()).isFalse();
     }
 
@@ -172,8 +173,8 @@ class ResourceServiceTest {
     void suggest_withDuplicateNames_shouldMergeAndFlag() {
         UUID firstUuid = UUID.randomUUID();
         UUID secondUuid = UUID.randomUUID();
-        ResourceName firstCandidate = candidate(firstUuid, "메스머라이저");
-        ResourceName secondCandidate = candidate(secondUuid, "메스머라이저");
+        ResourceName firstCandidate = candidate(firstUuid, "메스머라이저", ResourceType.SONG);
+        ResourceName secondCandidate = candidate(secondUuid, "메스머라이저", ResourceType.ARTIST);
         when(resourceNameRepository.findSuggestionCandidates(
                         eq(ResourceStatus.ACTIVE),
                         eq("mes"),
@@ -188,7 +189,7 @@ class ResourceServiceTest {
         assertThat(result.items())
                 .containsExactly(
                         new com.vocawik.dto.resource.ResourceSuggestionElementResponse(
-                                null, "메스머라이저", null, true));
+                                null, "메스머라이저", null, null, true));
     }
 
     @Test
@@ -464,10 +465,21 @@ class ResourceServiceTest {
         return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
     }
 
+    private ResourceName candidate(UUID uuid, String name, ResourceType resourceType) {
+        return candidate(
+                Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name, resourceType);
+    }
+
     private ResourceName candidate(Long resourceId, UUID uuid, String name) {
+        return candidate(resourceId, uuid, name, ResourceType.SONG);
+    }
+
+    private ResourceName candidate(
+            Long resourceId, UUID uuid, String name, ResourceType resourceType) {
         Resource resource = mock(Resource.class);
         when(resource.getId()).thenReturn(resourceId);
         when(resource.getUuid()).thenReturn(uuid);
+        when(resource.getResourceType()).thenReturn(resourceType);
 
         ResourceName resourceName = mock(ResourceName.class);
         when(resourceName.getResource()).thenReturn(resource);
