@@ -37,7 +37,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -199,10 +198,8 @@ public class VocalController {
             summary = "Suggest vocals",
             description = "Returns up to 10 vocal suggestions matching the current query.")
     public ResponseEntity<VocalSuggestionListResponse> suggestVocals(
-            @Parameter(description = "Suggestion query") @RequestParam(name = "query") String query,
-            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
-            HttpServletRequest httpServletRequest) {
-        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
         return ResponseEntity.ok(vocalService.suggest(query));
     }
 
