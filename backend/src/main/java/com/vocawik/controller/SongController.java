@@ -57,7 +57,8 @@ public class SongController {
             Map.of(
                     "updatedAt", "resource.updatedAt",
                     "createdAt", "resource.createdAt",
-                    "publishedAt", "publishedAt");
+                    "publishedAt", "publishedAt",
+                    "name", "resource.canonicalName");
 
     private final SongService songService;
     private final ResourceService resourceService;
@@ -154,7 +155,9 @@ public class SongController {
                                     "createdAt,asc",
                                     "createdAt,desc",
                                     "publishedAt,asc",
-                                    "publishedAt,desc"
+                                    "publishedAt,desc",
+                                    "name,asc",
+                                    "name,desc"
                                 }))
     })
     public ResponseEntity<SongListResponse> searchSongs(
