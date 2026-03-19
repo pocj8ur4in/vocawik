@@ -70,6 +70,20 @@ CREATE TABLE guests (
     CONSTRAINT chk_guests_status CHECK (status IN ('ACTIVE', 'BLOCKED'))
 );
 
+-- stats
+CREATE TABLE stats (
+    stats_date DATE PRIMARY KEY,
+    song_count BIGINT NOT NULL,
+    vocal_count BIGINT NOT NULL,
+    artist_count BIGINT NOT NULL,
+    document_contributor_count BIGINT NOT NULL,
+    history_count BIGINT NOT NULL,
+    CONSTRAINT chk_stats_song_count CHECK (song_count >= 0),
+    CONSTRAINT chk_stats_vocal_count CHECK (vocal_count >= 0),
+    CONSTRAINT chk_stats_artist_count CHECK (artist_count >= 0),
+    CONSTRAINT chk_stats_document_contributor_count CHECK (document_contributor_count >= 0),
+    CONSTRAINT chk_stats_history_count CHECK (history_count >= 0)
+);
 -- resources
 CREATE TABLE resources (
     id BIGSERIAL PRIMARY KEY,
