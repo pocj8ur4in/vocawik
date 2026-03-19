@@ -14,6 +14,14 @@ public interface HistoryRepository extends JpaRepository<History, Long> {
 
     long countByActorUserId(Long actorUserId);
 
+    /** Counts distinct user contributors captured in histories. */
+    @Query("select count(distinct h.actorUser.id) from History h where h.actorUser is not null")
+    long countDistinctActorUsers();
+
+    /** Counts distinct guest contributors captured in histories. */
+    @Query("select count(distinct h.actorGuest.id) from History h where h.actorGuest is not null")
+    long countDistinctActorGuests();
+
     /** Finds a history row by UUID. */
     Optional<History> findByUuid(UUID uuid);
 

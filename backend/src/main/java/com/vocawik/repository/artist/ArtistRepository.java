@@ -13,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 /** Repository for {@link Artist} persistence access. */
 public interface ArtistRepository extends JpaRepository<Artist, Long>, ArtistCriteriaRepository {
 
+    /** Counts active artists. */
+    long countByResourceIsDeletedFalse();
+
     /**
      * Finds an artist by resource UUID, including deleted resources.
      *

@@ -13,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 /** Repository for {@link Song} persistence access. */
 public interface SongRepository extends JpaRepository<Song, Long>, SongCriteriaRepository {
 
+    /** Counts active songs. */
+    long countByResourceIsDeletedFalse();
+
     /**
      * Finds a song by resource UUID, including deleted resources.
      *
