@@ -1,6 +1,7 @@
 package com.vocawik.controller;
 
 import com.vocawik.dto.user.UserMeResponse;
+import com.vocawik.dto.user.UserProfileResponse;
 import com.vocawik.security.CurrentUser;
 import com.vocawik.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Endpoints for the current authenticated user. */
@@ -28,5 +30,12 @@ public class UserController {
     public ResponseEntity<UserMeResponse> getCurrentUser(
             @Parameter(hidden = true) @CurrentUser UUID userUuid) {
         return ResponseEntity.ok(userService.getCurrentUser(userUuid));
+    }
+
+    /** Returns a public user profile summary. */
+    @GetMapping("/users/{userUuid}")
+    @Operation(summary = "Get user profile", description = "Returns a public user profile summary.")
+    public ResponseEntity<UserProfileResponse> getUserProfile(@PathVariable UUID userUuid) {
+        return ResponseEntity.ok(userService.getUserProfile(userUuid));
     }
 }

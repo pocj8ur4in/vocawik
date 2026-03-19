@@ -12,6 +12,8 @@ import org.springframework.data.jpa.repository.Query;
 /** Repository for {@link History} persistence access. */
 public interface HistoryRepository extends JpaRepository<History, Long> {
 
+    long countByActorUserId(Long actorUserId);
+
     /** Finds a history row by UUID. */
     Optional<History> findByUuid(UUID uuid);
 
