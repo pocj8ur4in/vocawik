@@ -3,6 +3,7 @@ package com.vocawik.repository.song;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongArtist;
+import com.vocawik.domain.song.SongType;
 import com.vocawik.domain.song.SongVocal;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
@@ -152,8 +153,23 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
             Path<?> path = resolvePath(root, order.getProperty());
             orders.add(
                     order.isAscending() ? criteriaBuilder.asc(path) : criteriaBuilder.desc(path));
+            if (isNameSort(order)) {
+                orders.add(
+                        criteriaBuilder.asc(
+                                criteriaBuilder
+                                        .selectCase()
+                                        .when(
+                                                criteriaBuilder.equal(
+                                                        root.get("songType"), SongType.ORIGINAL),
+                                                0)
+                                        .otherwise(1)));
+            }
         }
         return orders;
+    }
+
+    private boolean isNameSort(Sort.Order order) {
+        return "resource.canonicalName".equals(order.getProperty());
     }
 
     private Path<?> resolvePath(Root<Song> root, String propertyPath) {
