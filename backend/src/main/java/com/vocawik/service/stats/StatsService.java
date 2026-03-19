@@ -35,6 +35,19 @@ public class StatsService {
         return toResponse(stat);
     }
 
+    /** Records the stats snapshot for the given UTC date only when the table is empty. */
+    @Transactional
+    public StatsResponse recordDailyStatsIfEmpty(LocalDate statsDate) {
+        if (statsDate == null) {
+            throw new IllegalArgumentException("statsDate is required");
+        }
+        DailyStat latest = dailyStatRepository.findTopByOrderByStatsDateDesc().orElse(null);
+        if (latest != null) {
+            return toResponse(latest);
+        }
+        return recordDailyStats(statsDate);
+    }
+
     /** Records or updates the stats snapshot for the given UTC date. */
     @Transactional
     public StatsResponse recordDailyStats(LocalDate statsDate) {
