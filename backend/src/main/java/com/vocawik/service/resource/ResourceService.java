@@ -58,6 +58,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -127,7 +128,7 @@ public class ResourceService {
             return new ResourceSuggestionListResponse(List.of());
         }
 
-        Map<UUID, ResourceSuggestionElementResponse> suggestionsByUuid = new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashSet<UUID>> resourceUuidsByName = new LinkedHashMap<>();
         resourceNameRepository
                 .findSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -136,15 +137,27 @@ public class ResourceService {
                                 0, RESOURCE_SUGGESTION_LIMIT * 3))
                 .forEach(
                         resourceName -> {
-                            UUID resourceUuid = resourceName.getResource().getUuid();
-                            suggestionsByUuid.putIfAbsent(
-                                    resourceUuid,
-                                    new ResourceSuggestionElementResponse(
-                                            resourceUuid, resourceName.getName()));
+                            resourceUuidsByName
+                                    .computeIfAbsent(
+                                            resourceName.getName(),
+                                            ignored -> new LinkedHashSet<>())
+                                    .add(resourceName.getResource().getUuid());
                         });
 
         return new ResourceSuggestionListResponse(
-                suggestionsByUuid.values().stream().limit(RESOURCE_SUGGESTION_LIMIT).toList());
+                resourceUuidsByName.entrySet().stream()
+                        .limit(RESOURCE_SUGGESTION_LIMIT)
+                        .map(
+                                entry -> {
+                                    boolean hasMultipleResources = entry.getValue().size() > 1;
+                                    UUID resourceUuid =
+                                            hasMultipleResources
+                                                    ? null
+                                                    : entry.getValue().iterator().next();
+                                    return new ResourceSuggestionElementResponse(
+                                            resourceUuid, entry.getKey(), hasMultipleResources);
+                                })
+                        .toList());
     }
 
     @Transactional(readOnly = true)

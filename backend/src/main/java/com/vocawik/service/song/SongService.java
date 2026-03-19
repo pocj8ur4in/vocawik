@@ -163,8 +163,7 @@ public class SongService {
             return new SongSuggestionListResponse(List.of());
         }
 
-        LinkedHashMap<UUID, SongSuggestionElementResponse> suggestionsByUuid =
-                new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashSet<UUID>> resourceUuidsByName = new LinkedHashMap<>();
         resourceNameRepository
                 .findSongSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -173,15 +172,27 @@ public class SongService {
                                 0, SONG_SUGGESTION_LIMIT * 3))
                 .forEach(
                         resourceName -> {
-                            UUID resourceUuid = resourceName.getResource().getUuid();
-                            suggestionsByUuid.putIfAbsent(
-                                    resourceUuid,
-                                    new SongSuggestionElementResponse(
-                                            resourceUuid, resourceName.getName()));
+                            resourceUuidsByName
+                                    .computeIfAbsent(
+                                            resourceName.getName(),
+                                            ignored -> new LinkedHashSet<>())
+                                    .add(resourceName.getResource().getUuid());
                         });
 
         return new SongSuggestionListResponse(
-                suggestionsByUuid.values().stream().limit(SONG_SUGGESTION_LIMIT).toList());
+                resourceUuidsByName.entrySet().stream()
+                        .limit(SONG_SUGGESTION_LIMIT)
+                        .map(
+                                entry -> {
+                                    boolean hasMultipleResources = entry.getValue().size() > 1;
+                                    UUID resourceUuid =
+                                            hasMultipleResources
+                                                    ? null
+                                                    : entry.getValue().iterator().next();
+                                    return new SongSuggestionElementResponse(
+                                            resourceUuid, entry.getKey(), hasMultipleResources);
+                                })
+                        .toList());
     }
 
     /**

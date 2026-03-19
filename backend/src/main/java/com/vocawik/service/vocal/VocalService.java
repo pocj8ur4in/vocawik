@@ -194,8 +194,7 @@ public class VocalService {
             return new VocalSuggestionListResponse(List.of());
         }
 
-        LinkedHashMap<UUID, VocalSuggestionElementResponse> suggestionsByUuid =
-                new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashSet<UUID>> resourceUuidsByName = new LinkedHashMap<>();
         resourceNameRepository
                 .findVocalSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -204,15 +203,27 @@ public class VocalService {
                                 0, VOCAL_SUGGESTION_LIMIT * 3))
                 .forEach(
                         resourceName -> {
-                            UUID resourceUuid = resourceName.getResource().getUuid();
-                            suggestionsByUuid.putIfAbsent(
-                                    resourceUuid,
-                                    new VocalSuggestionElementResponse(
-                                            resourceUuid, resourceName.getName()));
+                            resourceUuidsByName
+                                    .computeIfAbsent(
+                                            resourceName.getName(),
+                                            ignored -> new LinkedHashSet<>())
+                                    .add(resourceName.getResource().getUuid());
                         });
 
         return new VocalSuggestionListResponse(
-                suggestionsByUuid.values().stream().limit(VOCAL_SUGGESTION_LIMIT).toList());
+                resourceUuidsByName.entrySet().stream()
+                        .limit(VOCAL_SUGGESTION_LIMIT)
+                        .map(
+                                entry -> {
+                                    boolean hasMultipleResources = entry.getValue().size() > 1;
+                                    UUID resourceUuid =
+                                            hasMultipleResources
+                                                    ? null
+                                                    : entry.getValue().iterator().next();
+                                    return new VocalSuggestionElementResponse(
+                                            resourceUuid, entry.getKey(), hasMultipleResources);
+                                })
+                        .toList());
     }
 
     private String normalizeQuery(String query) {

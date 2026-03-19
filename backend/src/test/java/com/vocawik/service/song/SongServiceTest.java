@@ -16,6 +16,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
@@ -189,6 +190,52 @@ class SongServiceTest {
         verifyNoInteractions(resourceNameRepository);
     }
 
+    @Test
+    @DisplayName("Suggest should return resource uuid when name maps to a single resource")
+    void suggest_withSingleResourceName_shouldReturnUuid() {
+        UUID resourceUuid = UUID.randomUUID();
+        ResourceName candidate = candidate(resourceUuid, "메스머라이저");
+        when(resourceNameRepository.findSongSuggestionCandidates(
+                        eq(ResourceStatus.ACTIVE),
+                        eq("mes"),
+                        argThat(
+                                pageable ->
+                                        pageable.getPageNumber() == 0
+                                                && pageable.getPageSize() == 30)))
+                .thenReturn(List.of(candidate));
+
+        SongSuggestionListResponse result = songService.suggest(" mes ");
+
+        assertThat(result.items())
+                .containsExactly(
+                        new com.vocawik.dto.song.SongSuggestionElementResponse(
+                                resourceUuid, "메스머라이저", false));
+    }
+
+    @Test
+    @DisplayName("Suggest should merge duplicate names and mark them as multiple")
+    void suggest_withDuplicateNames_shouldMergeAndFlag() {
+        UUID firstUuid = UUID.randomUUID();
+        UUID secondUuid = UUID.randomUUID();
+        ResourceName firstCandidate = candidate(firstUuid, "메스머라이저");
+        ResourceName secondCandidate = candidate(secondUuid, "메스머라이저");
+        when(resourceNameRepository.findSongSuggestionCandidates(
+                        eq(ResourceStatus.ACTIVE),
+                        eq("mes"),
+                        argThat(
+                                pageable ->
+                                        pageable.getPageNumber() == 0
+                                                && pageable.getPageSize() == 30)))
+                .thenReturn(List.of(firstCandidate, secondCandidate));
+
+        SongSuggestionListResponse result = songService.suggest(" mes ");
+
+        assertThat(result.items())
+                .containsExactly(
+                        new com.vocawik.dto.song.SongSuggestionElementResponse(
+                                null, "메스머라이저", true));
+    }
+
     private Song song(
             Long resourceId,
             UUID resourceUuid,
@@ -217,6 +264,16 @@ class SongServiceTest {
         when(resourceName.getResource()).thenReturn(resource);
         when(resourceName.getName()).thenReturn(name);
         when(resourceName.getLangCode()).thenReturn(language);
+        return resourceName;
+    }
+
+    private ResourceName candidate(UUID uuid, String name) {
+        Resource resource = mock(Resource.class);
+        when(resource.getUuid()).thenReturn(uuid);
+
+        ResourceName resourceName = mock(ResourceName.class);
+        when(resourceName.getResource()).thenReturn(resource);
+        when(resourceName.getName()).thenReturn(name);
         return resourceName;
     }
 }

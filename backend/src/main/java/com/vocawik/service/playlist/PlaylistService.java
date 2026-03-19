@@ -38,6 +38,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -92,8 +93,7 @@ public class PlaylistService {
             return new PlaylistSuggestionListResponse(List.of());
         }
 
-        LinkedHashMap<UUID, PlaylistSuggestionElementResponse> suggestionsByUuid =
-                new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashSet<UUID>> resourceUuidsByName = new LinkedHashMap<>();
         resourceNameRepository
                 .findPlaylistSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -102,15 +102,27 @@ public class PlaylistService {
                                 0, PLAYLIST_SUGGESTION_LIMIT * 3))
                 .forEach(
                         resourceName -> {
-                            UUID resourceUuid = resourceName.getResource().getUuid();
-                            suggestionsByUuid.putIfAbsent(
-                                    resourceUuid,
-                                    new PlaylistSuggestionElementResponse(
-                                            resourceUuid, resourceName.getName()));
+                            resourceUuidsByName
+                                    .computeIfAbsent(
+                                            resourceName.getName(),
+                                            ignored -> new LinkedHashSet<>())
+                                    .add(resourceName.getResource().getUuid());
                         });
 
         return new PlaylistSuggestionListResponse(
-                suggestionsByUuid.values().stream().limit(PLAYLIST_SUGGESTION_LIMIT).toList());
+                resourceUuidsByName.entrySet().stream()
+                        .limit(PLAYLIST_SUGGESTION_LIMIT)
+                        .map(
+                                entry -> {
+                                    boolean hasMultipleResources = entry.getValue().size() > 1;
+                                    UUID resourceUuid =
+                                            hasMultipleResources
+                                                    ? null
+                                                    : entry.getValue().iterator().next();
+                                    return new PlaylistSuggestionElementResponse(
+                                            resourceUuid, entry.getKey(), hasMultipleResources);
+                                })
+                        .toList());
     }
 
     @Transactional

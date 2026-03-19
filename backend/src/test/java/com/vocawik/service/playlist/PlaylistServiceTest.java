@@ -147,7 +147,31 @@ class PlaylistServiceTest {
         assertThat(result.items()).hasSize(10);
         assertThat(result.items().getFirst().resourceUuid()).isEqualTo(duplicatedUuid);
         assertThat(result.items().getFirst().name()).isEqualTo("Miku Favorites");
-        assertThat(result.items()).extracting(item -> item.resourceUuid()).doesNotHaveDuplicates();
+        assertThat(result.items().getFirst().hasMultipleResources()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Suggest should merge duplicate names and mark them as multiple")
+    void suggest_withDuplicateNames_shouldMergeAndFlag() {
+        UUID firstUuid = UUID.randomUUID();
+        UUID secondUuid = UUID.randomUUID();
+        ResourceName firstCandidate = candidate(firstUuid, "메스머라이저");
+        ResourceName secondCandidate = candidate(secondUuid, "메스머라이저");
+        when(resourceNameRepository.findPlaylistSuggestionCandidates(
+                        eq(ResourceStatus.ACTIVE),
+                        eq("mes"),
+                        argThat(
+                                pageable ->
+                                        pageable.getPageNumber() == 0
+                                                && pageable.getPageSize() == 30)))
+                .thenReturn(List.of(firstCandidate, secondCandidate));
+
+        PlaylistSuggestionListResponse result = playlistService.suggest(" mes ");
+
+        assertThat(result.items())
+                .containsExactly(
+                        new com.vocawik.dto.playlist.PlaylistSuggestionElementResponse(
+                                null, "메스머라이저", true));
     }
 
     @Test
