@@ -18,7 +18,8 @@ public record PlaylistCreateRequest(
         Boolean isPublic,
         @Valid List<ResourceAliasCreateRequest> aliases,
         @Valid List<ResourceAclCreateRequest> acls,
-        @Valid List<PlaylistSongCreateRequest> songs) {
+        @Valid List<PlaylistSongCreateRequest> songs,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields. */
     public PlaylistCreateRequest {

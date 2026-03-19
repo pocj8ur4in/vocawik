@@ -16,7 +16,8 @@ public record VocalCreateRequest(
         String content,
         @Valid List<VocalLinkCreateRequest> links,
         @Valid List<ResourceAliasCreateRequest> aliases,
-        @Valid List<ResourceAclCreateRequest> acls) {
+        @Valid List<ResourceAclCreateRequest> acls,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields. */
     public VocalCreateRequest {

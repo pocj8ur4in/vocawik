@@ -24,6 +24,9 @@ public enum ErrorCode {
     OAUTH_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_GATEWAY, "OAuth token exchange failed."),
     OAUTH_USERINFO_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "OAuth user info fetch failed."),
 
+    CAPTCHA_REQUIRED(HttpStatus.BAD_REQUEST, "Captcha token is required."),
+    CAPTCHA_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "Captcha verification failed."),
+
     EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "Email is already registered."),
     EMAIL_VERIFICATION_ALREADY_REQUESTED(
             HttpStatus.CONFLICT, "Email verification already requested. Please check your inbox.");

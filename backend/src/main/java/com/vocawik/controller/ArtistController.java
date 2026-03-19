@@ -9,6 +9,7 @@ import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.security.guest.AllowGuest;
 import com.vocawik.service.artist.ArtistService;
+import com.vocawik.service.captcha.CaptchaVerificationService;
 import com.vocawik.service.resource.ResourceService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.ArrayList;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -59,6 +62,7 @@ public class ArtistController {
 
     private final ArtistService artistService;
     private final ResourceService resourceService;
+    private final CaptchaVerificationService captchaVerificationService;
 
     /**
      * Creates a new artist resource.
@@ -70,7 +74,10 @@ public class ArtistController {
     @AllowGuest
     @Operation(summary = "Create artist", description = "Creates an artist.")
     public ResponseEntity<ArtistResourceDetailResponse> createArtist(
-            @Valid @RequestBody ArtistCreateRequest request) {
+            @Valid @RequestBody ArtistCreateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         UUID resourceUuid = artistService.create(request);
         ArtistResourceDetailResponse detail = resourceService.getArtistByResourceUuid(resourceUuid);
         return ResponseEntity.created(URI.create("/artists/" + resourceUuid)).body(detail);
@@ -94,7 +101,11 @@ public class ArtistController {
     @AllowGuest
     @Operation(summary = "Update artist", description = "Updates an artist.")
     public ResponseEntity<ArtistResourceDetailResponse> updateArtist(
-            @PathVariable UUID resourceUuid, @Valid @RequestBody ArtistUpdateRequest request) {
+            @PathVariable UUID resourceUuid,
+            @Valid @RequestBody ArtistUpdateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         UUID updatedResourceUuid = artistService.update(resourceUuid, request);
         ArtistResourceDetailResponse detail =
                 resourceService.getArtistByResourceUuid(updatedResourceUuid);
@@ -200,8 +211,10 @@ public class ArtistController {
             summary = "Suggest artists",
             description = "Returns up to 10 artist suggestions matching the current query.")
     public ResponseEntity<ArtistSuggestionListResponse> suggestArtists(
-            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
-                    String query) {
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query") String query,
+            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
         return ResponseEntity.ok(artistService.suggest(query));
     }
 

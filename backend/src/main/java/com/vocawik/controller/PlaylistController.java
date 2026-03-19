@@ -8,6 +8,7 @@ import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.security.guest.AllowGuest;
+import com.vocawik.service.captcha.CaptchaVerificationService;
 import com.vocawik.service.playlist.PlaylistService;
 import com.vocawik.service.resource.ResourceService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Map;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -57,13 +60,17 @@ public class PlaylistController {
 
     private final PlaylistService playlistService;
     private final ResourceService resourceService;
+    private final CaptchaVerificationService captchaVerificationService;
 
     /** Creates a new playlist resource. */
     @PostMapping("/playlists")
     @AllowGuest
     @Operation(summary = "Create playlist", description = "Creates a playlist.")
     public ResponseEntity<PlaylistResourceDetailResponse> createPlaylist(
-            @Valid @RequestBody PlaylistCreateRequest request) {
+            @Valid @RequestBody PlaylistCreateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         UUID resourceUuid = playlistService.create(request);
         return ResponseEntity.created(java.net.URI.create("/playlists/" + resourceUuid))
                 .body(resourceService.getPlaylistByResourceUuid(resourceUuid));
@@ -74,7 +81,11 @@ public class PlaylistController {
     @AllowGuest
     @Operation(summary = "Update playlist", description = "Updates a playlist.")
     public ResponseEntity<PlaylistResourceDetailResponse> updatePlaylist(
-            @PathVariable UUID resourceUuid, @Valid @RequestBody PlaylistUpdateRequest request) {
+            @PathVariable UUID resourceUuid,
+            @Valid @RequestBody PlaylistUpdateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         UUID updatedResourceUuid = playlistService.update(resourceUuid, request);
         return ResponseEntity.ok(resourceService.getPlaylistByResourceUuid(updatedResourceUuid));
     }
@@ -165,8 +176,10 @@ public class PlaylistController {
             summary = "Suggest playlists",
             description = "Returns up to 10 playlist suggestions matching the current query.")
     public ResponseEntity<PlaylistSuggestionListResponse> suggestPlaylists(
-            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
-                    String query) {
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query") String query,
+            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
         return ResponseEntity.ok(playlistService.suggest(query));
     }
 

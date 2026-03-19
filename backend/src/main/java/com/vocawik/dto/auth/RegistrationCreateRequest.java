@@ -7,4 +7,5 @@ import jakarta.validation.constraints.Size;
 public record RegistrationCreateRequest(
         @NotBlank @Size(min = 8, max = 64) String password,
         @NotBlank @Size(min = 2, max = 10) String nickname,
-        @NotBlank String registerTicket) {}
+        @NotBlank String registerTicket,
+        String captchaToken) {}

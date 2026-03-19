@@ -6,4 +6,4 @@ import jakarta.validation.constraints.Size;
 
 /** Request body for registration verification request creation. */
 public record RegistrationVerificationRequestCreateRequest(
-        @NotBlank @Email @Size(max = 254) String email) {}
+        @NotBlank @Email @Size(max = 254) String email, String captchaToken) {}
