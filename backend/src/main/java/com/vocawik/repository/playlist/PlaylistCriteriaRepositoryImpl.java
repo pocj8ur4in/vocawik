@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
@@ -40,7 +41,8 @@ public class PlaylistCriteriaRepositoryImpl implements PlaylistCriteriaRepositor
                 buildPredicates(criteria, criteriaQuery, root, criteriaBuilder);
 
         criteriaQuery.where(predicates.toArray(Predicate[]::new));
-        criteriaQuery.orderBy(toOrders(pageable.getSort(), criteriaBuilder, root));
+        criteriaQuery.orderBy(
+                toOrders(pageable.getSort(), criteria, criteriaQuery, criteriaBuilder, root));
 
         TypedQuery<Playlist> typedQuery = entityManager.createQuery(criteriaQuery);
         typedQuery.setFirstResult((int) pageable.getOffset());
@@ -98,14 +100,92 @@ public class PlaylistCriteriaRepositoryImpl implements PlaylistCriteriaRepositor
         return criteriaBuilder.exists(subquery);
     }
 
-    private List<Order> toOrders(Sort sort, CriteriaBuilder criteriaBuilder, Root<Playlist> root) {
+    private List<Order> toOrders(
+            Sort sort,
+            PlaylistCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            CriteriaBuilder criteriaBuilder,
+            Root<Playlist> root) {
         List<Order> orders = new ArrayList<>();
         for (Sort.Order order : sort) {
+            if (isMatchSort(order)) {
+                Expression<Integer> matchRank =
+                        buildMatchRank(criteria.query(), criteriaQuery, root, criteriaBuilder);
+                orders.add(criteriaBuilder.asc(matchRank));
+                orders.add(criteriaBuilder.asc(root.get("resource").get("canonicalName")));
+                orders.add(criteriaBuilder.desc(root.get("resource").get("viewCount")));
+                orders.add(criteriaBuilder.desc(root.get("resource").get("updatedAt")));
+                continue;
+            }
             Path<?> path = resolvePath(root, order.getProperty());
             orders.add(
                     order.isAscending() ? criteriaBuilder.asc(path) : criteriaBuilder.desc(path));
+            if (isNameSort(order)) {
+                orders.add(criteriaBuilder.desc(root.get("resource").get("viewCount")));
+            }
         }
         return orders;
+    }
+
+    private Expression<Integer> buildMatchRank(
+            String query,
+            CriteriaQuery<?> criteriaQuery,
+            Root<Playlist> root,
+            CriteriaBuilder criteriaBuilder) {
+        if (query == null) {
+            return criteriaBuilder.literal(0);
+        }
+
+        String normalizedQuery = query.toLowerCase();
+        return criteriaBuilder
+                .<Integer>selectCase()
+                .when(
+                        hasAnyResourceNameEqual(
+                                normalizedQuery, criteriaQuery, root, criteriaBuilder),
+                        0)
+                .when(
+                        hasAnyResourceNamePrefix(
+                                normalizedQuery, criteriaQuery, root, criteriaBuilder),
+                        1)
+                .otherwise(2);
+    }
+
+    private Predicate hasAnyResourceNameEqual(
+            String normalizedQuery,
+            CriteriaQuery<?> criteriaQuery,
+            Root<Playlist> root,
+            CriteriaBuilder criteriaBuilder) {
+        Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
+        Root<ResourceName> resourceName = subquery.from(ResourceName.class);
+        subquery.select(criteriaBuilder.literal(1L));
+        subquery.where(
+                criteriaBuilder.equal(resourceName.get("resource"), root.get("resource")),
+                criteriaBuilder.equal(
+                        criteriaBuilder.lower(resourceName.get("name")), normalizedQuery));
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private Predicate hasAnyResourceNamePrefix(
+            String normalizedQuery,
+            CriteriaQuery<?> criteriaQuery,
+            Root<Playlist> root,
+            CriteriaBuilder criteriaBuilder) {
+        Subquery<Long> subquery = criteriaQuery.subquery(Long.class);
+        Root<ResourceName> resourceName = subquery.from(ResourceName.class);
+        subquery.select(criteriaBuilder.literal(1L));
+        subquery.where(
+                criteriaBuilder.equal(resourceName.get("resource"), root.get("resource")),
+                criteriaBuilder.like(
+                        criteriaBuilder.lower(resourceName.get("name")), normalizedQuery + "%"));
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private boolean isMatchSort(Sort.Order order) {
+        return "match".equals(order.getProperty());
+    }
+
+    private boolean isNameSort(Sort.Order order) {
+        return "resource.canonicalName".equals(order.getProperty());
     }
 
     private Path<?> resolvePath(Root<Playlist> root, String propertyPath) {
