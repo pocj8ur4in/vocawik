@@ -128,7 +128,8 @@ public class ResourceService {
             return new ResourceSuggestionListResponse(List.of());
         }
 
-        LinkedHashMap<String, LinkedHashMap<Long, UUID>> resourceRefsByName = new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashMap<Long, ResourceSuggestionRef>> resourceRefsByName =
+                new LinkedHashMap<>();
         resourceNameRepository
                 .findSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -142,7 +143,11 @@ public class ResourceService {
                                     .computeIfAbsent(
                                             resourceName.getName(),
                                             ignored -> new LinkedHashMap<>())
-                                    .putIfAbsent(resource.getId(), resource.getUuid());
+                                    .putIfAbsent(
+                                            resource.getId(),
+                                            new ResourceSuggestionRef(
+                                                    resource.getUuid(),
+                                                    resource.getResourceType().name()));
                         });
 
         Map<Long, String> localizedNamesByResourceId =
@@ -157,12 +162,17 @@ public class ResourceService {
                         .limit(RESOURCE_SUGGESTION_LIMIT)
                         .map(
                                 entry -> {
-                                    LinkedHashMap<Long, UUID> resourceRefs = entry.getValue();
+                                    LinkedHashMap<Long, ResourceSuggestionRef> resourceRefs =
+                                            entry.getValue();
                                     boolean hasMultipleResources = resourceRefs.size() > 1;
                                     UUID resourceUuid =
                                             hasMultipleResources
                                                     ? null
-                                                    : resourceRefs.values().iterator().next();
+                                                    : resourceRefs
+                                                            .values()
+                                                            .iterator()
+                                                            .next()
+                                                            .uuid();
                                     String localizedName =
                                             hasMultipleResources
                                                     ? null
@@ -171,13 +181,26 @@ public class ResourceService {
                                                                     .keySet()
                                                                     .iterator()
                                                                     .next());
+                                    String resourceType =
+                                            resolveSuggestionResourceType(resourceRefs);
                                     return new ResourceSuggestionElementResponse(
                                             resourceUuid,
                                             entry.getKey(),
                                             localizedName,
+                                            resourceType,
                                             hasMultipleResources);
                                 })
                         .toList());
+    }
+
+    private String resolveSuggestionResourceType(
+            LinkedHashMap<Long, ResourceSuggestionRef> resourceRefs) {
+        List<String> resourceTypes =
+                resourceRefs.values().stream()
+                        .map(ResourceSuggestionRef::resourceType)
+                        .distinct()
+                        .toList();
+        return resourceTypes.size() == 1 ? resourceTypes.getFirst() : null;
     }
 
     @Transactional(readOnly = true)
@@ -802,4 +825,6 @@ public class ResourceService {
                 song.getSongType().name(),
                 playlistSong.getSortOrder());
     }
+
+    private record ResourceSuggestionRef(UUID uuid, String resourceType) {}
 }
