@@ -21,6 +21,9 @@ import com.vocawik.domain.resource.ResourceType;
 import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongArtist;
 import com.vocawik.domain.song.SongArtistRole;
+import com.vocawik.domain.song.SongPv;
+import com.vocawik.domain.song.SongPvProvider;
+import com.vocawik.domain.song.SongPvView;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.domain.song.SongVocal;
@@ -45,6 +48,7 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.service.history.ResourceHistoryService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -58,6 +62,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 class ResourceServiceTest {
 
@@ -130,6 +136,7 @@ class ResourceServiceTest {
     @AfterEach
     void tearDown() {
         LocaleContextHolder.resetLocaleContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -433,6 +440,57 @@ class ResourceServiceTest {
         assertThat(result.songs().getFirst().songLocalizedName()).isEqualTo("テル・ユア・ワールド");
     }
 
+    @Test
+    @DisplayName("Song detail should hide PV view history for non-admin")
+    void getSongByResourceUuid_shouldHidePvViewsForNonAdmin() {
+        UUID resourceUuid = UUID.randomUUID();
+        Song song = song(1L, resourceUuid, "Tell Your World");
+        SongPv pv = songPv(10L);
+        SongPvView pvView = songPvView(pv, 123L, LocalDateTime.parse("2026-03-20T12:45:43"));
+        when(songRepository.findByResourceUuid(eq(resourceUuid)))
+                .thenReturn(java.util.Optional.of(song));
+        stubEmptyResourceDetails(1L);
+        when(songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(pv));
+        when(songPvViewRepository.findAllBySongPvIdIn(eq(List.of(10L))))
+                .thenReturn(List.of(pvView));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(UUID.randomUUID(), "USER"), null, List.of()));
+
+        var result = resourceService.getSongByResourceUuid(resourceUuid);
+
+        assertThat(result.pvs()).hasSize(1);
+        assertThat(result.pvs().getFirst().views()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Song detail should expose PV view history for admin")
+    void getSongByResourceUuid_shouldExposePvViewsForAdmin() {
+        UUID resourceUuid = UUID.randomUUID();
+        Song song = song(1L, resourceUuid, "Tell Your World");
+        SongPv pv = songPv(10L);
+        SongPvView pvView = songPvView(pv, 123L, LocalDateTime.parse("2026-03-20T12:45:43"));
+        when(songRepository.findByResourceUuid(eq(resourceUuid)))
+                .thenReturn(java.util.Optional.of(song));
+        stubEmptyResourceDetails(1L);
+        when(songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(pv));
+        when(songPvViewRepository.findAllBySongPvIdIn(eq(List.of(10L))))
+                .thenReturn(List.of(pvView));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(UUID.randomUUID(), "ADMIN"), null, List.of()));
+
+        var result = resourceService.getSongByResourceUuid(resourceUuid);
+
+        assertThat(result.pvs()).hasSize(1);
+        assertThat(result.pvs().getFirst().views()).hasSize(1);
+        assertThat(result.pvs().getFirst().views().getFirst().viewCount()).isEqualTo(123L);
+    }
+
     private void stubEmptyResourceDetails(Long resourceId) {
         when(resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(eq(resourceId)))
                 .thenReturn(List.of());
@@ -443,6 +501,7 @@ class ResourceServiceTest {
                 .thenReturn(List.of());
         when(songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
                 .thenReturn(List.of());
+        when(songPvViewRepository.findAllBySongPvIdIn(eq(List.of()))).thenReturn(List.of());
         when(songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
                 .thenReturn(List.of());
         when(songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
@@ -571,6 +630,38 @@ class ResourceServiceTest {
 
     private SongRelation songRelation(Song sourceSong, Song targetSong) {
         return SongRelation.create(sourceSong, targetSong);
+    }
+
+    private SongPv songPv(Long id) {
+        SongPv pv = mock(SongPv.class);
+        when(pv.getId()).thenReturn(id);
+        when(pv.getUuid()).thenReturn(UUID.randomUUID());
+        when(pv.getService()).thenReturn(SongPvProvider.YOUTUBE);
+        when(pv.getVideoKey()).thenReturn("video-" + id);
+        when(pv.getTitle()).thenReturn("PV " + id);
+        when(pv.getThumbnailUrl()).thenReturn(null);
+        when(pv.getUploaderKey()).thenReturn(null);
+        when(pv.getDurationSeconds()).thenReturn(null);
+        when(pv.isOfficial()).thenReturn(true);
+        when(pv.getPublishedAt()).thenReturn(null);
+        when(pv.getSortOrder()).thenReturn(0);
+        when(pv.getPiaproAudioUrl()).thenReturn(null);
+        when(pv.getBilibiliCid()).thenReturn(null);
+        when(pv.getBandcampExternalUrl()).thenReturn(null);
+        when(pv.getCreatedAt()).thenReturn(LocalDateTime.parse("2026-03-20T12:45:43"));
+        when(pv.getUpdatedAt()).thenReturn(LocalDateTime.parse("2026-03-20T12:45:43"));
+        return pv;
+    }
+
+    private SongPvView songPvView(SongPv pv, Long viewCount, LocalDateTime createdAt) {
+        SongPvView view = mock(SongPvView.class);
+        when(view.getId()).thenReturn(1L);
+        when(view.getSongPv()).thenReturn(pv);
+        when(view.getUuid()).thenReturn(UUID.randomUUID());
+        when(view.getViewCount()).thenReturn(viewCount);
+        when(view.getCreatedAt()).thenReturn(createdAt);
+        when(view.getUpdatedAt()).thenReturn(createdAt);
+        return view;
     }
 
     private PlaylistSong playlistSong(Playlist playlist, Song song, int sortOrder) {
