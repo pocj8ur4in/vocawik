@@ -219,8 +219,7 @@ public class ArtistService {
             return new ArtistSuggestionListResponse(List.of());
         }
 
-        LinkedHashMap<UUID, ArtistSuggestionElementResponse> suggestionsByUuid =
-                new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashSet<UUID>> resourceUuidsByName = new LinkedHashMap<>();
         resourceNameRepository
                 .findArtistSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -229,15 +228,27 @@ public class ArtistService {
                                 0, ARTIST_SUGGESTION_LIMIT * 3))
                 .forEach(
                         resourceName -> {
-                            UUID resourceUuid = resourceName.getResource().getUuid();
-                            suggestionsByUuid.putIfAbsent(
-                                    resourceUuid,
-                                    new ArtistSuggestionElementResponse(
-                                            resourceUuid, resourceName.getName()));
+                            resourceUuidsByName
+                                    .computeIfAbsent(
+                                            resourceName.getName(),
+                                            ignored -> new LinkedHashSet<>())
+                                    .add(resourceName.getResource().getUuid());
                         });
 
         return new ArtistSuggestionListResponse(
-                suggestionsByUuid.values().stream().limit(ARTIST_SUGGESTION_LIMIT).toList());
+                resourceUuidsByName.entrySet().stream()
+                        .limit(ARTIST_SUGGESTION_LIMIT)
+                        .map(
+                                entry -> {
+                                    boolean hasMultipleResources = entry.getValue().size() > 1;
+                                    UUID resourceUuid =
+                                            hasMultipleResources
+                                                    ? null
+                                                    : entry.getValue().iterator().next();
+                                    return new ArtistSuggestionElementResponse(
+                                            resourceUuid, entry.getKey(), hasMultipleResources);
+                                })
+                        .toList());
     }
 
     private String normalizeQuery(String query) {
