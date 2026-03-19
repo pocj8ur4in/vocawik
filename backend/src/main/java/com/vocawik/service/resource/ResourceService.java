@@ -2,12 +2,14 @@ package com.vocawik.service.resource;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.artist.ArtistGroup;
 import com.vocawik.domain.artist.ArtistLink;
 import com.vocawik.domain.playlist.Playlist;
 import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
+import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.Song;
 import com.vocawik.domain.song.SongArtist;
@@ -54,12 +56,14 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -105,8 +109,12 @@ public class ResourceService {
         Page<Resource> result =
                 resourceRepository.search(new ResourceCriteria(status, normalizedQuery), pageable);
 
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceId(result.getContent());
         List<ResourceElementResponse> items =
-                result.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream()
+                        .map(resource -> toSummary(resource, localizedNamesByResourceId))
+                        .toList();
 
         return new ResourceListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
@@ -352,10 +360,43 @@ public class ResourceService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private ResourceElementResponse toSummary(Resource resource) {
+    private Map<Long, String> loadLocalizedNamesByResourceId(List<Resource> resources) {
+        Language language = resolveCurrentLanguage();
+        if (language == null || resources.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> resourceIds = resources.stream().map(Resource::getId).distinct().toList();
+
+        Map<Long, String> localizedNamesByResourceId = new HashMap<>();
+        for (ResourceName resourceName :
+                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        resourceIds)) {
+            if (resourceName.getLangCode() != language) {
+                continue;
+            }
+            localizedNamesByResourceId.putIfAbsent(
+                    resourceName.getResource().getId(), resourceName.getName());
+        }
+        return localizedNamesByResourceId;
+    }
+
+    private Language resolveCurrentLanguage() {
+        return switch (LocaleContextHolder.getLocale().getLanguage()) {
+            case "ko" -> Language.KO;
+            case "en" -> Language.EN;
+            case "ja" -> Language.JA;
+            case "zh" -> Language.ZH;
+            default -> null;
+        };
+    }
+
+    private ResourceElementResponse toSummary(
+            Resource resource, Map<Long, String> localizedNamesByResourceId) {
         return new ResourceElementResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getResourceType().name(),
                 resource.getStatus().name(),
                 resource.getViewCount(),

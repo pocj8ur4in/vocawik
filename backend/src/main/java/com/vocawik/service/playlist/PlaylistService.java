@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -68,8 +69,12 @@ public class PlaylistService {
         Page<Playlist> result =
                 playlistRepository.search(new PlaylistCriteria(status, normalizedQuery), pageable);
 
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceId(result.getContent());
         List<PlaylistElementResponse> items =
-                result.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream()
+                        .map(playlist -> toSummary(playlist, localizedNamesByResourceId))
+                        .toList();
 
         return new PlaylistListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
@@ -168,11 +173,48 @@ public class PlaylistService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private PlaylistElementResponse toSummary(Playlist playlist) {
+    private Map<Long, String> loadLocalizedNamesByResourceId(List<Playlist> playlists) {
+        Language language = resolveCurrentLanguage();
+        if (language == null || playlists.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> resourceIds =
+                playlists.stream()
+                        .map(playlist -> playlist.getResource().getId())
+                        .distinct()
+                        .toList();
+
+        Map<Long, String> localizedNamesByResourceId = new HashMap<>();
+        for (ResourceName resourceName :
+                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        resourceIds)) {
+            if (resourceName.getLangCode() != language) {
+                continue;
+            }
+            localizedNamesByResourceId.putIfAbsent(
+                    resourceName.getResource().getId(), resourceName.getName());
+        }
+        return localizedNamesByResourceId;
+    }
+
+    private Language resolveCurrentLanguage() {
+        return switch (LocaleContextHolder.getLocale().getLanguage()) {
+            case "ko" -> Language.KO;
+            case "en" -> Language.EN;
+            case "ja" -> Language.JA;
+            case "zh" -> Language.ZH;
+            default -> null;
+        };
+    }
+
+    private PlaylistElementResponse toSummary(
+            Playlist playlist, Map<Long, String> localizedNamesByResourceId) {
         Resource resource = playlist.getResource();
         return new PlaylistElementResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),

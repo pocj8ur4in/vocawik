@@ -2,6 +2,7 @@ package com.vocawik.repository.resource;
 
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
+import java.util.Collection;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,6 +14,10 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
 
     /** Finds all names by resource id in display order. */
     java.util.List<ResourceName> findAllByResourceIdOrderBySortOrderAscIdAsc(Long resourceId);
+
+    /** Finds all names for the given resource ids in display order. */
+    java.util.List<ResourceName> findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+            Collection<Long> resourceIds);
 
     /** Finds ranked resource-name candidates for query suggestions. */
     @Query(

@@ -4,13 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vocawik.common.i18n.Language;
+import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.artist.ArtistListResponse;
 import com.vocawik.dto.artist.ArtistSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.artist.ArtistGroupRepository;
@@ -22,22 +26,30 @@ import com.vocawik.service.history.ResourceHistoryService;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 class ArtistServiceTest {
 
     private ResourceNameRepository resourceNameRepository;
+    private ArtistRepository artistRepository;
     private ArtistService artistService;
 
     @BeforeEach
     void setUp() {
+        LocaleContextHolder.resetLocaleContext();
         resourceNameRepository = mock(ResourceNameRepository.class);
+        artistRepository = mock(ArtistRepository.class);
         artistService =
                 new ArtistService(
-                        mock(ArtistRepository.class),
+                        artistRepository,
                         mock(ArtistGroupRepository.class),
                         mock(ArtistLinkRepository.class),
                         mock(ResourceRepository.class),
@@ -46,6 +58,11 @@ class ArtistServiceTest {
                         mock(ResourceHistoryService.class),
                         mock(EntityManager.class),
                         new ObjectMapper());
+    }
+
+    @AfterEach
+    void tearDown() {
+        LocaleContextHolder.resetLocaleContext();
     }
 
     @Test
@@ -84,6 +101,92 @@ class ArtistServiceTest {
         verifyNoInteractions(resourceNameRepository);
     }
 
+    @Test
+    @DisplayName("Search should include localized name matching request locale")
+    void search_withMatchingLocale_shouldIncludeLocalizedName() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
+        Artist artist = artist(1L, UUID.randomUUID(), "Hachioji-P");
+        ResourceName japaneseName = localizedName(1L, "八王子P", Language.JA);
+        when(artistRepository.search(
+                        argThat(
+                                criteria ->
+                                        criteria.status() == null
+                                                && criteria.query() == null
+                                                && criteria.songUuids().isEmpty()
+                                                && criteria.groupArtistUuids().isEmpty()
+                                                && criteria.memberArtistUuids().isEmpty()),
+                        eq(PageRequest.of(0, 20))))
+                .thenReturn(new PageImpl<>(List.of(artist), PageRequest.of(0, 20), 1));
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(japaneseName));
+
+        ArtistListResponse result =
+                artistService.search(null, null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().getFirst().canonicalName()).isEqualTo("Hachioji-P");
+        assertThat(result.items().getFirst().localizedName()).isEqualTo("八王子P");
+    }
+
+    @Test
+    @DisplayName("Search should return null localized name when request locale name is missing")
+    void search_withoutMatchingLocale_shouldReturnNullLocalizedName() {
+        LocaleContextHolder.setLocale(Locale.KOREAN);
+        Artist artist = artist(1L, UUID.randomUUID(), "Hachioji-P");
+        ResourceName japaneseName = localizedName(1L, "八王子P", Language.JA);
+        when(artistRepository.search(
+                        argThat(
+                                criteria ->
+                                        criteria.status() == null
+                                                && criteria.query() == null
+                                                && criteria.songUuids().isEmpty()
+                                                && criteria.groupArtistUuids().isEmpty()
+                                                && criteria.memberArtistUuids().isEmpty()),
+                        eq(PageRequest.of(0, 20))))
+                .thenReturn(new PageImpl<>(List.of(artist), PageRequest.of(0, 20), 1));
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(japaneseName));
+
+        ArtistListResponse result =
+                artistService.search(null, null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().getFirst().localizedName()).isNull();
+    }
+
+    @Test
+    @DisplayName("Search should not query resource names when result is empty")
+    void search_withEmptyResult_shouldSkipLocalizedNameLookup() {
+        when(artistRepository.search(
+                        argThat(
+                                criteria ->
+                                        criteria.status() == null
+                                                && criteria.query() == null
+                                                && criteria.songUuids().isEmpty()
+                                                && criteria.groupArtistUuids().isEmpty()
+                                                && criteria.memberArtistUuids().isEmpty()),
+                        eq(PageRequest.of(0, 20))))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ArtistListResponse result =
+                artistService.search(null, null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(result.items()).isEmpty();
+        verify(artistRepository)
+                .search(
+                        argThat(
+                                criteria ->
+                                        criteria.status() == null
+                                                && criteria.query() == null
+                                                && criteria.songUuids().isEmpty()
+                                                && criteria.groupArtistUuids().isEmpty()
+                                                && criteria.memberArtistUuids().isEmpty()),
+                        eq(PageRequest.of(0, 20)));
+        verifyNoInteractions(resourceNameRepository);
+    }
+
     private ResourceName candidate(UUID uuid, String name) {
         Resource resource = mock(Resource.class);
         when(resource.getUuid()).thenReturn(uuid);
@@ -91,6 +194,30 @@ class ArtistServiceTest {
         ResourceName resourceName = mock(ResourceName.class);
         when(resourceName.getResource()).thenReturn(resource);
         when(resourceName.getName()).thenReturn(name);
+        return resourceName;
+    }
+
+    private Artist artist(Long resourceId, UUID resourceUuid, String canonicalName) {
+        Resource resource = mock(Resource.class);
+        when(resource.getId()).thenReturn(resourceId);
+        when(resource.getUuid()).thenReturn(resourceUuid);
+        when(resource.getCanonicalName()).thenReturn(canonicalName);
+        when(resource.getStatus()).thenReturn(ResourceStatus.ACTIVE);
+        when(resource.getViewCount()).thenReturn(0L);
+
+        Artist artist = mock(Artist.class);
+        when(artist.getResource()).thenReturn(resource);
+        return artist;
+    }
+
+    private ResourceName localizedName(Long resourceId, String name, Language language) {
+        Resource resource = mock(Resource.class);
+        when(resource.getId()).thenReturn(resourceId);
+
+        ResourceName resourceName = mock(ResourceName.class);
+        when(resourceName.getResource()).thenReturn(resource);
+        when(resourceName.getName()).thenReturn(name);
+        when(resourceName.getLangCode()).thenReturn(language);
         return resourceName;
     }
 }
