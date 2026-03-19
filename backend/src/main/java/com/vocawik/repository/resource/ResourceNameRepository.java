@@ -29,7 +29,11 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
               and r.status = :status
               and lower(rn.name) like concat('%', lower(:query), '%')
             order by
-              case when lower(rn.name) like concat(lower(:query), '%') then 0 else 1 end,
+              case
+                when lower(rn.name) = lower(:query) then 0
+                when lower(rn.name) like concat(lower(:query), '%') then 1
+                else 2
+              end,
               case when rn.isPrimary = true then 0 else 1 end,
               r.viewCount desc,
               r.updatedAt desc,
@@ -55,7 +59,11 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
                   where v.resource = rn.resource
               )
             order by
-              case when lower(rn.name) like concat(lower(:query), '%') then 0 else 1 end,
+              case
+                when lower(rn.name) = lower(:query) then 0
+                when lower(rn.name) like concat(lower(:query), '%') then 1
+                else 2
+              end,
               case when rn.isPrimary = true then 0 else 1 end,
               rn.resource.viewCount desc,
               rn.resource.updatedAt desc,
@@ -81,7 +89,11 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
                   where a.resource = rn.resource
               )
             order by
-              case when lower(rn.name) like concat(lower(:query), '%') then 0 else 1 end,
+              case
+                when lower(rn.name) = lower(:query) then 0
+                when lower(rn.name) like concat(lower(:query), '%') then 1
+                else 2
+              end,
               case when rn.isPrimary = true then 0 else 1 end,
               rn.resource.viewCount desc,
               rn.resource.updatedAt desc,
@@ -107,7 +119,11 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
                   where s.resource = rn.resource
               )
             order by
-              case when lower(rn.name) like concat(lower(:query), '%') then 0 else 1 end,
+              case
+                when lower(rn.name) = lower(:query) then 0
+                when lower(rn.name) like concat(lower(:query), '%') then 1
+                else 2
+              end,
               case when rn.isPrimary = true then 0 else 1 end,
               rn.resource.viewCount desc,
               rn.resource.updatedAt desc,
@@ -133,7 +149,11 @@ public interface ResourceNameRepository extends JpaRepository<ResourceName, Long
                   where p.resource = rn.resource
               )
             order by
-              case when lower(rn.name) like concat(lower(:query), '%') then 0 else 1 end,
+              case
+                when lower(rn.name) = lower(:query) then 0
+                when lower(rn.name) like concat(lower(:query), '%') then 1
+                else 2
+              end,
               case when rn.isPrimary = true then 0 else 1 end,
               rn.resource.viewCount desc,
               rn.resource.updatedAt desc,
