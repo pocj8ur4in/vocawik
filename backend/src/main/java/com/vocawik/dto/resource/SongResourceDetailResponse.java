@@ -9,6 +9,7 @@ public record SongResourceDetailResponse(
         UUID resourceUuid,
         boolean isDeleted,
         String canonicalName,
+        String localizedName,
         String status,
         String songType,
         long viewCount,
