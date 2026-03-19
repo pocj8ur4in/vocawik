@@ -11,13 +11,19 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.artist.Artist;
+import com.vocawik.domain.artist.ArtistGroup;
 import com.vocawik.domain.playlist.Playlist;
+import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.resource.ResourceType;
 import com.vocawik.domain.song.Song;
+import com.vocawik.domain.song.SongArtist;
+import com.vocawik.domain.song.SongArtistRole;
+import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongType;
+import com.vocawik.domain.song.SongVocal;
 import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceSuggestionListResponse;
@@ -259,18 +265,55 @@ class ResourceServiceTest {
         LocaleContextHolder.setLocale(Locale.JAPANESE);
         UUID resourceUuid = UUID.randomUUID();
         Song song = song(1L, resourceUuid, "Tell Your World");
+        Artist artist = artist(2L, UUID.randomUUID(), "Hachioji-P");
+        Vocal vocal = vocal(3L, UUID.randomUUID(), "Hatsune Miku");
+        Song targetSong = song(4L, UUID.randomUUID(), "World is Mine");
+        Song sourceSong = song(5L, UUID.randomUUID(), "Melt");
+        Playlist playlist = playlist(6L, UUID.randomUUID(), "Miku Favorites");
         ResourceName japaneseName = localizedName(1L, "テル・ユア・ワールド", Language.JA);
+        ResourceName artistJapaneseName = localizedName(2L, "八王子P", Language.JA);
+        ResourceName vocalJapaneseName = localizedName(3L, "初音ミク", Language.JA);
+        ResourceName targetJapaneseName = localizedName(4L, "ワールドイズマイン", Language.JA);
+        ResourceName sourceJapaneseName = localizedName(5L, "メルト", Language.JA);
+        ResourceName playlistJapaneseName = localizedName(6L, "ミクお気に入り", Language.JA);
         when(songRepository.findByResourceUuid(eq(resourceUuid)))
                 .thenReturn(java.util.Optional.of(song));
         stubEmptyResourceDetails(1L);
+        when(songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(songArtist(song, artist, true, 0)));
+        when(songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(songVocal(song, vocal, true, 0)));
+        when(songRelationRepository.findAllBySourceSongIdOrderByIdAsc(eq(1L)))
+                .thenReturn(List.of(songRelation(song, targetSong)));
+        when(songRelationRepository.findAllByTargetSongIdOrderByIdAsc(eq(1L)))
+                .thenReturn(List.of(songRelation(sourceSong, song)));
+        when(playlistSongRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(playlistSong(playlist, song, 0)));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
-                        eq(List.of(1L))))
-                .thenReturn(List.of(japaneseName));
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 6
+                                                && resourceIds.containsAll(
+                                                        List.of(1L, 2L, 3L, 4L, 5L, 6L)))))
+                .thenReturn(
+                        List.of(
+                                japaneseName,
+                                artistJapaneseName,
+                                vocalJapaneseName,
+                                targetJapaneseName,
+                                sourceJapaneseName,
+                                playlistJapaneseName));
 
         var result = resourceService.getSongByResourceUuid(resourceUuid);
 
         assertThat(result.canonicalName()).isEqualTo("Tell Your World");
         assertThat(result.localizedName()).isEqualTo("テル・ユア・ワールド");
+        assertThat(result.artists().getFirst().localizedName()).isEqualTo("八王子P");
+        assertThat(result.vocals().getFirst().vocalLocalizedName()).isEqualTo("初音ミク");
+        assertThat(result.relations().getFirst().targetSongLocalizedName()).isEqualTo("ワールドイズマイン");
+        assertThat(result.incomingRelations().getFirst().sourceSongLocalizedName())
+                .isEqualTo("メルト");
+        assertThat(result.playlists().getFirst().playlistLocalizedName()).isEqualTo("ミクお気に入り");
     }
 
     @Test
@@ -279,23 +322,48 @@ class ResourceServiceTest {
         LocaleContextHolder.setLocale(Locale.JAPANESE);
         UUID resourceUuid = UUID.randomUUID();
         Artist artist = artist(1L, resourceUuid, "Hachioji-P");
+        Song song = song(2L, UUID.randomUUID(), "GimmexGimme");
+        Artist memberArtist = artist(3L, UUID.randomUUID(), "KAFU");
+        Artist groupArtist = artist(4L, UUID.randomUUID(), "V.W.P");
         ResourceName japaneseName = localizedName(1L, "八王子P", Language.JA);
+        ResourceName songJapaneseName = localizedName(2L, "GimmexGimme", Language.JA);
+        ResourceName memberJapaneseName = localizedName(3L, "可不", Language.JA);
+        ResourceName groupJapaneseName = localizedName(4L, "花譜グループ", Language.JA);
         when(artistRepository.findByResourceUuid(eq(resourceUuid)))
                 .thenReturn(java.util.Optional.of(artist));
         stubEmptyResourceDetails(1L);
         when(songArtistRepository.countByArtistId(eq(1L))).thenReturn(0L);
         when(songArtistRepository.findRecentByArtistId(eq(1L), eq(PageRequest.of(0, 10))))
-                .thenReturn(List.of());
+                .thenReturn(List.of(songArtist(song, artist, true, 0)));
         when(songArtistRepository.findPopularByArtistId(eq(1L), eq(PageRequest.of(0, 10))))
-                .thenReturn(List.of());
+                .thenReturn(List.of(songArtist(song, artist, true, 0)));
+        when(artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(artistGroup(artist, memberArtist, 0)));
+        when(artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(artistGroup(groupArtist, artist, 0)));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
-                        eq(List.of(1L))))
-                .thenReturn(List.of(japaneseName));
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 4
+                                                && resourceIds.containsAll(
+                                                        List.of(1L, 2L, 3L, 4L)))))
+                .thenReturn(
+                        List.of(
+                                japaneseName,
+                                songJapaneseName,
+                                memberJapaneseName,
+                                groupJapaneseName));
 
         var result = resourceService.getArtistByResourceUuid(resourceUuid);
 
         assertThat(result.canonicalName()).isEqualTo("Hachioji-P");
         assertThat(result.localizedName()).isEqualTo("八王子P");
+        assertThat(result.songs().recentSongs().getFirst().songLocalizedName())
+                .isEqualTo("GimmexGimme");
+        assertThat(result.songs().popularSongs().getFirst().songLocalizedName())
+                .isEqualTo("GimmexGimme");
+        assertThat(result.groups().getFirst().memberArtistLocalizedName()).isEqualTo("可不");
+        assertThat(result.members().getFirst().groupArtistLocalizedName()).isEqualTo("花譜グループ");
     }
 
     @Test
@@ -304,23 +372,32 @@ class ResourceServiceTest {
         LocaleContextHolder.setLocale(Locale.JAPANESE);
         UUID resourceUuid = UUID.randomUUID();
         Vocal vocal = vocal(1L, resourceUuid, "Hatsune Miku");
+        Song song = song(2L, UUID.randomUUID(), "Tell Your World");
         ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
+        ResourceName songJapaneseName = localizedName(2L, "テル・ユア・ワールド", Language.JA);
         when(vocalRepository.findByResourceUuid(eq(resourceUuid)))
                 .thenReturn(java.util.Optional.of(vocal));
         stubEmptyResourceDetails(1L);
         when(songVocalRepository.countByVocalId(eq(1L))).thenReturn(0L);
         when(songVocalRepository.findRecentByVocalId(eq(1L), eq(PageRequest.of(0, 10))))
-                .thenReturn(List.of());
+                .thenReturn(List.of(songVocal(song, vocal, true, 0)));
         when(songVocalRepository.findPopularByVocalId(eq(1L), eq(PageRequest.of(0, 10))))
-                .thenReturn(List.of());
+                .thenReturn(List.of(songVocal(song, vocal, true, 0)));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
-                        eq(List.of(1L))))
-                .thenReturn(List.of(japaneseName));
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 2
+                                                && resourceIds.containsAll(List.of(1L, 2L)))))
+                .thenReturn(List.of(japaneseName, songJapaneseName));
 
         var result = resourceService.getVocalByResourceUuid(resourceUuid);
 
         assertThat(result.canonicalName()).isEqualTo("Hatsune Miku");
         assertThat(result.localizedName()).isEqualTo("初音ミク");
+        assertThat(result.songs().recentSongs().getFirst().songLocalizedName())
+                .isEqualTo("テル・ユア・ワールド");
+        assertThat(result.songs().popularSongs().getFirst().songLocalizedName())
+                .isEqualTo("テル・ユア・ワールド");
     }
 
     @Test
@@ -329,18 +406,26 @@ class ResourceServiceTest {
         LocaleContextHolder.setLocale(Locale.JAPANESE);
         UUID resourceUuid = UUID.randomUUID();
         Playlist playlist = playlist(1L, resourceUuid, "Miku Favorites");
+        Song song = song(2L, UUID.randomUUID(), "Tell Your World");
         ResourceName japaneseName = localizedName(1L, "ミクお気に入り", Language.JA);
+        ResourceName songJapaneseName = localizedName(2L, "テル・ユア・ワールド", Language.JA);
         when(playlistRepository.findByResourceUuid(eq(resourceUuid)))
                 .thenReturn(java.util.Optional.of(playlist));
         stubEmptyResourceDetails(1L);
+        when(playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(eq(1L)))
+                .thenReturn(List.of(playlistSong(playlist, song, 0)));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
-                        eq(List.of(1L))))
-                .thenReturn(List.of(japaneseName));
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 2
+                                                && resourceIds.containsAll(List.of(1L, 2L)))))
+                .thenReturn(List.of(japaneseName, songJapaneseName));
 
         var result = resourceService.getPlaylistByResourceUuid(resourceUuid);
 
         assertThat(result.canonicalName()).isEqualTo("Miku Favorites");
         assertThat(result.localizedName()).isEqualTo("ミクお気に入り");
+        assertThat(result.songs().getFirst().songLocalizedName()).isEqualTo("テル・ユア・ワールド");
     }
 
     private void stubEmptyResourceDetails(Long resourceId) {
@@ -449,5 +534,26 @@ class ResourceServiceTest {
         when(resourceName.getName()).thenReturn(name);
         when(resourceName.getLangCode()).thenReturn(language);
         return resourceName;
+    }
+
+    private SongArtist songArtist(Song song, Artist artist, boolean isMain, int sortOrder) {
+        return SongArtist.create(
+                song, artist, java.util.Set.of(SongArtistRole.PRODUCER), isMain, sortOrder);
+    }
+
+    private SongVocal songVocal(Song song, Vocal vocal, boolean isMain, int sortOrder) {
+        return SongVocal.create(song, vocal, isMain, sortOrder);
+    }
+
+    private SongRelation songRelation(Song sourceSong, Song targetSong) {
+        return SongRelation.create(sourceSong, targetSong);
+    }
+
+    private PlaylistSong playlistSong(Playlist playlist, Song song, int sortOrder) {
+        return PlaylistSong.create(playlist, song, sortOrder);
+    }
+
+    private ArtistGroup artistGroup(Artist groupArtist, Artist memberArtist, int sortOrder) {
+        return ArtistGroup.create(groupArtist, memberArtist, sortOrder);
     }
 }

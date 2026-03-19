@@ -58,6 +58,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -186,7 +187,6 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = song.getResource();
-        String localizedName = loadLocalizedName(resource.getId());
 
         List<ResourceNameDetailResponse> names = loadResourceNames(resource.getId());
         List<ResourceAclDetailResponse> acls = loadResourceAcls(resource.getId());
@@ -205,12 +205,21 @@ public class ResourceService {
                 songRelationRepository.findAllByTargetSongIdOrderByIdAsc(song.getId());
         List<PlaylistSong> playlists =
                 playlistSongRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(
+                        collectSongDetailResourceIds(
+                                resource.getId(),
+                                artists,
+                                vocals,
+                                outgoingRelations,
+                                incomingRelations,
+                                playlists));
 
         return new SongResourceDetailResponse(
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
-                localizedName,
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 song.getSongType().name(),
                 resource.getViewCount(),
@@ -224,11 +233,19 @@ public class ResourceService {
                 acls,
                 lyrics.stream().map(this::toSongLyric).toList(),
                 pvs.stream().map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()))).toList(),
-                artists.stream().map(this::toSongArtist).toList(),
-                vocals.stream().map(this::toSongVocal).toList(),
-                outgoingRelations.stream().map(this::toSongRelation).toList(),
-                incomingRelations.stream().map(this::toSongIncomingRelation).toList(),
-                playlists.stream().map(this::toSongPlaylist).toList());
+                artists.stream()
+                        .map(item -> toSongArtist(item, localizedNamesByResourceId))
+                        .toList(),
+                vocals.stream().map(item -> toSongVocal(item, localizedNamesByResourceId)).toList(),
+                outgoingRelations.stream()
+                        .map(item -> toSongRelation(item, localizedNamesByResourceId))
+                        .toList(),
+                incomingRelations.stream()
+                        .map(item -> toSongIncomingRelation(item, localizedNamesByResourceId))
+                        .toList(),
+                playlists.stream()
+                        .map(item -> toSongPlaylist(item, localizedNamesByResourceId))
+                        .toList());
     }
 
     @Transactional
@@ -244,29 +261,38 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
-        String localizedName = loadLocalizedName(resource.getId());
         List<ArtistLink> links = artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
         long songCount = songArtistRepository.countByArtistId(artist.getId());
-        List<ArtistResourceDetailResponse.ArtistSong> recentSongs =
-                songArtistRepository
-                        .findRecentByArtistId(
-                                artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
-                        .stream()
-                        .map(this::toArtistSong)
+        List<SongArtist> recentSongs =
+                songArtistRepository.findRecentByArtistId(
+                        artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT));
+        List<SongArtist> popularSongs =
+                songArtistRepository.findPopularByArtistId(
+                        artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT));
+        List<ArtistGroup> groups =
+                artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
+                        artist.getId());
+        List<ArtistGroup> members =
+                artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
+                        artist.getId());
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(
+                        collectArtistDetailResourceIds(
+                                resource.getId(), recentSongs, popularSongs, groups, members));
+        List<ArtistResourceDetailResponse.ArtistSong> localizedRecentSongs =
+                recentSongs.stream()
+                        .map(item -> toArtistSong(item, localizedNamesByResourceId))
                         .toList();
-        List<ArtistResourceDetailResponse.ArtistSong> popularSongs =
-                songArtistRepository
-                        .findPopularByArtistId(
-                                artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
-                        .stream()
-                        .map(this::toArtistSong)
+        List<ArtistResourceDetailResponse.ArtistSong> localizedPopularSongs =
+                popularSongs.stream()
+                        .map(item -> toArtistSong(item, localizedNamesByResourceId))
                         .toList();
 
         return new ArtistResourceDetailResponse(
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
-                localizedName,
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
@@ -276,16 +302,13 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                new ArtistResourceDetailResponse.ArtistSongs(songCount, recentSongs, popularSongs),
-                artistGroupRepository
-                        .findAllByGroupArtistIdOrderBySortOrderAscIdAsc(artist.getId())
-                        .stream()
-                        .map(this::toArtistGroup)
+                new ArtistResourceDetailResponse.ArtistSongs(
+                        songCount, localizedRecentSongs, localizedPopularSongs),
+                groups.stream()
+                        .map(item -> toArtistGroup(item, localizedNamesByResourceId))
                         .toList(),
-                artistGroupRepository
-                        .findAllByMemberArtistIdOrderBySortOrderAscIdAsc(artist.getId())
-                        .stream()
-                        .map(this::toArtistMember)
+                members.stream()
+                        .map(item -> toArtistMember(item, localizedNamesByResourceId))
                         .toList());
     }
 
@@ -302,30 +325,32 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();
-        String localizedName = loadLocalizedName(resource.getId());
         List<VocalLink> links = vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
 
         long songCount = songVocalRepository.countByVocalId(vocal.getId());
-        List<VocalResourceDetailResponse.VocalSong> recentSongs =
-                songVocalRepository
-                        .findRecentByVocalId(
-                                vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
-                        .stream()
-                        .map(this::toVocalSong)
+        List<SongVocal> recentSongs =
+                songVocalRepository.findRecentByVocalId(
+                        vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT));
+        List<SongVocal> popularSongs =
+                songVocalRepository.findPopularByVocalId(
+                        vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT));
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(
+                        collectVocalDetailResourceIds(resource.getId(), recentSongs, popularSongs));
+        List<VocalResourceDetailResponse.VocalSong> localizedRecentSongs =
+                recentSongs.stream()
+                        .map(item -> toVocalSong(item, localizedNamesByResourceId))
                         .toList();
-        List<VocalResourceDetailResponse.VocalSong> popularSongs =
-                songVocalRepository
-                        .findPopularByVocalId(
-                                vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT))
-                        .stream()
-                        .map(this::toVocalSong)
+        List<VocalResourceDetailResponse.VocalSong> localizedPopularSongs =
+                popularSongs.stream()
+                        .map(item -> toVocalSong(item, localizedNamesByResourceId))
                         .toList();
 
         return new VocalResourceDetailResponse(
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
-                localizedName,
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
@@ -335,7 +360,8 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                new VocalResourceDetailResponse.VocalSongs(songCount, recentSongs, popularSongs));
+                new VocalResourceDetailResponse.VocalSongs(
+                        songCount, localizedRecentSongs, localizedPopularSongs));
     }
 
     @Transactional
@@ -351,13 +377,18 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
-        String localizedName = loadLocalizedName(resource.getId());
+        List<PlaylistSong> songs =
+                playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(
+                        playlist.getId());
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(
+                        collectPlaylistDetailResourceIds(resource.getId(), songs));
 
         return new PlaylistResourceDetailResponse(
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
-                localizedName,
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
@@ -367,10 +398,8 @@ public class ResourceService {
                 resource.getUpdatedAt(),
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                playlistSongRepository
-                        .findAllByPlaylistIdOrderBySortOrderAscIdAsc(playlist.getId())
-                        .stream()
-                        .map(this::toPlaylistDetailSong)
+                songs.stream()
+                        .map(item -> toPlaylistDetailSong(item, localizedNamesByResourceId))
                         .toList());
     }
 
@@ -434,8 +463,77 @@ public class ResourceService {
         return localizedNamesByResourceId;
     }
 
-    private String loadLocalizedName(Long resourceId) {
-        return loadLocalizedNamesByResourceIds(List.of(resourceId)).get(resourceId);
+    private List<Long> collectSongDetailResourceIds(
+            Long rootResourceId,
+            List<SongArtist> artists,
+            List<SongVocal> vocals,
+            List<SongRelation> outgoingRelations,
+            List<SongRelation> incomingRelations,
+            List<PlaylistSong> playlists) {
+        LinkedHashSet<Long> resourceIds = new LinkedHashSet<>();
+        resourceIds.add(rootResourceId);
+        artists.stream()
+                .map(songArtist -> songArtist.getArtist().getResource().getId())
+                .forEach(resourceIds::add);
+        vocals.stream()
+                .map(songVocal -> songVocal.getVocal().getResource().getId())
+                .forEach(resourceIds::add);
+        outgoingRelations.stream()
+                .map(relation -> relation.getTargetSong().getResource().getId())
+                .forEach(resourceIds::add);
+        incomingRelations.stream()
+                .map(relation -> relation.getSourceSong().getResource().getId())
+                .forEach(resourceIds::add);
+        playlists.stream()
+                .map(playlistSong -> playlistSong.getPlaylist().getResource().getId())
+                .forEach(resourceIds::add);
+        return List.copyOf(resourceIds);
+    }
+
+    private List<Long> collectArtistDetailResourceIds(
+            Long rootResourceId,
+            List<SongArtist> recentSongs,
+            List<SongArtist> popularSongs,
+            List<ArtistGroup> groups,
+            List<ArtistGroup> members) {
+        LinkedHashSet<Long> resourceIds = new LinkedHashSet<>();
+        resourceIds.add(rootResourceId);
+        recentSongs.stream()
+                .map(songArtist -> songArtist.getSong().getResource().getId())
+                .forEach(resourceIds::add);
+        popularSongs.stream()
+                .map(songArtist -> songArtist.getSong().getResource().getId())
+                .forEach(resourceIds::add);
+        groups.stream()
+                .map(artistGroup -> artistGroup.getMemberArtist().getResource().getId())
+                .forEach(resourceIds::add);
+        members.stream()
+                .map(artistGroup -> artistGroup.getGroupArtist().getResource().getId())
+                .forEach(resourceIds::add);
+        return List.copyOf(resourceIds);
+    }
+
+    private List<Long> collectVocalDetailResourceIds(
+            Long rootResourceId, List<SongVocal> recentSongs, List<SongVocal> popularSongs) {
+        LinkedHashSet<Long> resourceIds = new LinkedHashSet<>();
+        resourceIds.add(rootResourceId);
+        recentSongs.stream()
+                .map(songVocal -> songVocal.getSong().getResource().getId())
+                .forEach(resourceIds::add);
+        popularSongs.stream()
+                .map(songVocal -> songVocal.getSong().getResource().getId())
+                .forEach(resourceIds::add);
+        return List.copyOf(resourceIds);
+    }
+
+    private List<Long> collectPlaylistDetailResourceIds(
+            Long rootResourceId, List<PlaylistSong> songs) {
+        LinkedHashSet<Long> resourceIds = new LinkedHashSet<>();
+        resourceIds.add(rootResourceId);
+        songs.stream()
+                .map(playlistSong -> playlistSong.getSong().getResource().getId())
+                .forEach(resourceIds::add);
+        return List.copyOf(resourceIds);
     }
 
     private Language resolveCurrentLanguage() {
@@ -570,51 +668,68 @@ public class ResourceService {
                 view.getUuid(), view.getViewCount(), view.getCreatedAt(), view.getUpdatedAt());
     }
 
-    private SongResourceDetailResponse.SongArtist toSongArtist(SongArtist songArtist) {
+    private SongResourceDetailResponse.SongArtist toSongArtist(
+            SongArtist songArtist, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = songArtist.getArtist().getResource();
         return new SongResourceDetailResponse.SongArtist(
-                songArtist.getArtist().getResource().getUuid(),
-                songArtist.getArtist().getResource().getCanonicalName(),
-                songArtist.getArtist().getResource().getThumbnailUrl(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
                 songArtist.isMain(),
                 songArtist.getSortOrder(),
                 songArtist.getRoles().stream().map(Enum::name).sorted().toList());
     }
 
-    private SongResourceDetailResponse.SongVocal toSongVocal(SongVocal songVocal) {
+    private SongResourceDetailResponse.SongVocal toSongVocal(
+            SongVocal songVocal, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = songVocal.getVocal().getResource();
         return new SongResourceDetailResponse.SongVocal(
-                songVocal.getVocal().getResource().getUuid(),
-                songVocal.getVocal().getResource().getCanonicalName(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 songVocal.isMain(),
                 songVocal.getSortOrder());
     }
 
-    private SongResourceDetailResponse.SongRelation toSongRelation(SongRelation relation) {
+    private SongResourceDetailResponse.SongRelation toSongRelation(
+            SongRelation relation, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = relation.getTargetSong().getResource();
         return new SongResourceDetailResponse.SongRelation(
-                relation.getTargetSong().getResource().getUuid(),
-                relation.getTargetSong().getResource().getCanonicalName(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 relation.getTargetSong().getSongType().name());
     }
 
     private SongResourceDetailResponse.SongIncomingRelation toSongIncomingRelation(
-            SongRelation relation) {
+            SongRelation relation, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = relation.getSourceSong().getResource();
         return new SongResourceDetailResponse.SongIncomingRelation(
-                relation.getSourceSong().getResource().getUuid(),
-                relation.getSourceSong().getResource().getCanonicalName(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 relation.getSourceSong().getSongType().name());
     }
 
-    private SongResourceDetailResponse.SongPlaylist toSongPlaylist(PlaylistSong playlistSong) {
+    private SongResourceDetailResponse.SongPlaylist toSongPlaylist(
+            PlaylistSong playlistSong, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = playlistSong.getPlaylist().getResource();
         return new SongResourceDetailResponse.SongPlaylist(
-                playlistSong.getPlaylist().getResource().getUuid(),
-                playlistSong.getPlaylist().getResource().getCanonicalName(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 playlistSong.getSortOrder());
     }
 
-    private ArtistResourceDetailResponse.ArtistSong toArtistSong(SongArtist songArtist) {
+    private ArtistResourceDetailResponse.ArtistSong toArtistSong(
+            SongArtist songArtist, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = songArtist.getSong().getResource();
         return new ArtistResourceDetailResponse.ArtistSong(
-                songArtist.getSong().getResource().getUuid(),
-                songArtist.getSong().getResource().getCanonicalName(),
-                songArtist.getSong().getResource().getThumbnailUrl(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
                 songArtist.getSong().getSongType().name(),
                 songArtist.getSong().getPublishedAt(),
                 songArtist.isMain(),
@@ -622,19 +737,25 @@ public class ResourceService {
                 songArtist.getRoles().stream().map(Enum::name).sorted().toList());
     }
 
-    private ArtistResourceDetailResponse.ArtistGroup toArtistGroup(ArtistGroup artistGroup) {
+    private ArtistResourceDetailResponse.ArtistGroup toArtistGroup(
+            ArtistGroup artistGroup, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = artistGroup.getMemberArtist().getResource();
         return new ArtistResourceDetailResponse.ArtistGroup(
-                artistGroup.getMemberArtist().getResource().getUuid(),
-                artistGroup.getMemberArtist().getResource().getCanonicalName(),
-                artistGroup.getMemberArtist().getResource().getThumbnailUrl(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
                 artistGroup.getSortOrder());
     }
 
-    private ArtistResourceDetailResponse.ArtistMember toArtistMember(ArtistGroup artistGroup) {
+    private ArtistResourceDetailResponse.ArtistMember toArtistMember(
+            ArtistGroup artistGroup, Map<Long, String> localizedNamesByResourceId) {
+        Resource resource = artistGroup.getGroupArtist().getResource();
         return new ArtistResourceDetailResponse.ArtistMember(
-                artistGroup.getGroupArtist().getResource().getUuid(),
-                artistGroup.getGroupArtist().getResource().getCanonicalName(),
-                artistGroup.getGroupArtist().getResource().getThumbnailUrl(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
                 artistGroup.getSortOrder());
     }
 
@@ -646,12 +767,15 @@ public class ResourceService {
                 artistLink.isDeleted());
     }
 
-    private VocalResourceDetailResponse.VocalSong toVocalSong(SongVocal songVocal) {
+    private VocalResourceDetailResponse.VocalSong toVocalSong(
+            SongVocal songVocal, Map<Long, String> localizedNamesByResourceId) {
         Song song = songVocal.getSong();
+        Resource resource = song.getResource();
         return new VocalResourceDetailResponse.VocalSong(
-                song.getResource().getUuid(),
-                song.getResource().getCanonicalName(),
-                song.getResource().getThumbnailUrl(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
                 song.getSongType().name(),
                 song.getPublishedAt(),
                 songVocal.isMain(),
@@ -667,12 +791,14 @@ public class ResourceService {
     }
 
     private PlaylistResourceDetailResponse.PlaylistSong toPlaylistDetailSong(
-            PlaylistSong playlistSong) {
+            PlaylistSong playlistSong, Map<Long, String> localizedNamesByResourceId) {
         Song song = playlistSong.getSong();
+        Resource resource = song.getResource();
         return new PlaylistResourceDetailResponse.PlaylistSong(
-                song.getResource().getUuid(),
-                song.getResource().getCanonicalName(),
-                song.getResource().getThumbnailUrl(),
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
                 song.getSongType().name(),
                 playlistSong.getSortOrder());
     }

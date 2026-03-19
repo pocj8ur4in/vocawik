@@ -32,6 +32,7 @@ public record PlaylistResourceDetailResponse(
     public record PlaylistSong(
             UUID songResourceUuid,
             String songCanonicalName,
+            String songLocalizedName,
             String songThumbnailUrl,
             String songType,
             int sortOrder) {}

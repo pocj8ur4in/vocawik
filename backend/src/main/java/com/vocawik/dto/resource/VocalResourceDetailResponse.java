@@ -44,6 +44,7 @@ public record VocalResourceDetailResponse(
     public record VocalSong(
             UUID songResourceUuid,
             String songCanonicalName,
+            String songLocalizedName,
             String songThumbnailUrl,
             String songType,
             LocalDateTime publishedAt,
