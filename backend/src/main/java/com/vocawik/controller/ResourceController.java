@@ -113,7 +113,7 @@ public class ResourceController {
                         PageRequest.of(
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
-                                sanitizeSort(pageable.getSort()))));
+                                sanitizeSort(pageable.getSort(), query))));
     }
 
     /** Suggests resources matching the current query. */
@@ -184,16 +184,24 @@ public class ResourceController {
                 resourceHistoryService.getByResourceUuidAndHistoryUuid(resourceUuid, historyUuid));
     }
 
-    private Sort sanitizeSort(Sort requestedSort) {
+    private Sort sanitizeSort(Sort requestedSort, String query) {
         Sort sort =
                 (requestedSort == null || requestedSort.isUnsorted())
                         ? Sort.by(DEFAULT_SORT_DIRECTION, DEFAULT_SORT_PROPERTY)
                         : requestedSort;
+        boolean hasSearchQuery = query != null && !query.trim().isEmpty();
 
         ArrayList<Sort.Order> allowedOrders = new ArrayList<>();
         for (Sort.Order order : sort) {
             if ("match".equals(order.getProperty()) && order.isDescending()) {
                 throw new IllegalArgumentException("match sort only supports ascending order");
+            }
+            if ("match".equals(order.getProperty()) && !hasSearchQuery) {
+                allowedOrders.add(
+                        new Sort.Order(
+                                DEFAULT_SORT_DIRECTION,
+                                ALLOWED_SORT_PROPERTIES.get(DEFAULT_SORT_PROPERTY)));
+                continue;
             }
             String internalProperty = ALLOWED_SORT_PROPERTIES.get(order.getProperty());
             if (internalProperty == null) {
