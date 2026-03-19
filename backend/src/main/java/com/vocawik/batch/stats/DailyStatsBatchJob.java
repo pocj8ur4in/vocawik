@@ -4,6 +4,8 @@ import com.vocawik.service.stats.StatsService;
 import java.time.Clock;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,12 @@ public class DailyStatsBatchJob {
 
     private final StatsService statsService;
     private final Clock batchClock;
+
+    /** Ensures the stats table has an initial UTC snapshot after startup. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void recordDailyStatsIfEmptyOnStartup() {
+        statsService.recordDailyStatsIfEmpty(LocalDate.now(batchClock));
+    }
 
     /** Records the daily stats snapshot every day at 00:00 UTC. */
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")

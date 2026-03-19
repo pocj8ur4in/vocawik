@@ -14,6 +14,18 @@ import org.junit.jupiter.api.Test;
 class DailyStatsBatchJobTest {
 
     @Test
+    @DisplayName("Startup hook should initialize stats for the current UTC date when empty")
+    void recordDailyStatsIfEmptyOnStartup_shouldUseCurrentUtcDate() {
+        StatsService statsService = mock(StatsService.class);
+        Clock fixedClock = Clock.fixed(Instant.parse("2026-03-20T12:34:56Z"), ZoneOffset.UTC);
+        DailyStatsBatchJob batchJob = new DailyStatsBatchJob(statsService, fixedClock);
+
+        batchJob.recordDailyStatsIfEmptyOnStartup();
+
+        verify(statsService).recordDailyStatsIfEmpty(LocalDate.of(2026, 3, 20));
+    }
+
+    @Test
     @DisplayName("Batch job should record stats for the current UTC date")
     void recordDailyStats_shouldUseCurrentUtcDate() {
         StatsService statsService = mock(StatsService.class);
