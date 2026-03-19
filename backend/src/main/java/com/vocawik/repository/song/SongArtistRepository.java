@@ -20,15 +20,17 @@ public interface SongArtistRepository extends JpaRepository<SongArtist, Long> {
     /** Counts all song-artist rows by artist id. */
     long countByArtistId(Long artistId);
 
-    /** Finds recent song-artist rows ordered by song resource creation time. */
+    /** Finds recent song-artist rows ordered by song published time. */
     @Query(
             """
             select sa
             from SongArtist sa
                 join sa.song s
-                join s.resource r
             where sa.artist.id = :artistId
-            order by r.createdAt desc, sa.id desc
+            order by
+                case when s.publishedAt is null then 1 else 0 end asc,
+                s.publishedAt desc,
+                sa.id desc
             """)
     List<SongArtist> findRecentByArtistId(@Param("artistId") Long artistId, Pageable pageable);
 
