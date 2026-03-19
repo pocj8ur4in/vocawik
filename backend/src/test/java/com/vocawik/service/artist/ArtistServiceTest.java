@@ -68,10 +68,12 @@ class ArtistServiceTest {
     @Test
     @DisplayName("Suggest should return up to 10 distinct artists")
     void suggest_shouldReturnUpToTenDistinctArtists() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
         List<ResourceName> candidates = new ArrayList<>();
         UUID duplicatedUuid = UUID.randomUUID();
-        candidates.add(candidate(duplicatedUuid, "Hachioji-P"));
-        candidates.add(candidate(duplicatedUuid, "8#Prince"));
+        ResourceName japaneseName = localizedName(1L, "八王子P", Language.JA);
+        candidates.add(candidate(1L, duplicatedUuid, "Hachioji-P"));
+        candidates.add(candidate(1L, duplicatedUuid, "8#Prince"));
         for (int i = 0; i < 10; i++) {
             candidates.add(candidate(UUID.randomUUID(), "Candidate " + i));
         }
@@ -83,12 +85,18 @@ class ArtistServiceTest {
                                         pageable.getPageNumber() == 0
                                                 && pageable.getPageSize() == 30)))
                 .thenReturn(candidates);
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        argThat(
+                                resourceIds ->
+                                        resourceIds.size() == 11 && resourceIds.contains(1L))))
+                .thenReturn(List.of(japaneseName));
 
         ArtistSuggestionListResponse result = artistService.suggest(" hachi ");
 
         assertThat(result.items()).hasSize(10);
         assertThat(result.items().getFirst().resourceUuid()).isEqualTo(duplicatedUuid);
         assertThat(result.items().getFirst().name()).isEqualTo("Hachioji-P");
+        assertThat(result.items().getFirst().localizedName()).isEqualTo("八王子P");
         assertThat(result.items().getFirst().hasMultipleResources()).isFalse();
     }
 
@@ -113,7 +121,7 @@ class ArtistServiceTest {
         assertThat(result.items())
                 .containsExactly(
                         new com.vocawik.dto.artist.ArtistSuggestionElementResponse(
-                                null, "메스머라이저", true));
+                                null, "메스머라이저", null, true));
     }
 
     @Test
@@ -212,7 +220,12 @@ class ArtistServiceTest {
     }
 
     private ResourceName candidate(UUID uuid, String name) {
+        return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
+    }
+
+    private ResourceName candidate(Long resourceId, UUID uuid, String name) {
         Resource resource = mock(Resource.class);
+        when(resource.getId()).thenReturn(resourceId);
         when(resource.getUuid()).thenReturn(uuid);
 
         ResourceName resourceName = mock(ResourceName.class);

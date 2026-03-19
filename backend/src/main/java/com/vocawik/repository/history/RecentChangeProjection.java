@@ -10,6 +10,8 @@ public interface RecentChangeProjection {
 
     LocalDateTime getCreatedAt();
 
+    Long getResourceId();
+
     UUID getResourceUuid();
 
     String getCanonicalName();

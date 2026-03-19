@@ -4,4 +4,4 @@ import java.util.UUID;
 
 /** Suggestion item for resource autocomplete responses. */
 public record ResourceSuggestionElementResponse(
-        UUID resourceUuid, String name, boolean hasMultipleResources) {}
+        UUID resourceUuid, String name, String localizedName, boolean hasMultipleResources) {}

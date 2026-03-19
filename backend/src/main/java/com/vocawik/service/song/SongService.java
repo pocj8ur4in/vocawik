@@ -163,7 +163,7 @@ public class SongService {
             return new SongSuggestionListResponse(List.of());
         }
 
-        LinkedHashMap<String, LinkedHashSet<UUID>> resourceUuidsByName = new LinkedHashMap<>();
+        LinkedHashMap<String, LinkedHashMap<Long, UUID>> resourceRefsByName = new LinkedHashMap<>();
         resourceNameRepository
                 .findSongSuggestionCandidates(
                         ResourceStatus.ACTIVE,
@@ -172,25 +172,45 @@ public class SongService {
                                 0, SONG_SUGGESTION_LIMIT * 3))
                 .forEach(
                         resourceName -> {
-                            resourceUuidsByName
+                            Resource resource = resourceName.getResource();
+                            resourceRefsByName
                                     .computeIfAbsent(
                                             resourceName.getName(),
-                                            ignored -> new LinkedHashSet<>())
-                                    .add(resourceName.getResource().getUuid());
+                                            ignored -> new LinkedHashMap<>())
+                                    .putIfAbsent(resource.getId(), resource.getUuid());
                         });
 
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(
+                        resourceRefsByName.values().stream()
+                                .flatMap(resourceRefs -> resourceRefs.keySet().stream())
+                                .distinct()
+                                .toList());
+
         return new SongSuggestionListResponse(
-                resourceUuidsByName.entrySet().stream()
+                resourceRefsByName.entrySet().stream()
                         .limit(SONG_SUGGESTION_LIMIT)
                         .map(
                                 entry -> {
-                                    boolean hasMultipleResources = entry.getValue().size() > 1;
+                                    LinkedHashMap<Long, UUID> resourceRefs = entry.getValue();
+                                    boolean hasMultipleResources = resourceRefs.size() > 1;
                                     UUID resourceUuid =
                                             hasMultipleResources
                                                     ? null
-                                                    : entry.getValue().iterator().next();
+                                                    : resourceRefs.values().iterator().next();
+                                    String localizedName =
+                                            hasMultipleResources
+                                                    ? null
+                                                    : localizedNamesByResourceId.get(
+                                                            resourceRefs
+                                                                    .keySet()
+                                                                    .iterator()
+                                                                    .next());
                                     return new SongSuggestionElementResponse(
-                                            resourceUuid, entry.getKey(), hasMultipleResources);
+                                            resourceUuid,
+                                            entry.getKey(),
+                                            localizedName,
+                                            hasMultipleResources);
                                 })
                         .toList());
     }
@@ -1615,13 +1635,25 @@ public class SongService {
             return Map.of();
         }
 
-        List<Long> resourceIds =
-                songs.stream().map(song -> song.getResource().getId()).distinct().toList();
+        return loadLocalizedNamesByResourceIds(
+                songs.stream().map(song -> song.getResource().getId()).distinct().toList());
+    }
+
+    private Map<Long, String> loadLocalizedNamesByResourceIds(List<Long> resourceIds) {
+        Language language = resolveCurrentLanguage();
+        if (language == null || resourceIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<ResourceName> localizedNames =
+                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        resourceIds);
+        if (localizedNames == null) {
+            return Map.of();
+        }
 
         Map<Long, String> localizedNamesByResourceId = new HashMap<>();
-        for (ResourceName resourceName :
-                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
-                        resourceIds)) {
+        for (ResourceName resourceName : localizedNames) {
             if (resourceName.getLangCode() != language) {
                 continue;
             }
