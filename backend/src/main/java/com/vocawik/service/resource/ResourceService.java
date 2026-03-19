@@ -19,6 +19,7 @@ import com.vocawik.domain.song.SongPv;
 import com.vocawik.domain.song.SongPvView;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongVocal;
+import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.domain.vocal.VocalLink;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
@@ -68,6 +69,8 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -665,15 +668,27 @@ public class ResourceService {
                 pv.getPublishedAt(),
                 toSongPvExtra(pv),
                 pv.getSortOrder(),
-                (views == null ? List.<SongPvView>of() : views)
-                        .stream()
-                                .sorted(
-                                        Comparator.comparing(SongPvView::getCreatedAt)
-                                                .thenComparing(SongPvView::getId))
-                                .map(this::toSongPvView)
-                                .toList(),
+                canViewSongPvHistory()
+                        ? (views == null ? List.<SongPvView>of() : views)
+                                .stream()
+                                        .sorted(
+                                                Comparator.comparing(SongPvView::getCreatedAt)
+                                                        .thenComparing(SongPvView::getId))
+                                        .map(this::toSongPvView)
+                                        .toList()
+                        : List.of(),
                 pv.getCreatedAt(),
                 pv.getUpdatedAt());
+    }
+
+    private boolean canViewSongPvHistory() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !(authentication.getPrincipal()
+                        instanceof com.vocawik.security.jwt.AuthPrincipal principal)) {
+            return false;
+        }
+        return UserRole.ADMIN.name().equals(principal.role());
     }
 
     private SongResourceDetailResponse.SongPvExtra toSongPvExtra(SongPv pv) {
