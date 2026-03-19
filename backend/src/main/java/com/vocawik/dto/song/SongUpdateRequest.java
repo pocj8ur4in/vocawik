@@ -84,7 +84,7 @@ public record SongUpdateRequest(
             @NotBlank String videoKey,
             @Size(max = 255) String title,
             String thumbnailUrl,
-            @Size(max = 100) String uploaderKey,
+            String uploaderKey,
             @Min(0) Integer durationSeconds,
             boolean isOfficial,
             LocalDateTime publishedAt,

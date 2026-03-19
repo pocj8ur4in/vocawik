@@ -335,7 +335,7 @@ CREATE TABLE song_pvs (
     video_key TEXT NOT NULL,
     title VARCHAR(255),
     thumbnail_url TEXT,
-    uploader_key VARCHAR(100),
+    uploader_key TEXT,
     duration_seconds INTEGER,
     is_official BOOLEAN NOT NULL DEFAULT TRUE,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,

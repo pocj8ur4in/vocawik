@@ -38,7 +38,7 @@ public class SongPv extends BaseEntity {
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
 
-    @Column(name = "uploader_key", length = 100)
+    @Column(name = "uploader_key", columnDefinition = "TEXT")
     private String uploaderKey;
 
     @Column(name = "duration_seconds")
