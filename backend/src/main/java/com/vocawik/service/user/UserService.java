@@ -50,6 +50,8 @@ public class UserService {
         return new UserProfileResponse(
                 user.getUuid(),
                 user.getNickname(),
+                user.getEmail(),
+                user.getRole().name(),
                 user.getCreatedAt(),
                 user.getLastLoginAt(),
                 historyRepository.countByActorUserId(user.getId()));

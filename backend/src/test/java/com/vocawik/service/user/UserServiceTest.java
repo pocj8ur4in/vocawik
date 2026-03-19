@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserPvProvider;
+import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.user.UserTheme;
 import com.vocawik.dto.user.UserMeResponse;
 import com.vocawik.dto.user.UserProfileResponse;
@@ -69,6 +70,8 @@ class UserServiceTest {
         when(user.getId()).thenReturn(1L);
         when(user.getUuid()).thenReturn(userUuid);
         when(user.getNickname()).thenReturn("string");
+        when(user.getEmail()).thenReturn("user@example.com");
+        when(user.getRole()).thenReturn(UserRole.USER);
         when(user.getCreatedAt()).thenReturn(LocalDateTime.parse("2026-03-19T12:45:43.445"));
         when(user.getLastLoginAt()).thenReturn(LocalDateTime.parse("2026-03-19T13:45:43.445"));
         when(userRepository.findByUuidAndIsDeletedFalse(eq(userUuid)))
@@ -82,6 +85,8 @@ class UserServiceTest {
                         new UserProfileResponse(
                                 userUuid,
                                 "string",
+                                "user@example.com",
+                                "USER",
                                 LocalDateTime.parse("2026-03-19T12:45:43.445"),
                                 LocalDateTime.parse("2026-03-19T13:45:43.445"),
                                 123L));
