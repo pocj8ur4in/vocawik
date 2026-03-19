@@ -49,7 +49,8 @@ public class PlaylistController {
     private static final Map<String, String> ALLOWED_SORT_PROPERTIES =
             Map.of(
                     "updatedAt", "resource.updatedAt",
-                    "createdAt", "resource.createdAt");
+                    "createdAt", "resource.createdAt",
+                    "name", "resource.canonicalName");
 
     private final PlaylistService playlistService;
     private final ResourceService resourceService;
@@ -122,7 +123,9 @@ public class PlaylistController {
                                     "updatedAt,asc",
                                     "updatedAt,desc",
                                     "createdAt,asc",
-                                    "createdAt,desc"
+                                    "createdAt,desc",
+                                    "name,asc",
+                                    "name,desc"
                                 }))
     })
     public ResponseEntity<PlaylistListResponse> searchPlaylists(

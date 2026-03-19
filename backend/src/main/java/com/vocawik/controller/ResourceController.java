@@ -17,7 +17,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -38,7 +38,11 @@ public class ResourceController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
     private static final Sort.Direction DEFAULT_SORT_DIRECTION = Sort.Direction.DESC;
-    private static final Set<String> ALLOWED_SORT_PROPERTIES = Set.of("updatedAt", "createdAt");
+    private static final Map<String, String> ALLOWED_SORT_PROPERTIES =
+            Map.of(
+                    "updatedAt", "updatedAt",
+                    "createdAt", "createdAt",
+                    "name", "canonicalName");
 
     private final ResourceService resourceService;
     private final ResourceHistoryService resourceHistoryService;
@@ -82,7 +86,9 @@ public class ResourceController {
                                     "updatedAt,asc",
                                     "updatedAt,desc",
                                     "createdAt,asc",
-                                    "createdAt,desc"
+                                    "createdAt,desc",
+                                    "name,asc",
+                                    "name,desc"
                                 }))
     })
     public ResponseEntity<ResourceListResponse> searchResources(
@@ -184,11 +190,12 @@ public class ResourceController {
 
         ArrayList<Sort.Order> allowedOrders = new ArrayList<>();
         for (Sort.Order order : sort) {
-            if (!ALLOWED_SORT_PROPERTIES.contains(order.getProperty())) {
+            String internalProperty = ALLOWED_SORT_PROPERTIES.get(order.getProperty());
+            if (internalProperty == null) {
                 throw new IllegalArgumentException(
                         "Unsupported sort property: " + order.getProperty());
             }
-            allowedOrders.add(order);
+            allowedOrders.add(new Sort.Order(order.getDirection(), internalProperty));
         }
         return Sort.by(allowedOrders);
     }
