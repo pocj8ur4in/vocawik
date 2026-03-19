@@ -24,17 +24,11 @@ public class UserService {
                         .orElseThrow(() -> new UnauthorizedException("Authentication required."));
 
         return new UserMeResponse(
-                user.getUuid(),
-                user.getEmail(),
                 user.getNickname(),
-                user.getStatus().name(),
-                user.getRole().name(),
                 user.getLangCode().name(),
                 user.getTimezone().getId(),
                 user.getTheme().name(),
                 user.getPvProvider().name(),
-                user.getLastLoginAt(),
-                user.getCreatedAt(),
-                user.getUpdatedAt());
+                user.getLastLoginAt());
     }
 }
