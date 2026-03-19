@@ -95,6 +95,7 @@ public record SongResourceDetailResponse(
     public record SongArtist(
             UUID artistResourceUuid,
             String canonicalName,
+            String localizedName,
             String thumbnailUrl,
             boolean isMain,
             int sortOrder,
@@ -108,17 +109,30 @@ public record SongResourceDetailResponse(
 
     /** Song vocal item in the detailed payload. */
     public record SongVocal(
-            UUID vocalResourceUuid, String vocalCanonicalName, boolean isMain, int sortOrder) {}
+            UUID vocalResourceUuid,
+            String vocalCanonicalName,
+            String vocalLocalizedName,
+            boolean isMain,
+            int sortOrder) {}
 
     /** Song relation item in the detailed payload. */
     public record SongRelation(
-            UUID targetSongResourceUuid, String targetSongCanonicalName, String targetSongType) {}
+            UUID targetSongResourceUuid,
+            String targetSongCanonicalName,
+            String targetSongLocalizedName,
+            String targetSongType) {}
 
     /** Incoming relation item in the detailed payload. */
     public record SongIncomingRelation(
-            UUID sourceSongResourceUuid, String sourceSongCanonicalName, String sourceSongType) {}
+            UUID sourceSongResourceUuid,
+            String sourceSongCanonicalName,
+            String sourceSongLocalizedName,
+            String sourceSongType) {}
 
     /** Playlist item that contains this song. */
     public record SongPlaylist(
-            UUID playlistResourceUuid, String playlistCanonicalName, int sortOrder) {}
+            UUID playlistResourceUuid,
+            String playlistCanonicalName,
+            String playlistLocalizedName,
+            int sortOrder) {}
 }

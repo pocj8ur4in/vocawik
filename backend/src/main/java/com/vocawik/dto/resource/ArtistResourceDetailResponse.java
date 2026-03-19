@@ -48,6 +48,7 @@ public record ArtistResourceDetailResponse(
     public record ArtistSong(
             UUID songResourceUuid,
             String songCanonicalName,
+            String songLocalizedName,
             String songThumbnailUrl,
             String songType,
             LocalDateTime publishedAt,
@@ -65,6 +66,7 @@ public record ArtistResourceDetailResponse(
     public record ArtistGroup(
             UUID memberArtistResourceUuid,
             String memberArtistCanonicalName,
+            String memberArtistLocalizedName,
             String memberArtistThumbnailUrl,
             int sortOrder) {}
 
@@ -72,6 +74,7 @@ public record ArtistResourceDetailResponse(
     public record ArtistMember(
             UUID groupArtistResourceUuid,
             String groupArtistCanonicalName,
+            String groupArtistLocalizedName,
             String groupArtistThumbnailUrl,
             int sortOrder) {}
 }
