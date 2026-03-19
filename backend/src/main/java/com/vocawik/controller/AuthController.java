@@ -19,8 +19,10 @@ import com.vocawik.service.auth.SessionService;
 import com.vocawik.service.auth.VerificationService;
 import com.vocawik.service.auth.oauth.OAuthService;
 import com.vocawik.service.auth.oauth.OAuthStateService;
+import com.vocawik.service.captcha.CaptchaVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -61,6 +63,7 @@ public class AuthController {
     private final OAuthService oAuthService;
     private final VerificationService verificationService;
     private final OAuthStateService oAuthStateService;
+    private final CaptchaVerificationService captchaVerificationService;
 
     /**
      * Requests email verification for register.
@@ -74,7 +77,9 @@ public class AuthController {
             summary = "Verify request for register",
             description = "Creates an email verification request for registration.")
     public ResponseEntity<RegistrationVerificationRequestResponse> requestEmailVerification(
-            @Valid @RequestBody RegistrationVerificationRequestCreateRequest request) {
+            @Valid @RequestBody RegistrationVerificationRequestCreateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequired(request.captchaToken(), httpServletRequest);
         String requestId = verificationService.requestEmailVerification(request.email());
         Instant expiresAt =
                 Instant.now().plusSeconds(verificationService.getRegistrationEmailLinkTtlSeconds());
@@ -113,7 +118,10 @@ public class AuthController {
     @Operation(
             summary = "Create registration",
             description = "Creates a user account from verified register ticket.")
-    public ResponseEntity<Void> register(@Valid @RequestBody RegistrationCreateRequest request) {
+    public ResponseEntity<Void> register(
+            @Valid @RequestBody RegistrationCreateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequired(request.captchaToken(), httpServletRequest);
         UUID userUuid =
                 verificationService.register(
                         request.password(), request.nickname(), request.registerTicket());
@@ -135,7 +143,10 @@ public class AuthController {
             summary = "Create session",
             description = "Authenticates credentials and creates an access/refresh session.")
     public ResponseEntity<SessionTokenResponse> login(
-            @Valid @RequestBody SessionCreateRequest request, HttpServletResponse response) {
+            @Valid @RequestBody SessionCreateRequest request,
+            HttpServletRequest httpServletRequest,
+            HttpServletResponse response) {
+        captchaVerificationService.verifyRequired(request.captchaToken(), httpServletRequest);
         AuthTokenBundle tokenBundle = sessionService.login(request.email(), request.password());
         addRefreshCookie(response, tokenBundle.refreshToken());
         return ResponseEntity.created(URI.create("/api/v1/sessions/current"))

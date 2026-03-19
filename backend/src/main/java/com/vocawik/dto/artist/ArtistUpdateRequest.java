@@ -18,7 +18,8 @@ public record ArtistUpdateRequest(
         @Valid List<ArtistLinkUpdateRequest> links,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
-        @Valid List<ArtistMemberUpdateRequest> members) {
+        @Valid List<ArtistMemberUpdateRequest> members,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public ArtistUpdateRequest {

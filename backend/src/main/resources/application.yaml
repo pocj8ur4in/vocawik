@@ -98,6 +98,12 @@ oauth:
     user-info-uri: ${GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}
     redirect-uri: ${GOOGLE_REDIRECT_URI:}
 
+captcha:
+  turnstile:
+    enabled: ${TURNSTILE_ENABLED:false}
+    secret-key: ${TURNSTILE_SECRET_KEY:}
+    siteverify-url: ${TURNSTILE_SITEVERIFY_URL:https://challenges.cloudflare.com/turnstile/v0/siteverify}
+
 pv:
   http:
     connect-timeout-ms: ${PV_HTTP_CONNECT_TIMEOUT_MS:2000}
@@ -183,6 +189,7 @@ logging:
       - cookie
       - set-cookie
       - x-api-key
+      - x-captcha-token
       - proxy-authorization
     logged-headers:
       - user-agent

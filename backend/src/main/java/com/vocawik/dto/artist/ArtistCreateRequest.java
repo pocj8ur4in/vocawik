@@ -18,7 +18,8 @@ public record ArtistCreateRequest(
         @Valid List<ArtistLinkCreateRequest> links,
         @Valid List<ResourceAliasCreateRequest> aliases,
         @Valid List<ResourceAclCreateRequest> acls,
-        @Valid List<ArtistMemberCreateRequest> members) {
+        @Valid List<ArtistMemberCreateRequest> members,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields. */
     public ArtistCreateRequest {

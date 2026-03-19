@@ -18,7 +18,8 @@ public record PlaylistUpdateRequest(
         Boolean isPublic,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
-        @Valid List<PlaylistSongUpdateRequest> songs) {
+        @Valid List<PlaylistSongUpdateRequest> songs,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public PlaylistUpdateRequest {

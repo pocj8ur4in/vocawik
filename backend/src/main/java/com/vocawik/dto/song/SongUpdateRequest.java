@@ -26,7 +26,8 @@ public record SongUpdateRequest(
         @Valid List<SongPvUpdateRequest> pvs,
         @Valid List<SongArtistUpdateRequest> artists,
         @Valid List<SongVocalUpdateRequest> vocals,
-        UUID relationsTargetSongResourceUuid) {
+        UUID relationsTargetSongResourceUuid,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public SongUpdateRequest {

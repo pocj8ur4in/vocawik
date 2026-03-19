@@ -16,7 +16,8 @@ public record VocalUpdateRequest(
         String content,
         @Valid List<VocalLinkUpdateRequest> links,
         @Valid List<ResourceAliasUpdateRequest> aliases,
-        @Valid List<ResourceAclUpdateRequest> acls) {
+        @Valid List<ResourceAclUpdateRequest> acls,
+        String captchaToken) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public VocalUpdateRequest {

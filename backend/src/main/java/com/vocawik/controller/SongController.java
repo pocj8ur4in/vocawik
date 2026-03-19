@@ -11,6 +11,7 @@ import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.security.guest.AllowGuest;
+import com.vocawik.service.captcha.CaptchaVerificationService;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -20,6 +21,7 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -40,6 +42,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -65,6 +68,7 @@ public class SongController {
 
     private final SongService songService;
     private final ResourceService resourceService;
+    private final CaptchaVerificationService captchaVerificationService;
 
     /**
      * Creates a new song resource.
@@ -76,7 +80,9 @@ public class SongController {
     @AllowGuest
     @Operation(summary = "Create song", description = "Creates a song.")
     public ResponseEntity<SongResourceDetailResponse> createSong(
-            @Valid @RequestBody SongCreateRequest request) {
+            @Valid @RequestBody SongCreateRequest request, HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         UUID resourceUuid = songService.create(request);
         SongResourceDetailResponse detail = resourceService.getSongByResourceUuid(resourceUuid);
         return ResponseEntity.created(URI.create("/songs/" + resourceUuid)).body(detail);
@@ -100,7 +106,11 @@ public class SongController {
     @AllowGuest
     @Operation(summary = "Update song", description = "Updates a song.")
     public ResponseEntity<SongResourceDetailResponse> updateSong(
-            @PathVariable UUID resourceUuid, @Valid @RequestBody SongUpdateRequest request) {
+            @PathVariable UUID resourceUuid,
+            @Valid @RequestBody SongUpdateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         UUID updatedResourceUuid = songService.update(resourceUuid, request);
         SongResourceDetailResponse detail =
                 resourceService.getSongByResourceUuid(updatedResourceUuid);
@@ -221,8 +231,10 @@ public class SongController {
             summary = "Suggest songs",
             description = "Returns up to 10 song suggestions matching the current query.")
     public ResponseEntity<SongSuggestionListResponse> suggestSongs(
-            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
-                    String query) {
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query") String query,
+            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
         return ResponseEntity.ok(songService.suggest(query));
     }
 
@@ -238,7 +250,10 @@ public class SongController {
             summary = "Resolve song PV",
             description = "Returns parsed/normalized PV metadata from URL.")
     public ResponseEntity<SongPvResolveResponse> resolveSongPv(
-            @Valid @RequestBody SongPvResolveRequest request) {
+            @Valid @RequestBody SongPvResolveRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
         return ResponseEntity.ok(songService.resolveSongPv(request));
     }
 
