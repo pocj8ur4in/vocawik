@@ -10,10 +10,15 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.common.i18n.Language;
+import com.vocawik.domain.artist.Artist;
+import com.vocawik.domain.playlist.Playlist;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.resource.ResourceType;
+import com.vocawik.domain.song.Song;
+import com.vocawik.domain.song.SongType;
+import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
@@ -35,6 +40,7 @@ import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.history.ResourceHistoryService;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -49,6 +55,22 @@ import org.springframework.data.domain.PageRequest;
 
 class ResourceServiceTest {
 
+    private AclRepository aclRepository;
+    private SongRepository songRepository;
+    private SongLinkRepository songLinkRepository;
+    private SongLyricRepository songLyricRepository;
+    private SongPvRepository songPvRepository;
+    private SongPvViewRepository songPvViewRepository;
+    private SongArtistRepository songArtistRepository;
+    private SongVocalRepository songVocalRepository;
+    private SongRelationRepository songRelationRepository;
+    private PlaylistSongRepository playlistSongRepository;
+    private PlaylistRepository playlistRepository;
+    private ArtistRepository artistRepository;
+    private ArtistGroupRepository artistGroupRepository;
+    private ArtistLinkRepository artistLinkRepository;
+    private VocalRepository vocalRepository;
+    private VocalLinkRepository vocalLinkRepository;
     private ResourceNameRepository resourceNameRepository;
     private ResourceRepository resourceRepository;
     private ResourceService resourceService;
@@ -56,28 +78,44 @@ class ResourceServiceTest {
     @BeforeEach
     void setUp() {
         LocaleContextHolder.resetLocaleContext();
+        aclRepository = mock(AclRepository.class);
+        songRepository = mock(SongRepository.class);
+        songLinkRepository = mock(SongLinkRepository.class);
+        songLyricRepository = mock(SongLyricRepository.class);
+        songPvRepository = mock(SongPvRepository.class);
+        songPvViewRepository = mock(SongPvViewRepository.class);
+        songArtistRepository = mock(SongArtistRepository.class);
+        songVocalRepository = mock(SongVocalRepository.class);
+        songRelationRepository = mock(SongRelationRepository.class);
+        playlistSongRepository = mock(PlaylistSongRepository.class);
+        playlistRepository = mock(PlaylistRepository.class);
+        artistRepository = mock(ArtistRepository.class);
+        artistGroupRepository = mock(ArtistGroupRepository.class);
+        artistLinkRepository = mock(ArtistLinkRepository.class);
+        vocalRepository = mock(VocalRepository.class);
+        vocalLinkRepository = mock(VocalLinkRepository.class);
         resourceNameRepository = mock(ResourceNameRepository.class);
         resourceRepository = mock(ResourceRepository.class);
         resourceService =
                 new ResourceService(
                         resourceRepository,
                         resourceNameRepository,
-                        mock(AclRepository.class),
-                        mock(SongRepository.class),
-                        mock(SongLinkRepository.class),
-                        mock(SongLyricRepository.class),
-                        mock(SongPvRepository.class),
-                        mock(SongPvViewRepository.class),
-                        mock(SongArtistRepository.class),
-                        mock(SongVocalRepository.class),
-                        mock(SongRelationRepository.class),
-                        mock(PlaylistSongRepository.class),
-                        mock(PlaylistRepository.class),
-                        mock(ArtistRepository.class),
-                        mock(ArtistGroupRepository.class),
-                        mock(ArtistLinkRepository.class),
-                        mock(VocalRepository.class),
-                        mock(VocalLinkRepository.class),
+                        aclRepository,
+                        songRepository,
+                        songLinkRepository,
+                        songLyricRepository,
+                        songPvRepository,
+                        songPvViewRepository,
+                        songArtistRepository,
+                        songVocalRepository,
+                        songRelationRepository,
+                        playlistSongRepository,
+                        playlistRepository,
+                        artistRepository,
+                        artistGroupRepository,
+                        artistLinkRepository,
+                        vocalRepository,
+                        vocalLinkRepository,
                         mock(ResourceHistoryService.class),
                         mock(ResourcePopularityService.class),
                         new ObjectMapper());
@@ -215,6 +253,128 @@ class ResourceServiceTest {
         verifyNoInteractions(resourceNameRepository);
     }
 
+    @Test
+    @DisplayName("Song detail should include localized name matching request locale")
+    void getSongByResourceUuid_withMatchingLocale_shouldIncludeLocalizedName() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
+        UUID resourceUuid = UUID.randomUUID();
+        Song song = song(1L, resourceUuid, "Tell Your World");
+        ResourceName japaneseName = localizedName(1L, "テル・ユア・ワールド", Language.JA);
+        when(songRepository.findByResourceUuid(eq(resourceUuid)))
+                .thenReturn(java.util.Optional.of(song));
+        stubEmptyResourceDetails(1L);
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(japaneseName));
+
+        var result = resourceService.getSongByResourceUuid(resourceUuid);
+
+        assertThat(result.canonicalName()).isEqualTo("Tell Your World");
+        assertThat(result.localizedName()).isEqualTo("テル・ユア・ワールド");
+    }
+
+    @Test
+    @DisplayName("Artist detail should include localized name matching request locale")
+    void getArtistByResourceUuid_withMatchingLocale_shouldIncludeLocalizedName() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
+        UUID resourceUuid = UUID.randomUUID();
+        Artist artist = artist(1L, resourceUuid, "Hachioji-P");
+        ResourceName japaneseName = localizedName(1L, "八王子P", Language.JA);
+        when(artistRepository.findByResourceUuid(eq(resourceUuid)))
+                .thenReturn(java.util.Optional.of(artist));
+        stubEmptyResourceDetails(1L);
+        when(songArtistRepository.countByArtistId(eq(1L))).thenReturn(0L);
+        when(songArtistRepository.findRecentByArtistId(eq(1L), eq(PageRequest.of(0, 10))))
+                .thenReturn(List.of());
+        when(songArtistRepository.findPopularByArtistId(eq(1L), eq(PageRequest.of(0, 10))))
+                .thenReturn(List.of());
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(japaneseName));
+
+        var result = resourceService.getArtistByResourceUuid(resourceUuid);
+
+        assertThat(result.canonicalName()).isEqualTo("Hachioji-P");
+        assertThat(result.localizedName()).isEqualTo("八王子P");
+    }
+
+    @Test
+    @DisplayName("Vocal detail should include localized name matching request locale")
+    void getVocalByResourceUuid_withMatchingLocale_shouldIncludeLocalizedName() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
+        UUID resourceUuid = UUID.randomUUID();
+        Vocal vocal = vocal(1L, resourceUuid, "Hatsune Miku");
+        ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
+        when(vocalRepository.findByResourceUuid(eq(resourceUuid)))
+                .thenReturn(java.util.Optional.of(vocal));
+        stubEmptyResourceDetails(1L);
+        when(songVocalRepository.countByVocalId(eq(1L))).thenReturn(0L);
+        when(songVocalRepository.findRecentByVocalId(eq(1L), eq(PageRequest.of(0, 10))))
+                .thenReturn(List.of());
+        when(songVocalRepository.findPopularByVocalId(eq(1L), eq(PageRequest.of(0, 10))))
+                .thenReturn(List.of());
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(japaneseName));
+
+        var result = resourceService.getVocalByResourceUuid(resourceUuid);
+
+        assertThat(result.canonicalName()).isEqualTo("Hatsune Miku");
+        assertThat(result.localizedName()).isEqualTo("初音ミク");
+    }
+
+    @Test
+    @DisplayName("Playlist detail should include localized name matching request locale")
+    void getPlaylistByResourceUuid_withMatchingLocale_shouldIncludeLocalizedName() {
+        LocaleContextHolder.setLocale(Locale.JAPANESE);
+        UUID resourceUuid = UUID.randomUUID();
+        Playlist playlist = playlist(1L, resourceUuid, "Miku Favorites");
+        ResourceName japaneseName = localizedName(1L, "ミクお気に入り", Language.JA);
+        when(playlistRepository.findByResourceUuid(eq(resourceUuid)))
+                .thenReturn(java.util.Optional.of(playlist));
+        stubEmptyResourceDetails(1L);
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(japaneseName));
+
+        var result = resourceService.getPlaylistByResourceUuid(resourceUuid);
+
+        assertThat(result.canonicalName()).isEqualTo("Miku Favorites");
+        assertThat(result.localizedName()).isEqualTo("ミクお気に入り");
+    }
+
+    private void stubEmptyResourceDetails(Long resourceId) {
+        when(resourceNameRepository.findAllByResourceIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(aclRepository.findAllByResourceIdOrderByPriorityAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(songLinkRepository.findAllBySongIdOrderByIdAsc(eq(resourceId))).thenReturn(List.of());
+        when(songLyricRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(songPvRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(songRelationRepository.findAllBySourceSongIdOrderByIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(songRelationRepository.findAllByTargetSongIdOrderByIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(playlistSongRepository.findAllBySongIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(artistLinkRepository.findAllByArtistIdOrderByIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(vocalLinkRepository.findAllByVocalIdOrderByIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+        when(playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(eq(resourceId)))
+                .thenReturn(List.of());
+    }
+
     private ResourceName candidate(UUID uuid, String name) {
         return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
     }
@@ -239,6 +399,45 @@ class ResourceServiceTest {
         when(resource.getStatus()).thenReturn(ResourceStatus.ACTIVE);
         when(resource.getViewCount()).thenReturn(0L);
         return resource;
+    }
+
+    private Song song(Long resourceId, UUID uuid, String canonicalName) {
+        Song song = mock(Song.class);
+        Resource resource = resource(resourceId, uuid, canonicalName, ResourceType.SONG);
+        when(song.getId()).thenReturn(resourceId);
+        when(song.getResource()).thenReturn(resource);
+        when(song.getSongType()).thenReturn(SongType.ORIGINAL);
+        when(song.getContent()).thenReturn(null);
+        when(song.getPublishedAt()).thenReturn(LocalDateTime.parse("2026-03-19T12:45:43"));
+        return song;
+    }
+
+    private Artist artist(Long resourceId, UUID uuid, String canonicalName) {
+        Artist artist = mock(Artist.class);
+        Resource resource = resource(resourceId, uuid, canonicalName, ResourceType.ARTIST);
+        when(artist.getId()).thenReturn(resourceId);
+        when(artist.getResource()).thenReturn(resource);
+        when(artist.getContent()).thenReturn(null);
+        return artist;
+    }
+
+    private Vocal vocal(Long resourceId, UUID uuid, String canonicalName) {
+        Vocal vocal = mock(Vocal.class);
+        Resource resource = resource(resourceId, uuid, canonicalName, ResourceType.VOCAL);
+        when(vocal.getId()).thenReturn(resourceId);
+        when(vocal.getResource()).thenReturn(resource);
+        when(vocal.getContent()).thenReturn(null);
+        return vocal;
+    }
+
+    private Playlist playlist(Long resourceId, UUID uuid, String canonicalName) {
+        Playlist playlist = mock(Playlist.class);
+        Resource resource = resource(resourceId, uuid, canonicalName, ResourceType.PLAYLIST);
+        when(playlist.getId()).thenReturn(resourceId);
+        when(playlist.getResource()).thenReturn(resource);
+        when(playlist.getContent()).thenReturn(null);
+        when(playlist.isPublic()).thenReturn(true);
+        return playlist;
     }
 
     private ResourceName localizedName(Long resourceId, String name, Language language) {

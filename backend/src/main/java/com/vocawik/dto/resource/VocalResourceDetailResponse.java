@@ -9,6 +9,7 @@ public record VocalResourceDetailResponse(
         UUID resourceUuid,
         boolean isDeleted,
         String canonicalName,
+        String localizedName,
         String status,
         long viewCount,
         String thumbnailUrl,

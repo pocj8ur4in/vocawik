@@ -186,6 +186,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = song.getResource();
+        String localizedName = loadLocalizedName(resource.getId());
 
         List<ResourceNameDetailResponse> names = loadResourceNames(resource.getId());
         List<ResourceAclDetailResponse> acls = loadResourceAcls(resource.getId());
@@ -209,6 +210,7 @@ public class ResourceService {
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
+                localizedName,
                 resource.getStatus().name(),
                 song.getSongType().name(),
                 resource.getViewCount(),
@@ -242,6 +244,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
+        String localizedName = loadLocalizedName(resource.getId());
         List<ArtistLink> links = artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
         long songCount = songArtistRepository.countByArtistId(artist.getId());
         List<ArtistResourceDetailResponse.ArtistSong> recentSongs =
@@ -263,6 +266,7 @@ public class ResourceService {
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
+                localizedName,
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
@@ -298,6 +302,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();
+        String localizedName = loadLocalizedName(resource.getId());
         List<VocalLink> links = vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
 
         long songCount = songVocalRepository.countByVocalId(vocal.getId());
@@ -320,6 +325,7 @@ public class ResourceService {
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
+                localizedName,
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
@@ -345,11 +351,13 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
+        String localizedName = loadLocalizedName(resource.getId());
 
         return new PlaylistResourceDetailResponse(
                 resource.getUuid(),
                 resource.isDeleted(),
                 resource.getCanonicalName(),
+                localizedName,
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
@@ -424,6 +432,10 @@ public class ResourceService {
                     resourceName.getResource().getId(), resourceName.getName());
         }
         return localizedNamesByResourceId;
+    }
+
+    private String loadLocalizedName(Long resourceId) {
+        return loadLocalizedNamesByResourceIds(List.of(resourceId)).get(resourceId);
     }
 
     private Language resolveCurrentLanguage() {
