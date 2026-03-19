@@ -6,6 +6,7 @@ import com.vocawik.dto.vocal.VocalCreateRequest;
 import com.vocawik.dto.vocal.VocalListResponse;
 import com.vocawik.dto.vocal.VocalSuggestionListResponse;
 import com.vocawik.dto.vocal.VocalUpdateRequest;
+import com.vocawik.security.guest.AllowGuest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.vocal.VocalService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -65,6 +66,7 @@ public class VocalController {
      * @return created vocal resource detail
      */
     @PostMapping("/vocals")
+    @AllowGuest
     @Operation(summary = "Create vocal", description = "Creates a vocal.")
     public ResponseEntity<VocalResourceDetailResponse> createVocal(
             @Valid @RequestBody VocalCreateRequest request) {
@@ -88,6 +90,7 @@ public class VocalController {
      * @return updated vocal resource detail
      */
     @PatchMapping("/vocals/{resourceUuid}")
+    @AllowGuest
     @Operation(summary = "Update vocal", description = "Updates a vocal.")
     public ResponseEntity<VocalResourceDetailResponse> updateVocal(
             @PathVariable UUID resourceUuid, @Valid @RequestBody VocalUpdateRequest request) {

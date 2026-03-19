@@ -6,6 +6,7 @@ import com.vocawik.dto.playlist.PlaylistListResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
+import com.vocawik.security.guest.AllowGuest;
 import com.vocawik.service.playlist.PlaylistService;
 import com.vocawik.service.resource.ResourceService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -58,6 +59,7 @@ public class PlaylistController {
 
     /** Creates a new playlist resource. */
     @PostMapping("/playlists")
+    @AllowGuest
     @Operation(summary = "Create playlist", description = "Creates a playlist.")
     public ResponseEntity<PlaylistResourceDetailResponse> createPlaylist(
             @Valid @RequestBody PlaylistCreateRequest request) {
@@ -68,6 +70,7 @@ public class PlaylistController {
 
     /** Updates a playlist resource. */
     @PatchMapping("/playlists/{resourceUuid}")
+    @AllowGuest
     @Operation(summary = "Update playlist", description = "Updates a playlist.")
     public ResponseEntity<PlaylistResourceDetailResponse> updatePlaylist(
             @PathVariable UUID resourceUuid, @Valid @RequestBody PlaylistUpdateRequest request) {

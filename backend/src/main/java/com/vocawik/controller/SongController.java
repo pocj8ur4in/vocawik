@@ -9,6 +9,7 @@ import com.vocawik.dto.song.SongPvResolveRequest;
 import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
+import com.vocawik.security.guest.AllowGuest;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -71,6 +72,7 @@ public class SongController {
      * @return created song resource detail
      */
     @PostMapping("/songs")
+    @AllowGuest
     @Operation(summary = "Create song", description = "Creates a song.")
     public ResponseEntity<SongResourceDetailResponse> createSong(
             @Valid @RequestBody SongCreateRequest request) {
@@ -94,6 +96,7 @@ public class SongController {
      * @return updated song resource detail
      */
     @PatchMapping("/songs/{resourceUuid}")
+    @AllowGuest
     @Operation(summary = "Update song", description = "Updates a song.")
     public ResponseEntity<SongResourceDetailResponse> updateSong(
             @PathVariable UUID resourceUuid, @Valid @RequestBody SongUpdateRequest request) {

@@ -6,6 +6,7 @@ import com.vocawik.dto.artist.ArtistListResponse;
 import com.vocawik.dto.artist.ArtistSuggestionListResponse;
 import com.vocawik.dto.artist.ArtistUpdateRequest;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
+import com.vocawik.security.guest.AllowGuest;
 import com.vocawik.service.artist.ArtistService;
 import com.vocawik.service.resource.ResourceService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -65,6 +66,7 @@ public class ArtistController {
      * @return created artist resource detail
      */
     @PostMapping("/artists")
+    @AllowGuest
     @Operation(summary = "Create artist", description = "Creates an artist.")
     public ResponseEntity<ArtistResourceDetailResponse> createArtist(
             @Valid @RequestBody ArtistCreateRequest request) {
@@ -88,6 +90,7 @@ public class ArtistController {
      * @return updated artist resource detail
      */
     @PatchMapping("/artists/{resourceUuid}")
+    @AllowGuest
     @Operation(summary = "Update artist", description = "Updates an artist.")
     public ResponseEntity<ArtistResourceDetailResponse> updateArtist(
             @PathVariable UUID resourceUuid, @Valid @RequestBody ArtistUpdateRequest request) {
