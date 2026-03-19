@@ -18,7 +18,6 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +29,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -129,10 +127,8 @@ public class ResourceController {
             summary = "Suggest resources",
             description = "Returns up to 10 resource suggestions matching the current query.")
     public ResponseEntity<ResourceSuggestionListResponse> suggestResources(
-            @Parameter(description = "Suggestion query") @RequestParam(name = "query") String query,
-            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
-            HttpServletRequest httpServletRequest) {
-        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
         return ResponseEntity.ok(resourceService.suggest(query));
     }
 
