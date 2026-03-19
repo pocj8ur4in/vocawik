@@ -20,15 +20,17 @@ public interface SongVocalRepository extends JpaRepository<SongVocal, Long> {
     /** Counts all song-vocal rows by vocal id. */
     long countByVocalId(Long vocalId);
 
-    /** Finds recent song-vocal rows ordered by song resource creation time. */
+    /** Finds recent song-vocal rows ordered by song published time. */
     @Query(
             """
             select sv
             from SongVocal sv
                 join sv.song s
-                join s.resource r
             where sv.vocal.id = :vocalId
-            order by r.createdAt desc, sv.id desc
+            order by
+                case when s.publishedAt is null then 1 else 0 end asc,
+                s.publishedAt desc,
+                sv.id desc
             """)
     List<SongVocal> findRecentByVocalId(@Param("vocalId") Long vocalId, Pageable pageable);
 
