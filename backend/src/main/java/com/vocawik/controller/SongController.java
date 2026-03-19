@@ -1,5 +1,6 @@
 package com.vocawik.controller;
 
+import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
@@ -128,6 +129,7 @@ public class SongController {
      * @return paged song summaries
      */
     @GetMapping("/songs")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Search songs",
             description = "Returns active songs with optional filters.")
@@ -214,6 +216,7 @@ public class SongController {
 
     /** Suggests songs matching the current query. */
     @GetMapping("/songs/suggestions")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Suggest songs",
             description = "Returns up to 10 song suggestions matching the current query.")
@@ -230,6 +233,7 @@ public class SongController {
      * @return resolved pv metadata
      */
     @PostMapping("/songs/pvs")
+    @RateLimit(requests = 20, seconds = 60)
     @Operation(
             summary = "Resolve song PV",
             description = "Returns parsed/normalized PV metadata from URL.")

@@ -1,5 +1,6 @@
 package com.vocawik.controller;
 
+import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.artist.ArtistCreateRequest;
 import com.vocawik.dto.artist.ArtistListResponse;
@@ -121,6 +122,7 @@ public class ArtistController {
      * @return paged artist summaries
      */
     @GetMapping("/artists")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Search artists",
             description = "Returns active artists with optional filters.")
@@ -193,6 +195,7 @@ public class ArtistController {
 
     /** Suggests artists matching the current query. */
     @GetMapping("/artists/suggestions")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Suggest artists",
             description = "Returns up to 10 artist suggestions matching the current query.")
