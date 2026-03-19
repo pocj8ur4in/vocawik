@@ -1,5 +1,6 @@
 package com.vocawik.controller;
 
+import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
@@ -98,6 +99,7 @@ public class PlaylistController {
 
     /** Searches playlists with optional filters. */
     @GetMapping("/playlists")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Search playlists",
             description = "Returns active playlists with optional filters.")
@@ -158,6 +160,7 @@ public class PlaylistController {
 
     /** Suggests playlists matching the current query. */
     @GetMapping("/playlists/suggestions")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Suggest playlists",
             description = "Returns up to 10 playlist suggestions matching the current query.")

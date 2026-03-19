@@ -1,5 +1,6 @@
 package com.vocawik.controller;
 
+import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
@@ -58,6 +59,7 @@ public class ResourceController {
      * @return paged resource summaries
      */
     @GetMapping("/resources")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Search resources",
             description = "Returns active resources with optional filters.")
@@ -118,6 +120,7 @@ public class ResourceController {
 
     /** Suggests resources matching the current query. */
     @GetMapping("/resources/suggestions")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Suggest resources",
             description = "Returns up to 10 resource suggestions matching the current query.")
@@ -138,6 +141,7 @@ public class ResourceController {
 
     /** Lists the most recent resource changes across all resource types. */
     @GetMapping("/histories/recent")
+    @RateLimit(requests = 30, seconds = 60)
     @Operation(
             summary = "List recent changes",
             description = "Returns the most recent resource changes across all resource types.")
@@ -156,6 +160,7 @@ public class ResourceController {
 
     /** Lists popular resources over the last 60 minutes. */
     @GetMapping("/resources/popular")
+    @RateLimit(requests = 30, seconds = 60)
     @Operation(
             summary = "List popular resources",
             description = "Returns the most viewed public resources during the last 60 minutes.")

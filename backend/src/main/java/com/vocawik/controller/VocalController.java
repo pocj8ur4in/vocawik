@@ -1,5 +1,6 @@
 package com.vocawik.controller;
 
+import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.resource.VocalResourceDetailResponse;
 import com.vocawik.dto.vocal.VocalCreateRequest;
@@ -119,6 +120,7 @@ public class VocalController {
      * @return paged vocal summaries
      */
     @GetMapping("/vocals")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Search vocal",
             description = "Returns active vocals with optional filters.")
@@ -182,6 +184,7 @@ public class VocalController {
 
     /** Suggests vocals matching the current query. */
     @GetMapping("/vocals/suggestions")
+    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Suggest vocals",
             description = "Returns up to 10 vocal suggestions matching the current query.")
