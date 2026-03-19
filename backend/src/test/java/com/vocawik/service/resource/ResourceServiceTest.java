@@ -312,8 +312,12 @@ class ResourceServiceTest {
         assertThat(result.artists().getFirst().localizedName()).isEqualTo("八王子P");
         assertThat(result.vocals().getFirst().vocalLocalizedName()).isEqualTo("初音ミク");
         assertThat(result.relations().getFirst().targetSongLocalizedName()).isEqualTo("ワールドイズマイン");
+        assertThat(result.relations().getFirst().targetSongThumbnailUrl())
+                .isEqualTo("https://cdn.example.com/world-is-mine.webp");
         assertThat(result.incomingRelations().getFirst().sourceSongLocalizedName())
                 .isEqualTo("メルト");
+        assertThat(result.incomingRelations().getFirst().sourceSongThumbnailUrl())
+                .isEqualTo("https://cdn.example.com/melt.webp");
         assertThat(result.playlists().getFirst().playlistLocalizedName()).isEqualTo("ミクお気に入り");
     }
 
@@ -501,6 +505,14 @@ class ResourceServiceTest {
     private Song song(Long resourceId, UUID uuid, String canonicalName) {
         Song song = mock(Song.class);
         Resource resource = resource(resourceId, uuid, canonicalName, ResourceType.SONG);
+        if (resourceId == 4L) {
+            when(resource.getThumbnailUrl())
+                    .thenReturn("https://cdn.example.com/world-is-mine.webp");
+        } else if (resourceId == 5L) {
+            when(resource.getThumbnailUrl()).thenReturn("https://cdn.example.com/melt.webp");
+        } else {
+            when(resource.getThumbnailUrl()).thenReturn(null);
+        }
         when(song.getId()).thenReturn(resourceId);
         when(song.getResource()).thenReturn(resource);
         when(song.getSongType()).thenReturn(SongType.ORIGINAL);

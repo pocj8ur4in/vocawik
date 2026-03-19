@@ -120,14 +120,16 @@ public record SongResourceDetailResponse(
             UUID targetSongResourceUuid,
             String targetSongCanonicalName,
             String targetSongLocalizedName,
-            String targetSongType) {}
+            String targetSongType,
+            String targetSongThumbnailUrl) {}
 
     /** Incoming relation item in the detailed payload. */
     public record SongIncomingRelation(
             UUID sourceSongResourceUuid,
             String sourceSongCanonicalName,
             String sourceSongLocalizedName,
-            String sourceSongType) {}
+            String sourceSongType,
+            String sourceSongThumbnailUrl) {}
 
     /** Playlist item that contains this song. */
     public record SongPlaylist(
