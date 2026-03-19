@@ -1,12 +1,15 @@
 package com.vocawik.service.resource;
 
+import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.playlist.Playlist;
 import com.vocawik.domain.resource.Resource;
+import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.resource.ResourceType;
 import com.vocawik.dto.resource.PopularResourceElementResponse;
 import com.vocawik.dto.resource.PopularResourceListResponse;
 import com.vocawik.repository.playlist.PlaylistRepository;
+import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.security.ip.ClientIpResolver;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -24,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -53,6 +57,7 @@ public class ResourcePopularityService {
             DateTimeFormatter.ofPattern("yyyyMMddHHmm");
 
     private final ResourceRepository resourceRepository;
+    private final ResourceNameRepository resourceNameRepository;
     private final PlaylistRepository playlistRepository;
     private final StringRedisTemplate stringRedisTemplate;
     private final ClientIpResolver clientIpResolver;
@@ -146,6 +151,8 @@ public class ResourcePopularityService {
                     resourceRepository.findAllByUuidInAndIsDeletedFalseAndStatus(
                             scoreByUuid.keySet(), ResourceStatus.ACTIVE);
             Set<Long> publicPlaylistIds = resolvePublicPlaylistIds(resources);
+            Map<Long, String> localizedNamesByResourceId =
+                    loadLocalizedNamesByResourceId(resources);
 
             List<PopularResourceElementResponse> items =
                     resources.stream()
@@ -166,6 +173,8 @@ public class ResourcePopularityService {
                                                     resource.getUuid(),
                                                     resource.getResourceType().name(),
                                                     resource.getCanonicalName(),
+                                                    localizedNamesByResourceId.get(
+                                                            resource.getId()),
                                                     scoreByUuid.getOrDefault(
                                                             resource.getUuid(), 0L)))
                             .toList();
@@ -215,6 +224,40 @@ public class ResourcePopularityService {
         return playlistRepository.findAllByIdInAndIsPublicTrue(playlistIds).stream()
                 .map(Playlist::getId)
                 .collect(Collectors.toSet());
+    }
+
+    private Map<Long, String> loadLocalizedNamesByResourceId(List<Resource> resources) {
+        Language language = resolveCurrentLanguage();
+        if (language == null || resources.isEmpty()) {
+            return Map.of();
+        }
+
+        List<ResourceName> localizedNames =
+                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        resources.stream().map(Resource::getId).distinct().toList());
+        if (localizedNames == null) {
+            return Map.of();
+        }
+
+        Map<Long, String> localizedNamesByResourceId = new LinkedHashMap<>();
+        for (ResourceName resourceName : localizedNames) {
+            if (resourceName.getLangCode() != language) {
+                continue;
+            }
+            localizedNamesByResourceId.putIfAbsent(
+                    resourceName.getResource().getId(), resourceName.getName());
+        }
+        return localizedNamesByResourceId;
+    }
+
+    private Language resolveCurrentLanguage() {
+        return switch (LocaleContextHolder.getLocale().getLanguage()) {
+            case "ko" -> Language.KO;
+            case "en" -> Language.EN;
+            case "ja" -> Language.JA;
+            case "zh" -> Language.ZH;
+            default -> null;
+        };
     }
 
     private List<String> recentBucketKeys() {

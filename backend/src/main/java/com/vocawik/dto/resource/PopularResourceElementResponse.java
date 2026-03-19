@@ -4,4 +4,8 @@ import java.util.UUID;
 
 /** Summary item for recent popular resources. */
 public record PopularResourceElementResponse(
-        UUID resourceUuid, String resourceType, String canonicalName, long recentViewCount) {}
+        UUID resourceUuid,
+        String resourceType,
+        String canonicalName,
+        String localizedName,
+        long recentViewCount) {}
