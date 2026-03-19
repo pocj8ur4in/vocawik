@@ -50,6 +50,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -200,8 +201,12 @@ public class ArtistService {
                                 normalizedMemberArtistUuids),
                         pageable);
 
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceId(result.getContent());
         List<ArtistElementResponse> items =
-                result.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream()
+                        .map(artist -> toSummary(artist, localizedNamesByResourceId))
+                        .toList();
 
         return new ArtistListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
@@ -1109,11 +1114,45 @@ public class ArtistService {
         return value == null ? null : value.toString();
     }
 
-    private ArtistElementResponse toSummary(Artist artist) {
+    private Map<Long, String> loadLocalizedNamesByResourceId(List<Artist> artists) {
+        Language language = resolveCurrentLanguage();
+        if (language == null || artists.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> resourceIds =
+                artists.stream().map(artist -> artist.getResource().getId()).distinct().toList();
+
+        Map<Long, String> localizedNamesByResourceId = new HashMap<>();
+        for (ResourceName resourceName :
+                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        resourceIds)) {
+            if (resourceName.getLangCode() != language) {
+                continue;
+            }
+            localizedNamesByResourceId.putIfAbsent(
+                    resourceName.getResource().getId(), resourceName.getName());
+        }
+        return localizedNamesByResourceId;
+    }
+
+    private Language resolveCurrentLanguage() {
+        return switch (LocaleContextHolder.getLocale().getLanguage()) {
+            case "ko" -> Language.KO;
+            case "en" -> Language.EN;
+            case "ja" -> Language.JA;
+            case "zh" -> Language.ZH;
+            default -> null;
+        };
+    }
+
+    private ArtistElementResponse toSummary(
+            Artist artist, Map<Long, String> localizedNamesByResourceId) {
         Resource resource = artist.getResource();
         return new ArtistElementResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),

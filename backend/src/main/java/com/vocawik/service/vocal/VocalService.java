@@ -45,6 +45,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -175,8 +176,12 @@ public class VocalService {
                 vocalRepository.search(
                         new VocalCriteria(status, normalizedQuery, normalizedSongUuids), pageable);
 
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceId(result.getContent());
         List<VocalElementResponse> items =
-                result.getContent().stream().map(this::toSummary).toList();
+                result.getContent().stream()
+                        .map(vocal -> toSummary(vocal, localizedNamesByResourceId))
+                        .toList();
 
         return new VocalListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
@@ -782,11 +787,45 @@ public class VocalService {
         return value == null ? null : value.toString();
     }
 
-    private VocalElementResponse toSummary(Vocal vocal) {
+    private Map<Long, String> loadLocalizedNamesByResourceId(List<Vocal> vocals) {
+        Language language = resolveCurrentLanguage();
+        if (language == null || vocals.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> resourceIds =
+                vocals.stream().map(vocal -> vocal.getResource().getId()).distinct().toList();
+
+        Map<Long, String> localizedNamesByResourceId = new HashMap<>();
+        for (ResourceName resourceName :
+                resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        resourceIds)) {
+            if (resourceName.getLangCode() != language) {
+                continue;
+            }
+            localizedNamesByResourceId.putIfAbsent(
+                    resourceName.getResource().getId(), resourceName.getName());
+        }
+        return localizedNamesByResourceId;
+    }
+
+    private Language resolveCurrentLanguage() {
+        return switch (LocaleContextHolder.getLocale().getLanguage()) {
+            case "ko" -> Language.KO;
+            case "en" -> Language.EN;
+            case "ja" -> Language.JA;
+            case "zh" -> Language.ZH;
+            default -> null;
+        };
+    }
+
+    private VocalElementResponse toSummary(
+            Vocal vocal, Map<Long, String> localizedNamesByResourceId) {
         Resource resource = vocal.getResource();
         return new VocalElementResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
