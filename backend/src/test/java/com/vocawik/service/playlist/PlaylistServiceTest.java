@@ -15,6 +15,7 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.playlist.PlaylistRepository;
 import com.vocawik.repository.playlist.PlaylistSongRepository;
@@ -120,6 +121,52 @@ class PlaylistServiceTest {
                         argThat(criteria -> criteria.status() == null && criteria.query() == null),
                         eq(PageRequest.of(0, 20)));
         verifyNoInteractions(resourceNameRepository);
+    }
+
+    @Test
+    @DisplayName("Suggest should return up to 10 distinct playlists")
+    void suggest_shouldReturnUpToTenDistinctPlaylists() {
+        List<ResourceName> candidates = new java.util.ArrayList<>();
+        UUID duplicatedUuid = UUID.randomUUID();
+        candidates.add(candidate(duplicatedUuid, "Miku Favorites"));
+        candidates.add(candidate(duplicatedUuid, "Miku Best"));
+        for (int i = 0; i < 10; i++) {
+            candidates.add(candidate(UUID.randomUUID(), "Candidate " + i));
+        }
+        when(resourceNameRepository.findPlaylistSuggestionCandidates(
+                        eq(ResourceStatus.ACTIVE),
+                        eq("mik"),
+                        argThat(
+                                pageable ->
+                                        pageable.getPageNumber() == 0
+                                                && pageable.getPageSize() == 30)))
+                .thenReturn(candidates);
+
+        PlaylistSuggestionListResponse result = playlistService.suggest(" mik ");
+
+        assertThat(result.items()).hasSize(10);
+        assertThat(result.items().getFirst().resourceUuid()).isEqualTo(duplicatedUuid);
+        assertThat(result.items().getFirst().name()).isEqualTo("Miku Favorites");
+        assertThat(result.items()).extracting(item -> item.resourceUuid()).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("Suggest should return empty list when query is blank")
+    void suggest_withBlankQuery_shouldReturnEmptyList() {
+        PlaylistSuggestionListResponse result = playlistService.suggest("   ");
+
+        assertThat(result.items()).isEmpty();
+        verifyNoInteractions(resourceNameRepository);
+    }
+
+    private ResourceName candidate(UUID uuid, String name) {
+        Resource resource = mock(Resource.class);
+        when(resource.getUuid()).thenReturn(uuid);
+
+        ResourceName resourceName = mock(ResourceName.class);
+        when(resourceName.getResource()).thenReturn(resource);
+        when(resourceName.getName()).thenReturn(name);
+        return resourceName;
     }
 
     private Playlist playlist(Long resourceId, UUID resourceUuid, String canonicalName) {
