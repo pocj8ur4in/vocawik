@@ -17,6 +17,8 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistElementResponse;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistSuggestionElementResponse;
+import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,6 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
         value = "EI_EXPOSE_REP2",
         justification = "Spring-managed dependencies are stored for internal orchestration only.")
 public class PlaylistService {
+
+    private static final int PLAYLIST_SUGGESTION_LIMIT = 10;
 
     private final PlaylistRepository playlistRepository;
     private final PlaylistSongRepository playlistSongRepository;
@@ -78,6 +83,34 @@ public class PlaylistService {
 
         return new PlaylistListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public PlaylistSuggestionListResponse suggest(String query) {
+        String normalizedQuery = normalizeQuery(query);
+        if (normalizedQuery == null) {
+            return new PlaylistSuggestionListResponse(List.of());
+        }
+
+        LinkedHashMap<UUID, PlaylistSuggestionElementResponse> suggestionsByUuid =
+                new LinkedHashMap<>();
+        resourceNameRepository
+                .findPlaylistSuggestionCandidates(
+                        ResourceStatus.ACTIVE,
+                        normalizedQuery,
+                        org.springframework.data.domain.PageRequest.of(
+                                0, PLAYLIST_SUGGESTION_LIMIT * 3))
+                .forEach(
+                        resourceName -> {
+                            UUID resourceUuid = resourceName.getResource().getUuid();
+                            suggestionsByUuid.putIfAbsent(
+                                    resourceUuid,
+                                    new PlaylistSuggestionElementResponse(
+                                            resourceUuid, resourceName.getName()));
+                        });
+
+        return new PlaylistSuggestionListResponse(
+                suggestionsByUuid.values().stream().limit(PLAYLIST_SUGGESTION_LIMIT).toList());
     }
 
     @Transactional

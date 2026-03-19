@@ -3,6 +3,7 @@ package com.vocawik.controller;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.service.playlist.PlaylistService;
@@ -145,6 +146,17 @@ public class PlaylistController {
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
                                 sanitizeSort(pageable.getSort()))));
+    }
+
+    /** Suggests playlists matching the current query. */
+    @GetMapping("/playlists/suggestions")
+    @Operation(
+            summary = "Suggest playlists",
+            description = "Returns up to 10 playlist suggestions matching the current query.")
+    public ResponseEntity<PlaylistSuggestionListResponse> suggestPlaylists(
+            @Parameter(description = "Suggestion query") @RequestParam(name = "query")
+                    String query) {
+        return ResponseEntity.ok(playlistService.suggest(query));
     }
 
     private Sort sanitizeSort(Sort requestedSort) {
