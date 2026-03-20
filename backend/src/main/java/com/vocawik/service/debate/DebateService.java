@@ -5,6 +5,7 @@ import com.vocawik.domain.debate.DebateComment;
 import com.vocawik.domain.debate.DebateStatus;
 import com.vocawik.domain.guest.Guest;
 import com.vocawik.domain.user.User;
+import com.vocawik.domain.user.UserRole;
 import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.dto.debate.DebateListElementResponse;
 import com.vocawik.dto.debate.DebateListResponse;
@@ -108,6 +109,18 @@ public class DebateService {
                 1L);
     }
 
+    @Transactional
+    public void delete(UUID resourceUuid, UUID debateUuid) {
+        Debate debate =
+                debateRepository
+                        .findByUuidAndResourceUuidAndIsDeletedFalse(debateUuid, resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!canDelete(debate)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        debate.softDelete();
+    }
+
     private String resolveAuthorName(Debate debate) {
         if (debate.getActorUser() != null) {
             return debate.getActorUser().getNickname();
@@ -116,6 +129,26 @@ public class DebateService {
             return "Guest";
         }
         return "System";
+    }
+
+    private boolean canDelete(Debate debate) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof AuthPrincipal authPrincipal) {
+            if (UserRole.ADMIN.name().equals(authPrincipal.role())) {
+                return true;
+            }
+            return debate.getActorUser() != null
+                    && authPrincipal.userUuid().equals(debate.getActorUser().getUuid());
+        }
+        if (principal instanceof GuestPrincipal guestPrincipal) {
+            return debate.getActorGuest() != null
+                    && guestPrincipal.guestUuid().equals(debate.getActorGuest().getUuid());
+        }
+        return false;
     }
 
     private Optional<User> currentUser() {

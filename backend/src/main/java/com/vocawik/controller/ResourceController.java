@@ -17,6 +17,7 @@ import com.vocawik.service.debate.DebateService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.resource.ResourcePopularityService;
 import com.vocawik.service.resource.ResourceService;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -34,10 +35,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,6 +48,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Tag(name = "Resource", description = "Resource endpoints")
 @RequiredArgsConstructor
+@SuppressFBWarnings(
+        value = "EI_EXPOSE_REP2",
+        justification =
+                "DebateService is a Spring-managed bean reference and is not exposed externally.")
 public class ResourceController {
 
     private static final String DEFAULT_SORT_PROPERTY = "updatedAt";
@@ -171,6 +178,22 @@ public class ResourceController {
         captchaVerificationService.verifyRequiredForNonUser(
                 request.captchaToken(), httpServletRequest);
         return ResponseEntity.ok(debateService.create(resourceUuid, request));
+    }
+
+    /** Soft deletes a debate thread. */
+    @DeleteMapping("/resources/{resourceUuid}/debates/{debateUuid}")
+    @AllowGuest
+    @Operation(
+            summary = "Delete debate",
+            description = "Soft deletes a debate thread for its author or an admin.")
+    public ResponseEntity<Void> deleteDebate(
+            @PathVariable UUID resourceUuid,
+            @PathVariable UUID debateUuid,
+            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
+        debateService.delete(resourceUuid, debateUuid);
+        return ResponseEntity.noContent().build();
     }
 
     /** Lists the most recent resource changes across all resource types. */
