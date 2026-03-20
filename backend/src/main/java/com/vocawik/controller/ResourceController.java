@@ -2,6 +2,8 @@ package com.vocawik.controller;
 
 import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.debate.DebateCreateRequest;
+import com.vocawik.dto.debate.DebateListElementResponse;
 import com.vocawik.dto.debate.DebateListResponse;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
@@ -9,6 +11,7 @@ import com.vocawik.dto.resource.PopularResourceListResponse;
 import com.vocawik.dto.resource.ResourceInfoResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceSuggestionListResponse;
+import com.vocawik.security.guest.AllowGuest;
 import com.vocawik.service.captcha.CaptchaVerificationService;
 import com.vocawik.service.debate.DebateService;
 import com.vocawik.service.history.ResourceHistoryService;
@@ -20,6 +23,8 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
@@ -31,6 +36,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -151,6 +158,19 @@ public class ResourceController {
             description = "Returns visible discussion threads attached to a resource.")
     public ResponseEntity<DebateListResponse> listDebates(@PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(debateService.listByResourceUuid(resourceUuid));
+    }
+
+    /** Creates a debate thread. */
+    @PostMapping("/resources/{resourceUuid}/debates")
+    @AllowGuest
+    @Operation(summary = "Create debate", description = "Creates a debate and its first comment.")
+    public ResponseEntity<DebateListElementResponse> createDebate(
+            @PathVariable UUID resourceUuid,
+            @Valid @RequestBody DebateCreateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
+        return ResponseEntity.ok(debateService.create(resourceUuid, request));
     }
 
     /** Lists the most recent resource changes across all resource types. */
