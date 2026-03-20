@@ -3,6 +3,8 @@ package com.vocawik.repository.debate;
 import com.vocawik.domain.debate.DebateComment;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -24,4 +26,7 @@ public interface DebateCommentRepository extends JpaRepository<DebateComment, Lo
 
     @EntityGraph(attributePaths = {"actorUser", "actorGuest", "parentComment"})
     List<DebateComment> findAllByDebateIdOrderByCreatedAtAscIdAsc(Long debateId);
+
+    @EntityGraph(attributePaths = {"actorUser", "actorGuest", "parentComment"})
+    Optional<DebateComment> findByUuidAndDebateIdAndIsDeletedFalse(UUID uuid, Long debateId);
 }

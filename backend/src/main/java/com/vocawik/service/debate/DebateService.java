@@ -6,6 +6,9 @@ import com.vocawik.domain.debate.DebateStatus;
 import com.vocawik.domain.guest.Guest;
 import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserRole;
+import com.vocawik.dto.debate.DebateCommentCreateRequest;
+import com.vocawik.dto.debate.DebateCommentResponse;
+import com.vocawik.dto.debate.DebateCommentUpdateRequest;
 import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.dto.debate.DebateDetailResponse;
 import com.vocawik.dto.debate.DebateListElementResponse;
@@ -112,12 +115,9 @@ public class DebateService {
                 resourceRepository
                         .findByUuidAndIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-
         User actorUser = currentUser().orElse(null);
         Guest actorGuest = actorUser == null ? currentGuest().orElse(null) : null;
-        if ((actorUser == null) == (actorGuest == null)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
+        validateExactlyOneActor(actorUser, actorGuest);
 
         Debate debate =
                 debateRepository.save(
@@ -135,15 +135,83 @@ public class DebateService {
     }
 
     @Transactional
-    public void delete(UUID resourceUuid, UUID debateUuid) {
-        Debate debate =
-                debateRepository
-                        .findByUuidAndResourceUuidAndIsDeletedFalse(debateUuid, resourceUuid)
+    public DebateCommentResponse createComment(
+            UUID resourceUuid, UUID debateUuid, DebateCommentCreateRequest request) {
+        Debate debate = findDebate(resourceUuid, debateUuid);
+        User actorUser = currentUser().orElse(null);
+        Guest actorGuest = actorUser == null ? currentGuest().orElse(null) : null;
+        validateExactlyOneActor(actorUser, actorGuest);
+
+        DebateComment parentComment =
+                request.parentCommentUuid() == null
+                        ? null
+                        : debateCommentRepository
+                                .findByUuidAndDebateIdAndIsDeletedFalse(
+                                        request.parentCommentUuid(), debate.getId())
+                                .orElseThrow(
+                                        () -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        DebateComment saved =
+                debateCommentRepository.save(
+                        DebateComment.create(
+                                debate,
+                                parentComment,
+                                actorUser,
+                                actorGuest,
+                                request.content().trim()));
+        return toDebateCommentResponse(saved);
+    }
+
+    @Transactional
+    public DebateCommentResponse updateComment(
+            UUID resourceUuid,
+            UUID debateUuid,
+            UUID commentUuid,
+            DebateCommentUpdateRequest request) {
+        Debate debate = findDebate(resourceUuid, debateUuid);
+        DebateComment comment =
+                debateCommentRepository
+                        .findByUuidAndDebateIdAndIsDeletedFalse(commentUuid, debate.getId())
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!canManage(comment)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        comment.revise(request.content().trim());
+        return toDebateCommentResponse(comment);
+    }
+
+    @Transactional
+    public void deleteComment(UUID resourceUuid, UUID debateUuid, UUID commentUuid) {
+        Debate debate = findDebate(resourceUuid, debateUuid);
+        DebateComment comment =
+                debateCommentRepository
+                        .findByUuidAndDebateIdAndIsDeletedFalse(commentUuid, debate.getId())
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!canManage(comment)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        comment.softDelete();
+    }
+
+    @Transactional
+    public void delete(UUID resourceUuid, UUID debateUuid) {
+        Debate debate = findDebate(resourceUuid, debateUuid);
         if (!canDelete(debate)) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         debate.softDelete();
+    }
+
+    private Debate findDebate(UUID resourceUuid, UUID debateUuid) {
+        return debateRepository
+                .findByUuidAndResourceUuidAndIsDeletedFalse(debateUuid, resourceUuid)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+    }
+
+    private void validateExactlyOneActor(User actorUser, Guest actorGuest) {
+        if ((actorUser == null) == (actorGuest == null)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
     }
 
     private String resolveAuthorName(Debate debate) {
@@ -169,6 +237,18 @@ public class DebateService {
 
     private DebateDetailResponse.Comment toDebateComment(DebateComment comment) {
         return new DebateDetailResponse.Comment(
+                comment.getUuid(),
+                comment.getParentComment() == null ? null : comment.getParentComment().getUuid(),
+                resolveAuthorName(comment),
+                comment.getContent(),
+                comment.getRevision(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt(),
+                comment.isDeleted());
+    }
+
+    private DebateCommentResponse toDebateCommentResponse(DebateComment comment) {
+        return new DebateCommentResponse(
                 comment.getUuid(),
                 comment.getParentComment() == null ? null : comment.getParentComment().getUuid(),
                 resolveAuthorName(comment),
@@ -205,6 +285,26 @@ public class DebateService {
         if (principal instanceof GuestPrincipal guestPrincipal) {
             return debate.getActorGuest() != null
                     && guestPrincipal.guestUuid().equals(debate.getActorGuest().getUuid());
+        }
+        return false;
+    }
+
+    private boolean canManage(DebateComment comment) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof AuthPrincipal authPrincipal) {
+            if (UserRole.ADMIN.name().equals(authPrincipal.role())) {
+                return true;
+            }
+            return comment.getActorUser() != null
+                    && authPrincipal.userUuid().equals(comment.getActorUser().getUuid());
+        }
+        if (principal instanceof GuestPrincipal guestPrincipal) {
+            return comment.getActorGuest() != null
+                    && guestPrincipal.guestUuid().equals(comment.getActorGuest().getUuid());
         }
         return false;
     }

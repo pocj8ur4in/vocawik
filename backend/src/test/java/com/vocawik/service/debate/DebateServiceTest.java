@@ -19,6 +19,8 @@ import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserPvProvider;
 import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.user.UserTheme;
+import com.vocawik.dto.debate.DebateCommentCreateRequest;
+import com.vocawik.dto.debate.DebateCommentUpdateRequest;
 import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.repository.debate.DebateCommentCountProjection;
 import com.vocawik.repository.debate.DebateCommentRepository;
@@ -357,6 +359,209 @@ class DebateServiceTest {
         assertThat(response.title()).isEqualTo("Guest topic");
         assertThat(response.authorName()).isEqualTo("Guest");
         assertThat(response.commentCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Create comment should persist reply for an authenticated user")
+    void createComment_shouldPersistReplyForUser() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d217f-11ea-7db3-b21e-2adf1e3e61c8");
+        UUID debateUuid = UUID.fromString("019d217f-1279-7b15-ba08-34c0c575fd7c");
+        UUID userUuid = UUID.fromString("019d217f-12df-7e2e-92df-55b85d2bb9ed");
+        UUID parentUuid = UUID.fromString("019d217f-133f-79b1-9f6f-f26a80f70fef");
+        Debate debate =
+                createUserDebate(
+                        901L,
+                        debateUuid,
+                        createResource(91L, resourceUuid),
+                        "PV",
+                        userUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 21, 0));
+        DebateComment parent =
+                createUserComment(
+                        902L,
+                        parentUuid,
+                        debate,
+                        null,
+                        userUuid,
+                        "author",
+                        "body",
+                        LocalDateTime.of(2026, 3, 21, 21, 0));
+        User user =
+                User.create(
+                        "author@vocawik.test",
+                        "author",
+                        Language.KO,
+                        ZoneId.of("Asia/Seoul"),
+                        UserTheme.LIGHT,
+                        UserPvProvider.YOUTUBE,
+                        UserRole.USER);
+        ReflectionTestUtils.setField(user, "uuid", userUuid);
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        when(userRepository.findByUuidAndIsDeletedFalse(eq(userUuid)))
+                .thenReturn(Optional.of(user));
+        when(debateCommentRepository.findByUuidAndDebateIdAndIsDeletedFalse(
+                        eq(parentUuid), eq(901L)))
+                .thenReturn(Optional.of(parent));
+        when(debateCommentRepository.save(org.mockito.ArgumentMatchers.any(DebateComment.class)))
+                .thenAnswer(
+                        invocation -> {
+                            DebateComment saved = invocation.getArgument(0);
+                            ReflectionTestUtils.setField(saved, "id", 903L);
+                            ReflectionTestUtils.setField(
+                                    saved,
+                                    "uuid",
+                                    UUID.fromString("019d217f-139d-7fdc-a883-e5f143dc5e31"));
+                            ReflectionTestUtils.setField(
+                                    saved, "createdAt", LocalDateTime.of(2026, 3, 21, 21, 5));
+                            ReflectionTestUtils.setField(
+                                    saved, "updatedAt", LocalDateTime.of(2026, 3, 21, 21, 5));
+                            return saved;
+                        });
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, UserRole.USER.name()), null));
+
+        var response =
+                debateService.createComment(
+                        resourceUuid,
+                        debateUuid,
+                        new DebateCommentCreateRequest("reply", parentUuid, null));
+
+        assertThat(response.parentCommentUuid()).isEqualTo(parentUuid);
+        assertThat(response.authorName()).isEqualTo("author");
+        assertThat(response.content()).isEqualTo("reply");
+        assertThat(response.revision()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Update comment should revise content for its author")
+    void updateComment_shouldReviseForAuthor() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d217f-13fb-7ad6-b456-0b3f4a55cd60");
+        UUID debateUuid = UUID.fromString("019d217f-1457-7fe5-b0db-f2ab9ddd42b7");
+        UUID commentUuid = UUID.fromString("019d217f-14aa-7d7f-9d48-82f7f63b10c1");
+        UUID userUuid = UUID.fromString("019d217f-1503-7cde-a3e5-5d39493912fc");
+        Debate debate =
+                createUserDebate(
+                        1001L,
+                        debateUuid,
+                        createResource(101L, resourceUuid),
+                        "PV",
+                        userUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 21, 10));
+        DebateComment comment =
+                createUserComment(
+                        1002L,
+                        commentUuid,
+                        debate,
+                        null,
+                        userUuid,
+                        "author",
+                        "before",
+                        LocalDateTime.of(2026, 3, 21, 21, 10));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        when(debateCommentRepository.findByUuidAndDebateIdAndIsDeletedFalse(
+                        eq(commentUuid), eq(1001L)))
+                .thenReturn(Optional.of(comment));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, UserRole.USER.name()), null));
+
+        var response =
+                debateService.updateComment(
+                        resourceUuid,
+                        debateUuid,
+                        commentUuid,
+                        new DebateCommentUpdateRequest("after", null));
+
+        assertThat(response.content()).isEqualTo("after");
+        assertThat(response.revision()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Delete comment should soft delete for its guest author")
+    void deleteComment_shouldSoftDeleteForGuestAuthor() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d217f-155e-7899-8a66-c8650e9d2867");
+        UUID debateUuid = UUID.fromString("019d217f-15b8-7353-b3f6-cdd33de97da4");
+        UUID commentUuid = UUID.fromString("019d217f-160e-735c-92c3-99ded2c1eb7a");
+        UUID guestUuid = UUID.fromString("019d217f-1662-7552-a9ef-3d349cfbbf2b");
+        Debate debate =
+                createGuestDebate(
+                        1101L,
+                        debateUuid,
+                        createResource(111L, resourceUuid),
+                        "PV",
+                        guestUuid,
+                        LocalDateTime.of(2026, 3, 21, 21, 20));
+        DebateComment comment =
+                createGuestComment(
+                        1102L,
+                        commentUuid,
+                        debate,
+                        null,
+                        guestUuid,
+                        "guest comment",
+                        LocalDateTime.of(2026, 3, 21, 21, 20));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        when(debateCommentRepository.findByUuidAndDebateIdAndIsDeletedFalse(
+                        eq(commentUuid), eq(1101L)))
+                .thenReturn(Optional.of(comment));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new GuestPrincipal(guestUuid), null));
+
+        debateService.deleteComment(resourceUuid, debateUuid, commentUuid);
+
+        assertThat(comment.isDeleted()).isTrue();
     }
 
     @Test

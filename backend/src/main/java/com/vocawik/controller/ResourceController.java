@@ -2,6 +2,9 @@ package com.vocawik.controller;
 
 import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.debate.DebateCommentCreateRequest;
+import com.vocawik.dto.debate.DebateCommentResponse;
+import com.vocawik.dto.debate.DebateCommentUpdateRequest;
 import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.dto.debate.DebateDetailResponse;
 import com.vocawik.dto.debate.DebateListElementResponse;
@@ -38,6 +41,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -193,6 +197,40 @@ public class ResourceController {
         return ResponseEntity.ok(debateService.create(resourceUuid, request));
     }
 
+    /** Creates a debate comment or reply. */
+    @PostMapping("/resources/{resourceUuid}/debates/{debateUuid}/comments")
+    @AllowGuest
+    @Operation(
+            summary = "Create debate comment",
+            description = "Creates a debate comment or reply.")
+    public ResponseEntity<DebateCommentResponse> createDebateComment(
+            @PathVariable UUID resourceUuid,
+            @PathVariable UUID debateUuid,
+            @Valid @RequestBody DebateCommentCreateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
+        return ResponseEntity.ok(debateService.createComment(resourceUuid, debateUuid, request));
+    }
+
+    /** Updates a debate comment. */
+    @PatchMapping("/resources/{resourceUuid}/debates/{debateUuid}/comments/{commentUuid}")
+    @AllowGuest
+    @Operation(
+            summary = "Update debate comment",
+            description = "Updates an existing debate comment.")
+    public ResponseEntity<DebateCommentResponse> updateDebateComment(
+            @PathVariable UUID resourceUuid,
+            @PathVariable UUID debateUuid,
+            @PathVariable UUID commentUuid,
+            @Valid @RequestBody DebateCommentUpdateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
+        return ResponseEntity.ok(
+                debateService.updateComment(resourceUuid, debateUuid, commentUuid, request));
+    }
+
     /** Soft deletes a debate thread. */
     @DeleteMapping("/resources/{resourceUuid}/debates/{debateUuid}")
     @AllowGuest
@@ -206,6 +244,21 @@ public class ResourceController {
             HttpServletRequest httpServletRequest) {
         captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
         debateService.delete(resourceUuid, debateUuid);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Soft deletes a debate comment. */
+    @DeleteMapping("/resources/{resourceUuid}/debates/{debateUuid}/comments/{commentUuid}")
+    @AllowGuest
+    @Operation(summary = "Delete debate comment", description = "Soft deletes a debate comment.")
+    public ResponseEntity<Void> deleteDebateComment(
+            @PathVariable UUID resourceUuid,
+            @PathVariable UUID debateUuid,
+            @PathVariable UUID commentUuid,
+            @RequestHeader(name = "X-Captcha-Token", required = false) String captchaToken,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
+        debateService.deleteComment(resourceUuid, debateUuid, commentUuid);
         return ResponseEntity.noContent().build();
     }
 
