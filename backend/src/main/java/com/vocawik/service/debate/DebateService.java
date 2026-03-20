@@ -7,6 +7,7 @@ import com.vocawik.domain.guest.Guest;
 import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserRole;
 import com.vocawik.dto.debate.DebateCreateRequest;
+import com.vocawik.dto.debate.DebateDetailResponse;
 import com.vocawik.dto.debate.DebateListElementResponse;
 import com.vocawik.dto.debate.DebateListResponse;
 import com.vocawik.repository.debate.DebateCommentCountProjection;
@@ -81,6 +82,30 @@ public class DebateService {
                         .toList());
     }
 
+    @Transactional(readOnly = true)
+    public DebateDetailResponse getByResourceUuidAndDebateUuid(UUID resourceUuid, UUID debateUuid) {
+        Debate debate =
+                debateRepository
+                        .findByUuidAndResourceUuidAndIsDeletedFalse(debateUuid, resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        List<DebateComment> comments =
+                debateCommentRepository.findAllByDebateIdOrderByCreatedAtAscIdAsc(debate.getId());
+
+        DebateDetailResponse.Body body =
+                comments.isEmpty() ? null : toDebateBody(comments.getFirst());
+        List<DebateDetailResponse.Comment> replies =
+                comments.stream().skip(1).map(this::toDebateComment).toList();
+
+        return new DebateDetailResponse(
+                debate.getUuid(),
+                debate.getTitle(),
+                resolveAuthorName(debate),
+                debate.getStatus().name(),
+                debate.getCreatedAt(),
+                body,
+                replies);
+    }
+
     @Transactional
     public DebateListElementResponse create(UUID resourceUuid, DebateCreateRequest request) {
         var resource =
@@ -126,6 +151,39 @@ public class DebateService {
             return debate.getActorUser().getNickname();
         }
         if (debate.getActorGuest() != null) {
+            return "Guest";
+        }
+        return "System";
+    }
+
+    private DebateDetailResponse.Body toDebateBody(DebateComment comment) {
+        return new DebateDetailResponse.Body(
+                comment.getUuid(),
+                resolveAuthorName(comment),
+                comment.getContent(),
+                comment.getRevision(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt(),
+                comment.isDeleted());
+    }
+
+    private DebateDetailResponse.Comment toDebateComment(DebateComment comment) {
+        return new DebateDetailResponse.Comment(
+                comment.getUuid(),
+                comment.getParentComment() == null ? null : comment.getParentComment().getUuid(),
+                resolveAuthorName(comment),
+                comment.getContent(),
+                comment.getRevision(),
+                comment.getCreatedAt(),
+                comment.getUpdatedAt(),
+                comment.isDeleted());
+    }
+
+    private String resolveAuthorName(DebateComment comment) {
+        if (comment.getActorUser() != null) {
+            return comment.getActorUser().getNickname();
+        }
+        if (comment.getActorGuest() != null) {
             return "Guest";
         }
         return "System";

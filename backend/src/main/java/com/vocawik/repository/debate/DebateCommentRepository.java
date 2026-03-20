@@ -3,6 +3,7 @@ package com.vocawik.repository.debate;
 import com.vocawik.domain.debate.DebateComment;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,4 +21,7 @@ public interface DebateCommentRepository extends JpaRepository<DebateComment, Lo
             """)
     List<DebateCommentCountProjection> countActiveCommentsByDebateIds(
             @Param("debateIds") Collection<Long> debateIds);
+
+    @EntityGraph(attributePaths = {"actorUser", "actorGuest", "parentComment"})
+    List<DebateComment> findAllByDebateIdOrderByCreatedAtAscIdAsc(Long debateId);
 }
