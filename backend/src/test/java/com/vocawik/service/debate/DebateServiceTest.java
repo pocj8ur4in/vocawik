@@ -71,6 +71,7 @@ class DebateServiceTest {
                         UUID.fromString("019d0f6d-f839-7433-97b9-a078d16cd8f8"),
                         resource,
                         "PV naming",
+                        UUID.fromString("019d2050-7d23-7d71-ab56-c8884ff95db2"),
                         "testuser",
                         LocalDateTime.of(2026, 3, 21, 10, 30));
         Debate guestDebate =
@@ -79,6 +80,7 @@ class DebateServiceTest {
                         UUID.fromString("019d0f6d-f994-799d-a936-5e4a5213552a"),
                         resource,
                         "Old alias cleanup",
+                        UUID.fromString("019d2050-7dc7-732f-ba26-a8e53fe33cf7"),
                         LocalDateTime.of(2026, 3, 20, 9, 0));
 
         when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
@@ -276,6 +278,172 @@ class DebateServiceTest {
         assertThat(response.commentCount()).isEqualTo(1L);
     }
 
+    @Test
+    @DisplayName("Delete should soft delete debate for its author")
+    void delete_shouldSoftDeleteForAuthor() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d2050-7e6a-79ee-a538-c598e6f1f650");
+        UUID debateUuid = UUID.fromString("019d2050-7f04-71b1-97dd-d09310af6ac5");
+        UUID userUuid = UUID.fromString("019d2050-7f59-733c-b0e1-eecbcb4deeb3");
+        Debate debate =
+                createUserDebate(
+                        501L,
+                        debateUuid,
+                        createResource(51L, resourceUuid),
+                        "PV",
+                        userUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 20, 0));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, UserRole.USER.name()), null));
+
+        debateService.delete(resourceUuid, debateUuid);
+
+        assertThat(debate.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Delete should allow admin")
+    void delete_shouldAllowAdmin() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d2050-8007-7fef-841d-4f48d5e23952");
+        UUID debateUuid = UUID.fromString("019d2050-805c-7cdd-a7df-59c590016eb0");
+        UUID authorUuid = UUID.fromString("019d2050-80ad-792c-b43c-c41f0a7363d7");
+        UUID adminUuid = UUID.fromString("019d2050-80f9-7f2b-b812-6cbc221bdc66");
+        Debate debate =
+                createUserDebate(
+                        601L,
+                        debateUuid,
+                        createResource(61L, resourceUuid),
+                        "PV",
+                        authorUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 20, 5));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(adminUuid, UserRole.ADMIN.name()), null));
+
+        debateService.delete(resourceUuid, debateUuid);
+
+        assertThat(debate.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Delete should fail for a different user")
+    void delete_shouldFailForDifferentUser() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d2050-8149-7c88-b5bd-dd2b0c997f2a");
+        UUID debateUuid = UUID.fromString("019d2050-8198-7903-8f99-c7de8f268e3f");
+        UUID authorUuid = UUID.fromString("019d2050-81e6-79a1-8a36-e18e82ef4f79");
+        UUID otherUserUuid = UUID.fromString("019d2050-8231-788f-b38f-89dca61c9498");
+        Debate debate =
+                createUserDebate(
+                        701L,
+                        debateUuid,
+                        createResource(71L, resourceUuid),
+                        "PV",
+                        authorUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 20, 10));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(otherUserUuid, UserRole.USER.name()), null));
+
+        assertThatThrownBy(() -> debateService.delete(resourceUuid, debateUuid))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Access denied.");
+        assertThat(debate.isDeleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Delete should soft delete debate for its guest author")
+    void delete_shouldSoftDeleteForGuestAuthor() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d2050-827c-74be-befd-0c79843bfba1");
+        UUID debateUuid = UUID.fromString("019d2050-82d1-7723-adad-309a6a5398bb");
+        UUID guestUuid = UUID.fromString("019d2050-8323-7b31-a340-2c1a5a0ca938");
+        Debate debate =
+                createGuestDebate(
+                        801L,
+                        debateUuid,
+                        createResource(81L, resourceUuid),
+                        "PV",
+                        guestUuid,
+                        LocalDateTime.of(2026, 3, 21, 20, 15));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new GuestPrincipal(guestUuid), null));
+
+        debateService.delete(resourceUuid, debateUuid);
+
+        assertThat(debate.isDeleted()).isTrue();
+    }
+
     private Resource createResource(Long id, UUID uuid) {
         Resource resource = Resource.create(ResourceType.SONG, "Mesmerizer", null);
         ReflectionTestUtils.setField(resource, "id", id);
@@ -288,6 +456,7 @@ class DebateServiceTest {
             UUID uuid,
             Resource resource,
             String title,
+            UUID userUuid,
             String nickname,
             LocalDateTime createdAt) {
         User user =
@@ -299,6 +468,7 @@ class DebateServiceTest {
                         UserTheme.LIGHT,
                         UserPvProvider.YOUTUBE,
                         UserRole.USER);
+        ReflectionTestUtils.setField(user, "uuid", userUuid);
         Debate debate = Debate.create(resource, user, null, title);
         ReflectionTestUtils.setField(debate, "id", id);
         ReflectionTestUtils.setField(debate, "uuid", uuid);
@@ -307,8 +477,14 @@ class DebateServiceTest {
     }
 
     private Debate createGuestDebate(
-            Long id, UUID uuid, Resource resource, String title, LocalDateTime createdAt) {
+            Long id,
+            UUID uuid,
+            Resource resource,
+            String title,
+            UUID guestUuid,
+            LocalDateTime createdAt) {
         Guest guest = Guest.create("127.0.0.1");
+        ReflectionTestUtils.setField(guest, "uuid", guestUuid);
         Debate debate = Debate.create(resource, null, guest, title);
         ReflectionTestUtils.setField(debate, "id", id);
         ReflectionTestUtils.setField(debate, "uuid", uuid);
