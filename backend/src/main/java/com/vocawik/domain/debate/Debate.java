@@ -78,6 +78,11 @@ public class Debate extends BaseEntity {
         this.status = DebateStatus.CLOSED;
     }
 
+    /** Reopens this debate thread. */
+    public void reopen() {
+        this.status = DebateStatus.OPEN;
+    }
+
     /** Archives this debate thread. */
     public void archive() {
         this.status = DebateStatus.ARCHIVED;

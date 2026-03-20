@@ -22,6 +22,7 @@ import com.vocawik.domain.user.UserTheme;
 import com.vocawik.dto.debate.DebateCommentCreateRequest;
 import com.vocawik.dto.debate.DebateCommentUpdateRequest;
 import com.vocawik.dto.debate.DebateCreateRequest;
+import com.vocawik.dto.debate.DebateStatusUpdateRequest;
 import com.vocawik.repository.debate.DebateCommentCountProjection;
 import com.vocawik.repository.debate.DebateCommentRepository;
 import com.vocawik.repository.debate.DebateRepository;
@@ -728,6 +729,144 @@ class DebateServiceTest {
         debateService.delete(resourceUuid, debateUuid);
 
         assertThat(debate.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Update status should close debate for its author")
+    void updateStatus_shouldCloseDebateForAuthor() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d24a8-76fc-711f-afde-4bf92e332eb5");
+        UUID debateUuid = UUID.fromString("019d24a8-7775-7e8f-bc42-aef4bd5608df");
+        UUID userUuid = UUID.fromString("019d24a8-77cf-7188-a3d8-aebc555ecce5");
+        Debate debate =
+                createUserDebate(
+                        1201L,
+                        debateUuid,
+                        createResource(121L, resourceUuid),
+                        "PV",
+                        userUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 22, 0));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, UserRole.USER.name()), null));
+
+        var response =
+                debateService.updateStatus(
+                        resourceUuid, debateUuid, new DebateStatusUpdateRequest("CLOSED", null));
+
+        assertThat(response.debateUuid()).isEqualTo(debateUuid);
+        assertThat(response.status()).isEqualTo("CLOSED");
+        assertThat(debate.getStatus()).isEqualTo(DebateStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("Update status should reopen debate for admin")
+    void updateStatus_shouldReopenDebateForAdmin() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d24a8-7824-7d0d-ad77-9d32efa0b4ae");
+        UUID debateUuid = UUID.fromString("019d24a8-7874-74c5-b0f2-f3b20f7d69b0");
+        UUID authorUuid = UUID.fromString("019d24a8-78c0-78e2-b432-499817ec59f7");
+        UUID adminUuid = UUID.fromString("019d24a8-790d-7c99-b11a-4416f3b2a9da");
+        Debate debate =
+                createUserDebate(
+                        1301L,
+                        debateUuid,
+                        createResource(131L, resourceUuid),
+                        "PV",
+                        authorUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 22, 10));
+        debate.close();
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(adminUuid, UserRole.ADMIN.name()), null));
+
+        var response =
+                debateService.updateStatus(
+                        resourceUuid, debateUuid, new DebateStatusUpdateRequest("OPEN", null));
+
+        assertThat(response.status()).isEqualTo("OPEN");
+        assertThat(debate.getStatus()).isEqualTo(DebateStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("Update status should reject archived status")
+    void updateStatus_shouldRejectArchivedStatus() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d24a8-7961-7e64-b287-1302a8da5ef0");
+        UUID debateUuid = UUID.fromString("019d24a8-79bb-7638-b1c2-169d437b08f1");
+        UUID userUuid = UUID.fromString("019d24a8-7a0f-764a-b1e2-848bf025d5a7");
+        Debate debate =
+                createUserDebate(
+                        1401L,
+                        debateUuid,
+                        createResource(141L, resourceUuid),
+                        "PV",
+                        userUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 22, 20));
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, UserRole.USER.name()), null));
+
+        assertThatThrownBy(
+                        () ->
+                                debateService.updateStatus(
+                                        resourceUuid,
+                                        debateUuid,
+                                        new DebateStatusUpdateRequest("ARCHIVED", null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Invalid input.");
+        assertThat(debate.getStatus()).isEqualTo(DebateStatus.OPEN);
     }
 
     private Resource createResource(Long id, UUID uuid) {

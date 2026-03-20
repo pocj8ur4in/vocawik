@@ -13,6 +13,8 @@ import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.dto.debate.DebateDetailResponse;
 import com.vocawik.dto.debate.DebateListElementResponse;
 import com.vocawik.dto.debate.DebateListResponse;
+import com.vocawik.dto.debate.DebateStatusResponse;
+import com.vocawik.dto.debate.DebateStatusUpdateRequest;
 import com.vocawik.repository.debate.DebateCommentCountProjection;
 import com.vocawik.repository.debate.DebateCommentRepository;
 import com.vocawik.repository.debate.DebateRepository;
@@ -200,6 +202,34 @@ public class DebateService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         debate.softDelete();
+    }
+
+    @Transactional
+    public DebateStatusResponse updateStatus(
+            UUID resourceUuid, UUID debateUuid, DebateStatusUpdateRequest request) {
+        Debate debate = findDebate(resourceUuid, debateUuid);
+        if (!canDelete(debate)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        DebateStatus nextStatus;
+        try {
+            nextStatus = DebateStatus.valueOf(request.status().trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (nextStatus == DebateStatus.ARCHIVED) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (nextStatus == DebateStatus.CLOSED) {
+            debate.close();
+        } else {
+            debate.reopen();
+        }
+
+        return new DebateStatusResponse(debate.getUuid(), debate.getStatus().name());
     }
 
     private Debate findDebate(UUID resourceUuid, UUID debateUuid) {

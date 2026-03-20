@@ -9,6 +9,8 @@ import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.dto.debate.DebateDetailResponse;
 import com.vocawik.dto.debate.DebateListElementResponse;
 import com.vocawik.dto.debate.DebateListResponse;
+import com.vocawik.dto.debate.DebateStatusResponse;
+import com.vocawik.dto.debate.DebateStatusUpdateRequest;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.resource.PopularResourceListResponse;
@@ -245,6 +247,22 @@ public class ResourceController {
         captchaVerificationService.verifyRequiredForNonUser(captchaToken, httpServletRequest);
         debateService.delete(resourceUuid, debateUuid);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Updates a debate thread status. */
+    @PatchMapping("/resources/{resourceUuid}/debates/{debateUuid}/status")
+    @AllowGuest
+    @Operation(
+            summary = "Update debate status",
+            description = "Updates a debate thread status for its author or an admin.")
+    public ResponseEntity<DebateStatusResponse> updateDebateStatus(
+            @PathVariable UUID resourceUuid,
+            @PathVariable UUID debateUuid,
+            @Valid @RequestBody DebateStatusUpdateRequest request,
+            HttpServletRequest httpServletRequest) {
+        captchaVerificationService.verifyRequiredForNonUser(
+                request.captchaToken(), httpServletRequest);
+        return ResponseEntity.ok(debateService.updateStatus(resourceUuid, debateUuid, request));
     }
 
     /** Soft deletes a debate comment. */
