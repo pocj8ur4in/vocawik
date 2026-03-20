@@ -114,23 +114,12 @@ public class VocalService {
         Resource resource = vocal.getResource();
         updateVocalFields(vocal, resource, request);
 
-        if (request.canonicalName() != null || request.aliases() != null) {
-            VocalCreateRequest.CanonicalNameCreateRequest canonicalName =
-                    request.canonicalName() == null
-                            ? toCreateCanonical(loadCanonicalName(resource))
-                            : toCreateCanonical(request.canonicalName());
-            List<VocalCreateRequest.ResourceAliasCreateRequest> aliases =
-                    request.aliases() == null
-                            ? toCreateAliasesFromResourceNames(loadAliases(resource))
-                            : toCreateAliases(request.aliases());
-            syncResourceNames(resource, canonicalName, aliases);
-        }
-        if (request.acls() != null) {
-            syncAcls(resource, toCreateAcls(request.acls()));
-        }
-        if (request.links() != null) {
-            syncVocalLinks(vocal, request.links());
-        }
+        syncResourceNames(
+                resource,
+                toCreateCanonical(request.canonicalName()),
+                toCreateAliases(request.aliases()));
+        syncAcls(resource, toCreateAcls(request.acls()));
+        syncVocalLinks(vocal, request.links());
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(vocal, resource));
         resourceRepository.saveAndFlush(resource);
@@ -449,18 +438,9 @@ public class VocalService {
     }
 
     private void updateVocalFields(Vocal vocal, Resource resource, VocalUpdateRequest request) {
-        String canonicalName =
-                request.canonicalName() == null
-                        ? resource.getCanonicalName()
-                        : normalizeCanonicalName(request.canonicalName().name());
-        String thumbnailUrl =
-                request.thumbnailUrl() == null
-                        ? resource.getThumbnailUrl()
-                        : normalizeNullable(request.thumbnailUrl());
-        String content =
-                request.content() == null
-                        ? vocal.getContent()
-                        : normalizeNullable(request.content());
+        String canonicalName = normalizeCanonicalName(request.canonicalName().name());
+        String thumbnailUrl = normalizeNullable(request.thumbnailUrl());
+        String content = normalizeNullable(request.content());
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
@@ -613,12 +593,6 @@ public class VocalService {
             VocalUpdateRequest.CanonicalNameUpdateRequest canonicalName) {
         return new VocalCreateRequest.CanonicalNameCreateRequest(
                 canonicalName.langCode(), canonicalName.name());
-    }
-
-    private VocalCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
-            ResourceName resourceName) {
-        return new VocalCreateRequest.CanonicalNameCreateRequest(
-                resourceName.getLangCode(), resourceName.getName());
     }
 
     private List<VocalCreateRequest.ResourceAliasCreateRequest> toCreateAliases(

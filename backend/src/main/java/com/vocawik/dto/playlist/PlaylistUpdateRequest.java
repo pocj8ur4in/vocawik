@@ -12,10 +12,10 @@ import java.util.UUID;
 
 /** Request payload for playlist update. */
 public record PlaylistUpdateRequest(
-        @Valid CanonicalNameUpdateRequest canonicalName,
+        @NotNull @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
-        Boolean isPublic,
+        @NotNull Boolean isPublic,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
         @Valid List<PlaylistSongUpdateRequest> songs,
@@ -23,9 +23,9 @@ public record PlaylistUpdateRequest(
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public PlaylistUpdateRequest {
-        aliases = aliases == null ? null : List.copyOf(aliases);
-        acls = acls == null ? null : List.copyOf(acls);
-        songs = songs == null ? null : List.copyOf(songs);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        acls = acls == null ? List.of() : List.copyOf(acls);
+        songs = songs == null ? List.of() : List.copyOf(songs);
     }
 
     /** Canonical resource name input. */

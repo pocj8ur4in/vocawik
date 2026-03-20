@@ -14,12 +14,12 @@ import java.util.UUID;
 
 /** Request payload for song update. */
 public record SongUpdateRequest(
-        @Valid CanonicalNameUpdateRequest canonicalName,
+        @NotNull @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
         @Valid List<SongLinkUpdateRequest> links,
         LocalDateTime publishedAt,
-        String songType,
+        @NotBlank String songType,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
         @Valid List<SongLyricUpdateRequest> lyrics,
@@ -31,13 +31,13 @@ public record SongUpdateRequest(
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public SongUpdateRequest {
-        links = links == null ? null : List.copyOf(links);
-        aliases = aliases == null ? null : List.copyOf(aliases);
-        acls = acls == null ? null : List.copyOf(acls);
-        lyrics = lyrics == null ? null : List.copyOf(lyrics);
-        pvs = pvs == null ? null : List.copyOf(pvs);
-        artists = artists == null ? null : List.copyOf(artists);
-        vocals = vocals == null ? null : List.copyOf(vocals);
+        links = links == null ? List.of() : List.copyOf(links);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        acls = acls == null ? List.of() : List.copyOf(acls);
+        lyrics = lyrics == null ? List.of() : List.copyOf(lyrics);
+        pvs = pvs == null ? List.of() : List.copyOf(pvs);
+        artists = artists == null ? List.of() : List.copyOf(artists);
+        vocals = vocals == null ? List.of() : List.copyOf(vocals);
     }
 
     /** Canonical resource name input. */

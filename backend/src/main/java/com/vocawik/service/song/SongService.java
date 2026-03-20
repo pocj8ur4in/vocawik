@@ -348,39 +348,17 @@ public class SongService {
         Resource resource = song.getResource();
         updateSongFields(song, resource, request);
 
-        if (request.canonicalName() != null || request.aliases() != null) {
-            SongCreateRequest.CanonicalNameCreateRequest canonicalName =
-                    request.canonicalName() == null
-                            ? toCreateCanonical(loadCanonicalName(resource))
-                            : toCreateCanonical(request.canonicalName());
-            List<SongCreateRequest.ResourceAliasCreateRequest> aliases =
-                    request.aliases() == null
-                            ? toCreateAliasesFromResourceNames(loadAliases(resource))
-                            : toCreateAliases(request.aliases());
-            syncResourceNames(resource, canonicalName, aliases);
-        }
-        if (request.acls() != null) {
-            syncAcls(resource, toCreateAcls(request.acls()));
-        }
-        if (request.links() != null) {
-            syncSongLinks(song, request.links());
-        }
-        if (request.lyrics() != null) {
-            syncSongLyrics(song, toCreateLyrics(request.lyrics()));
-        }
-        if (request.pvs() != null) {
-            syncSongPvs(song, toCreatePvs(request.pvs()));
-        }
-        if (request.artists() != null) {
-            syncSongArtists(song, toCreateArtists(request.artists()));
-        }
-        List<SongVocal> vocals =
-                request.vocals() == null
-                        ? songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId())
-                        : syncSongVocals(song, toCreateVocals(request.vocals()));
-        if (request.relationsTargetSongResourceUuid() != null) {
-            syncSongRelation(song, request.relationsTargetSongResourceUuid());
-        }
+        syncResourceNames(
+                resource,
+                toCreateCanonical(request.canonicalName()),
+                toCreateAliases(request.aliases()));
+        syncAcls(resource, toCreateAcls(request.acls()));
+        syncSongLinks(song, request.links());
+        syncSongLyrics(song, toCreateLyrics(request.lyrics()));
+        syncSongPvs(song, toCreatePvs(request.pvs()));
+        syncSongArtists(song, toCreateArtists(request.artists()));
+        List<SongVocal> vocals = syncSongVocals(song, toCreateVocals(request.vocals()));
+        syncSongRelation(song, request.relationsTargetSongResourceUuid());
         validateSongParticipationPresent(vocals);
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(song, resource));
@@ -461,22 +439,11 @@ public class SongService {
     }
 
     private void updateSongFields(Song song, Resource resource, SongUpdateRequest request) {
-        String canonicalName =
-                request.canonicalName() == null
-                        ? resource.getCanonicalName()
-                        : normalizeCanonicalName(request.canonicalName().name());
-        String thumbnailUrl =
-                request.thumbnailUrl() == null
-                        ? resource.getThumbnailUrl()
-                        : normalizeNullable(request.thumbnailUrl());
-        String content =
-                request.content() == null
-                        ? song.getContent()
-                        : normalizeNullable(request.content());
-        LocalDateTime publishedAt =
-                request.publishedAt() == null ? song.getPublishedAt() : request.publishedAt();
-        SongType songType =
-                request.songType() == null ? song.getSongType() : parseSongType(request.songType());
+        String canonicalName = normalizeCanonicalName(request.canonicalName().name());
+        String thumbnailUrl = normalizeNullable(request.thumbnailUrl());
+        String content = normalizeNullable(request.content());
+        LocalDateTime publishedAt = request.publishedAt();
+        SongType songType = parseSongType(request.songType());
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
@@ -971,7 +938,13 @@ public class SongService {
     }
 
     private void syncSongRelation(Song song, UUID targetSongResourceUuid) {
+        List<SongRelation> existingRelations =
+                songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
         if (targetSongResourceUuid == null) {
+            if (!existingRelations.isEmpty()) {
+                songRelationRepository.deleteAllInBatch(existingRelations);
+                songRelationRepository.flush();
+            }
             return;
         }
 
@@ -987,8 +960,6 @@ public class SongService {
                     "Unknown targetSongResourceUuid: " + targetSongResourceUuid);
         }
 
-        List<SongRelation> existingRelations =
-                songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
         List<SongRelation> toDelete = new ArrayList<>();
         boolean matched = false;
         for (SongRelation existing : existingRelations) {
@@ -1013,12 +984,6 @@ public class SongService {
             SongUpdateRequest.CanonicalNameUpdateRequest canonicalName) {
         return new SongCreateRequest.CanonicalNameCreateRequest(
                 canonicalName.langCode(), canonicalName.name());
-    }
-
-    private SongCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
-            ResourceName resourceName) {
-        return new SongCreateRequest.CanonicalNameCreateRequest(
-                resourceName.getLangCode(), resourceName.getName());
     }
 
     private List<SongCreateRequest.ResourceAliasCreateRequest> toCreateAliases(
