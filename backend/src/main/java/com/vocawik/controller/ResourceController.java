@@ -3,6 +3,7 @@ package com.vocawik.controller;
 import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.debate.DebateCreateRequest;
+import com.vocawik.dto.debate.DebateDetailResponse;
 import com.vocawik.dto.debate.DebateListElementResponse;
 import com.vocawik.dto.debate.DebateListResponse;
 import com.vocawik.dto.history.RecentChangeListResponse;
@@ -165,6 +166,18 @@ public class ResourceController {
             description = "Returns visible discussion threads attached to a resource.")
     public ResponseEntity<DebateListResponse> listDebates(@PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(debateService.listByResourceUuid(resourceUuid));
+    }
+
+    /** Returns a single debate thread with its body and comments. */
+    @GetMapping("/resources/{resourceUuid}/debates/{debateUuid}")
+    @Operation(
+            summary = "Get debate",
+            description =
+                    "Returns a debate thread with its first comment as the body and all remaining comments.")
+    public ResponseEntity<DebateDetailResponse> getDebate(
+            @PathVariable UUID resourceUuid, @PathVariable UUID debateUuid) {
+        return ResponseEntity.ok(
+                debateService.getByResourceUuidAndDebateUuid(resourceUuid, debateUuid));
     }
 
     /** Creates a debate thread. */

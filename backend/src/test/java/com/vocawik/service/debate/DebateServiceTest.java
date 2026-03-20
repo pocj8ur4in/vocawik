@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.debate.Debate;
+import com.vocawik.domain.debate.DebateComment;
 import com.vocawik.domain.debate.DebateStatus;
 import com.vocawik.domain.guest.Guest;
 import com.vocawik.domain.resource.Resource;
@@ -158,6 +159,86 @@ class DebateServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Resource not found.");
         verifyNoInteractions(debateRepository, debateCommentRepository);
+    }
+
+    @Test
+    @DisplayName("Detail should return first comment as body and remaining comments as replies")
+    void getByResourceUuidAndDebateUuid_shouldReturnBodyAndReplies() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d20a4-5de0-7135-a6d0-e33068b4d9ff");
+        UUID debateUuid = UUID.fromString("019d20a4-5fd0-7e62-b90a-0d8f09ec5ea4");
+        UUID authorUuid = UUID.fromString("019d20a4-60f2-7f85-8d88-7f9997b3159b");
+        UUID guestUuid = UUID.fromString("019d20a4-6152-75ec-a355-739381262b31");
+        Debate debate =
+                createUserDebate(
+                        111L,
+                        debateUuid,
+                        createResource(11L, resourceUuid),
+                        "PV naming",
+                        authorUuid,
+                        "author",
+                        LocalDateTime.of(2026, 3, 21, 9, 0));
+        DebateComment body =
+                createUserComment(
+                        211L,
+                        UUID.fromString("019d20a4-61b8-713f-a087-8dd3120e9bad"),
+                        debate,
+                        null,
+                        authorUuid,
+                        "author",
+                        "This is the main thread content.",
+                        LocalDateTime.of(2026, 3, 21, 9, 0));
+        DebateComment reply =
+                createGuestComment(
+                        212L,
+                        UUID.fromString("019d20a4-6215-7ac0-8211-57be6d41015e"),
+                        debate,
+                        null,
+                        guestUuid,
+                        "This is a reply.",
+                        LocalDateTime.of(2026, 3, 21, 9, 5));
+        DebateComment nestedReply =
+                createUserComment(
+                        213L,
+                        UUID.fromString("019d20a4-6270-7f17-ab74-c9a44c1a1f0c"),
+                        debate,
+                        reply,
+                        authorUuid,
+                        "author",
+                        "This is a nested reply.",
+                        LocalDateTime.of(2026, 3, 21, 9, 10));
+
+        when(debateRepository.findByUuidAndResourceUuidAndIsDeletedFalse(
+                        eq(debateUuid), eq(resourceUuid)))
+                .thenReturn(Optional.of(debate));
+        when(debateCommentRepository.findAllByDebateIdOrderByCreatedAtAscIdAsc(111L))
+                .thenReturn(List.of(body, reply, nestedReply));
+
+        var response = debateService.getByResourceUuidAndDebateUuid(resourceUuid, debateUuid);
+
+        assertThat(response.title()).isEqualTo("PV naming");
+        assertThat(response.body()).isNotNull();
+        assertThat(response.body().commentUuid()).isEqualTo(body.getUuid());
+        assertThat(response.body().content()).isEqualTo("This is the main thread content.");
+        assertThat(response.comments()).hasSize(2);
+        assertThat(response.comments().get(0).commentUuid()).isEqualTo(reply.getUuid());
+        assertThat(response.comments().get(0).parentCommentUuid()).isNull();
+        assertThat(response.comments().get(0).authorName()).isEqualTo("Guest");
+        assertThat(response.comments().get(1).commentUuid()).isEqualTo(nestedReply.getUuid());
+        assertThat(response.comments().get(1).parentCommentUuid()).isEqualTo(reply.getUuid());
+        assertThat(response.comments().get(1).authorName()).isEqualTo("author");
     }
 
     @Test
@@ -490,6 +571,51 @@ class DebateServiceTest {
         ReflectionTestUtils.setField(debate, "uuid", uuid);
         ReflectionTestUtils.setField(debate, "createdAt", createdAt);
         return debate;
+    }
+
+    private DebateComment createUserComment(
+            Long id,
+            UUID uuid,
+            Debate debate,
+            DebateComment parentComment,
+            UUID userUuid,
+            String nickname,
+            String content,
+            LocalDateTime createdAt) {
+        User user =
+                User.create(
+                        nickname.toLowerCase() + "@vocawik.test",
+                        nickname,
+                        Language.KO,
+                        ZoneId.of("Asia/Seoul"),
+                        UserTheme.LIGHT,
+                        UserPvProvider.YOUTUBE,
+                        UserRole.USER);
+        ReflectionTestUtils.setField(user, "uuid", userUuid);
+        DebateComment comment = DebateComment.create(debate, parentComment, user, null, content);
+        ReflectionTestUtils.setField(comment, "id", id);
+        ReflectionTestUtils.setField(comment, "uuid", uuid);
+        ReflectionTestUtils.setField(comment, "createdAt", createdAt);
+        ReflectionTestUtils.setField(comment, "updatedAt", createdAt);
+        return comment;
+    }
+
+    private DebateComment createGuestComment(
+            Long id,
+            UUID uuid,
+            Debate debate,
+            DebateComment parentComment,
+            UUID guestUuid,
+            String content,
+            LocalDateTime createdAt) {
+        Guest guest = Guest.create("127.0.0.1");
+        ReflectionTestUtils.setField(guest, "uuid", guestUuid);
+        DebateComment comment = DebateComment.create(debate, parentComment, null, guest, content);
+        ReflectionTestUtils.setField(comment, "id", id);
+        ReflectionTestUtils.setField(comment, "uuid", uuid);
+        ReflectionTestUtils.setField(comment, "createdAt", createdAt);
+        ReflectionTestUtils.setField(comment, "updatedAt", createdAt);
+        return comment;
     }
 
     private DebateCommentCountProjection commentCount(Long debateId, long commentCount) {
