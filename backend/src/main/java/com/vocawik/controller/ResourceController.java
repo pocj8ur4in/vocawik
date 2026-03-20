@@ -2,6 +2,7 @@ package com.vocawik.controller;
 
 import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
+import com.vocawik.dto.debate.DebateListResponse;
 import com.vocawik.dto.history.RecentChangeListResponse;
 import com.vocawik.dto.history.ResourceHistoryDetailResponse;
 import com.vocawik.dto.resource.PopularResourceListResponse;
@@ -9,6 +10,7 @@ import com.vocawik.dto.resource.ResourceInfoResponse;
 import com.vocawik.dto.resource.ResourceListResponse;
 import com.vocawik.dto.resource.ResourceSuggestionListResponse;
 import com.vocawik.service.captcha.CaptchaVerificationService;
+import com.vocawik.service.debate.DebateService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.resource.ResourcePopularityService;
 import com.vocawik.service.resource.ResourceService;
@@ -48,6 +50,7 @@ public class ResourceController {
                     "match", "match");
 
     private final ResourceService resourceService;
+    private final DebateService debateService;
     private final ResourceHistoryService resourceHistoryService;
     private final ResourcePopularityService resourcePopularityService;
     private final CaptchaVerificationService captchaVerificationService;
@@ -139,6 +142,15 @@ public class ResourceController {
             description = "Returns shared resource ACL and history metadata.")
     public ResponseEntity<ResourceInfoResponse> getResourceInfo(@PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(resourceService.getResourceInfoByResourceUuid(resourceUuid));
+    }
+
+    /** Lists debate threads attached to a resource. */
+    @GetMapping("/resources/{resourceUuid}/debates")
+    @Operation(
+            summary = "List debates",
+            description = "Returns visible discussion threads attached to a resource.")
+    public ResponseEntity<DebateListResponse> listDebates(@PathVariable UUID resourceUuid) {
+        return ResponseEntity.ok(debateService.listByResourceUuid(resourceUuid));
     }
 
     /** Lists the most recent resource changes across all resource types. */
