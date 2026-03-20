@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -17,21 +18,34 @@ import com.vocawik.domain.user.User;
 import com.vocawik.domain.user.UserPvProvider;
 import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.user.UserTheme;
+import com.vocawik.dto.debate.DebateCreateRequest;
 import com.vocawik.repository.debate.DebateCommentCountProjection;
 import com.vocawik.repository.debate.DebateCommentRepository;
 import com.vocawik.repository.debate.DebateRepository;
+import com.vocawik.repository.guest.GuestRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.repository.user.UserRepository;
+import com.vocawik.security.guest.GuestPrincipal;
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.web.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class DebateServiceTest {
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @DisplayName("List should return mapped debates with user and guest authors")
@@ -39,8 +53,15 @@ class DebateServiceTest {
         ResourceRepository resourceRepository = mock(ResourceRepository.class);
         DebateRepository debateRepository = mock(DebateRepository.class);
         DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
         DebateService debateService =
-                new DebateService(resourceRepository, debateRepository, debateCommentRepository);
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
 
         UUID resourceUuid = UUID.fromString("019d0f6d-f6a5-71d9-bd8e-b1b87dc60851");
         Resource resource = createResource(11L, resourceUuid);
@@ -87,8 +108,15 @@ class DebateServiceTest {
         ResourceRepository resourceRepository = mock(ResourceRepository.class);
         DebateRepository debateRepository = mock(DebateRepository.class);
         DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
         DebateService debateService =
-                new DebateService(resourceRepository, debateRepository, debateCommentRepository);
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
 
         UUID resourceUuid = UUID.fromString("019d0f6e-10f6-7667-abcc-879987ecf48f");
         when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
@@ -110,8 +138,15 @@ class DebateServiceTest {
         ResourceRepository resourceRepository = mock(ResourceRepository.class);
         DebateRepository debateRepository = mock(DebateRepository.class);
         DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
         DebateService debateService =
-                new DebateService(resourceRepository, debateRepository, debateCommentRepository);
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
 
         UUID resourceUuid = UUID.fromString("019d0f6e-1fb2-7e30-9338-be1547495282");
         when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
@@ -121,6 +156,124 @@ class DebateServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Resource not found.");
         verifyNoInteractions(debateRepository, debateCommentRepository);
+    }
+
+    @Test
+    @DisplayName("Create should persist debate and first comment for an authenticated user")
+    void create_shouldPersistDebateAndFirstCommentForUser() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d16a0-60d9-7a13-b5c8-59bf1c0b29b0");
+        UUID userUuid = UUID.fromString("019d16a0-627d-7e2f-9b8b-a13d574bfb77");
+        Resource resource = createResource(31L, resourceUuid);
+        User user =
+                User.create(
+                        "testuser@vocawik.test",
+                        "testuser",
+                        Language.KO,
+                        ZoneId.of("Asia/Seoul"),
+                        UserTheme.LIGHT,
+                        UserPvProvider.YOUTUBE,
+                        UserRole.USER);
+        ReflectionTestUtils.setField(user, "uuid", userUuid);
+        when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
+                .thenReturn(Optional.of(resource));
+        when(userRepository.findByUuidAndIsDeletedFalse(eq(userUuid)))
+                .thenReturn(Optional.of(user));
+        when(debateRepository.save(org.mockito.ArgumentMatchers.any(Debate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            Debate saved = invocation.getArgument(0);
+                            ReflectionTestUtils.setField(saved, "id", 301L);
+                            ReflectionTestUtils.setField(
+                                    saved,
+                                    "uuid",
+                                    UUID.fromString("019d16a0-6346-74fa-bb75-13b5e5a68efd"));
+                            ReflectionTestUtils.setField(
+                                    saved, "createdAt", LocalDateTime.of(2026, 3, 21, 19, 30));
+                            return saved;
+                        });
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, UserRole.USER.name()), null));
+
+        var response =
+                debateService.create(
+                        resourceUuid,
+                        new DebateCreateRequest("PV naming", "This is the first comment.", null));
+
+        assertThat(response.title()).isEqualTo("PV naming");
+        assertThat(response.authorName()).isEqualTo("testuser");
+        assertThat(response.status()).isEqualTo("OPEN");
+        assertThat(response.commentCount()).isEqualTo(1L);
+        verify(debateCommentRepository)
+                .save(
+                        org.mockito.ArgumentMatchers.any(
+                                com.vocawik.domain.debate.DebateComment.class));
+    }
+
+    @Test
+    @DisplayName("Create should persist debate and first comment for a guest")
+    void create_shouldPersistDebateAndFirstCommentForGuest() {
+        ResourceRepository resourceRepository = mock(ResourceRepository.class);
+        DebateRepository debateRepository = mock(DebateRepository.class);
+        DebateCommentRepository debateCommentRepository = mock(DebateCommentRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        GuestRepository guestRepository = mock(GuestRepository.class);
+        DebateService debateService =
+                new DebateService(
+                        resourceRepository,
+                        debateRepository,
+                        debateCommentRepository,
+                        userRepository,
+                        guestRepository);
+
+        UUID resourceUuid = UUID.fromString("019d16a0-63ad-72bd-aab5-4bdcaef06cda");
+        UUID guestUuid = UUID.fromString("019d16a0-6404-7794-b410-26d772b53903");
+        Resource resource = createResource(41L, resourceUuid);
+        Guest guest = Guest.create("127.0.0.1");
+        ReflectionTestUtils.setField(guest, "uuid", guestUuid);
+        when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
+                .thenReturn(Optional.of(resource));
+        when(guestRepository.findByUuidAndIsDeletedFalse(eq(guestUuid)))
+                .thenReturn(Optional.of(guest));
+        when(debateRepository.save(org.mockito.ArgumentMatchers.any(Debate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            Debate saved = invocation.getArgument(0);
+                            ReflectionTestUtils.setField(saved, "id", 401L);
+                            ReflectionTestUtils.setField(
+                                    saved,
+                                    "uuid",
+                                    UUID.fromString("019d16a0-6453-7081-a428-f9c859c29ff7"));
+                            ReflectionTestUtils.setField(
+                                    saved, "createdAt", LocalDateTime.of(2026, 3, 21, 19, 45));
+                            return saved;
+                        });
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new GuestPrincipal(guestUuid), null));
+
+        var response =
+                debateService.create(
+                        resourceUuid, new DebateCreateRequest("Guest topic", "Guest body", null));
+
+        assertThat(response.title()).isEqualTo("Guest topic");
+        assertThat(response.authorName()).isEqualTo("Guest");
+        assertThat(response.commentCount()).isEqualTo(1L);
     }
 
     private Resource createResource(Long id, UUID uuid) {
