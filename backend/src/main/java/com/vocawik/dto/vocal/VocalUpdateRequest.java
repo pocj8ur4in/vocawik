@@ -11,7 +11,7 @@ import java.util.List;
 
 /** Request payload for vocal update. */
 public record VocalUpdateRequest(
-        @Valid CanonicalNameUpdateRequest canonicalName,
+        @NotNull @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
         @Valid List<VocalLinkUpdateRequest> links,
@@ -21,9 +21,9 @@ public record VocalUpdateRequest(
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public VocalUpdateRequest {
-        links = links == null ? null : List.copyOf(links);
-        aliases = aliases == null ? null : List.copyOf(aliases);
-        acls = acls == null ? null : List.copyOf(acls);
+        links = links == null ? List.of() : List.copyOf(links);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        acls = acls == null ? List.of() : List.copyOf(acls);
     }
 
     /** Canonical resource name input. */

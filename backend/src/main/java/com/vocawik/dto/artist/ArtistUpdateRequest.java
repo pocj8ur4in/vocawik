@@ -12,7 +12,7 @@ import java.util.UUID;
 
 /** Request payload for artist update. */
 public record ArtistUpdateRequest(
-        @Valid CanonicalNameUpdateRequest canonicalName,
+        @NotNull @Valid CanonicalNameUpdateRequest canonicalName,
         String thumbnailUrl,
         String content,
         @Valid List<ArtistLinkUpdateRequest> links,
@@ -23,10 +23,10 @@ public record ArtistUpdateRequest(
 
     /** Defensive copy for mutable request fields while preserving null semantics. */
     public ArtistUpdateRequest {
-        links = links == null ? null : List.copyOf(links);
-        aliases = aliases == null ? null : List.copyOf(aliases);
-        acls = acls == null ? null : List.copyOf(acls);
-        members = members == null ? null : List.copyOf(members);
+        links = links == null ? List.of() : List.copyOf(links);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        acls = acls == null ? List.of() : List.copyOf(acls);
+        members = members == null ? List.of() : List.copyOf(members);
     }
 
     /** Canonical resource name input. */

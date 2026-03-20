@@ -121,26 +121,13 @@ public class ArtistService {
         Resource resource = artist.getResource();
         updateArtistFields(artist, resource, request);
 
-        if (request.canonicalName() != null || request.aliases() != null) {
-            ArtistCreateRequest.CanonicalNameCreateRequest canonicalName =
-                    request.canonicalName() == null
-                            ? toCreateCanonical(loadCanonicalName(resource))
-                            : toCreateCanonical(request.canonicalName());
-            List<ArtistCreateRequest.ResourceAliasCreateRequest> aliases =
-                    request.aliases() == null
-                            ? toCreateAliasesFromResourceNames(loadAliases(resource))
-                            : toCreateAliases(request.aliases());
-            syncResourceNames(resource, canonicalName, aliases);
-        }
-        if (request.acls() != null) {
-            syncAcls(resource, toCreateAcls(request.acls()));
-        }
-        if (request.links() != null) {
-            syncArtistLinks(artist, request.links());
-        }
-        if (request.members() != null) {
-            syncArtistMemberships(artist, toCreateMembers(request.members()));
-        }
+        syncResourceNames(
+                resource,
+                toCreateCanonical(request.canonicalName()),
+                toCreateAliases(request.aliases()));
+        syncAcls(resource, toCreateAcls(request.acls()));
+        syncArtistLinks(artist, request.links());
+        syncArtistMemberships(artist, toCreateMembers(request.members()));
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(artist, resource));
         resourceRepository.saveAndFlush(resource);
@@ -299,18 +286,9 @@ public class ArtistService {
     }
 
     private void updateArtistFields(Artist artist, Resource resource, ArtistUpdateRequest request) {
-        String canonicalName =
-                request.canonicalName() == null
-                        ? resource.getCanonicalName()
-                        : normalizeCanonicalName(request.canonicalName().name());
-        String thumbnailUrl =
-                request.thumbnailUrl() == null
-                        ? resource.getThumbnailUrl()
-                        : normalizeNullable(request.thumbnailUrl());
-        String content =
-                request.content() == null
-                        ? artist.getContent()
-                        : normalizeNullable(request.content());
+        String canonicalName = normalizeCanonicalName(request.canonicalName().name());
+        String thumbnailUrl = normalizeNullable(request.thumbnailUrl());
+        String content = normalizeNullable(request.content());
 
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
@@ -795,12 +773,6 @@ public class ArtistService {
             ArtistUpdateRequest.CanonicalNameUpdateRequest canonicalName) {
         return new ArtistCreateRequest.CanonicalNameCreateRequest(
                 canonicalName.langCode(), canonicalName.name());
-    }
-
-    private ArtistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
-            ResourceName resourceName) {
-        return new ArtistCreateRequest.CanonicalNameCreateRequest(
-                resourceName.getLangCode(), resourceName.getName());
     }
 
     private List<ArtistCreateRequest.ResourceAliasCreateRequest> toCreateAliases(

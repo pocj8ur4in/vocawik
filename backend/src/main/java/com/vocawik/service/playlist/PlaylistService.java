@@ -176,23 +176,12 @@ public class PlaylistService {
         Resource resource = playlist.getResource();
         updatePlaylistFields(playlist, resource, request);
 
-        if (request.canonicalName() != null || request.aliases() != null) {
-            PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName =
-                    request.canonicalName() == null
-                            ? toCreateCanonical(loadCanonicalName(resource))
-                            : toCreateCanonical(request.canonicalName());
-            List<PlaylistCreateRequest.ResourceAliasCreateRequest> aliases =
-                    request.aliases() == null
-                            ? toCreateAliasesFromResourceNames(loadAliases(resource))
-                            : toCreateAliases(request.aliases());
-            syncResourceNames(resource, canonicalName, aliases);
-        }
-        if (request.acls() != null) {
-            syncAcls(resource, toCreateAcls(request.acls()));
-        }
-        if (request.songs() != null) {
-            syncPlaylistSongs(playlist, toCreateSongs(request.songs()));
-        }
+        syncResourceNames(
+                resource,
+                toCreateCanonical(request.canonicalName()),
+                toCreateAliases(request.aliases()));
+        syncAcls(resource, toCreateAcls(request.acls()));
+        syncPlaylistSongs(playlist, toCreateSongs(request.songs()));
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(playlist, resource));
         resourceRepository.saveAndFlush(resource);
@@ -439,29 +428,15 @@ public class PlaylistService {
 
     private void updatePlaylistFields(
             Playlist playlist, Resource resource, PlaylistUpdateRequest request) {
-        if (request.canonicalName() != null) {
-            resource.updateCanonicalName(normalizeCanonicalName(request.canonicalName().name()));
-        }
-        if (request.thumbnailUrl() != null) {
-            resource.updateThumbnailUrl(normalizeNullable(request.thumbnailUrl()));
-        }
-        playlist.update(
-                request.content() != null
-                        ? normalizeNullable(request.content())
-                        : playlist.getContent(),
-                request.isPublic());
+        resource.updateCanonicalName(normalizeCanonicalName(request.canonicalName().name()));
+        resource.updateThumbnailUrl(normalizeNullable(request.thumbnailUrl()));
+        playlist.update(normalizeNullable(request.content()), request.isPublic());
     }
 
     private PlaylistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
             PlaylistUpdateRequest.CanonicalNameUpdateRequest canonicalName) {
         return new PlaylistCreateRequest.CanonicalNameCreateRequest(
                 canonicalName.langCode(), canonicalName.name());
-    }
-
-    private PlaylistCreateRequest.CanonicalNameCreateRequest toCreateCanonical(
-            ResourceName resourceName) {
-        return new PlaylistCreateRequest.CanonicalNameCreateRequest(
-                resourceName.getLangCode(), resourceName.getName());
     }
 
     private List<PlaylistCreateRequest.ResourceAliasCreateRequest> toCreateAliases(
