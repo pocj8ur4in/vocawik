@@ -52,6 +52,7 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
@@ -103,6 +104,7 @@ public class ResourceService {
     private final ArtistLinkRepository artistLinkRepository;
     private final VocalRepository vocalRepository;
     private final VocalLinkRepository vocalLinkRepository;
+    private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
     private final ResourcePopularityService resourcePopularityService;
     private final ObjectMapper objectMapper;
@@ -213,6 +215,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = song.getResource();
+        aclPermissionService.assertCanRead(resource);
 
         List<ResourceNameDetailResponse> names = loadResourceNames(resource.getId());
         List<ResourceAclDetailResponse> acls = loadResourceAcls(resource.getId());
@@ -276,8 +279,9 @@ public class ResourceService {
 
     @Transactional
     public SongResourceDetailResponse getSongByResourceUuidWithTracking(UUID resourceUuid) {
+        SongResourceDetailResponse detail = getSongByResourceUuid(resourceUuid);
         resourcePopularityService.trackView(resourceUuid);
-        return getSongByResourceUuid(resourceUuid);
+        return detail;
     }
 
     @Transactional(readOnly = true)
@@ -287,6 +291,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
+        aclPermissionService.assertCanRead(resource);
         List<ArtistLink> links = artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
         long songCount = songArtistRepository.countByArtistId(artist.getId());
         List<SongArtist> recentSongs =
@@ -340,8 +345,9 @@ public class ResourceService {
 
     @Transactional
     public ArtistResourceDetailResponse getArtistByResourceUuidWithTracking(UUID resourceUuid) {
+        ArtistResourceDetailResponse detail = getArtistByResourceUuid(resourceUuid);
         resourcePopularityService.trackView(resourceUuid);
-        return getArtistByResourceUuid(resourceUuid);
+        return detail;
     }
 
     @Transactional(readOnly = true)
@@ -351,6 +357,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();
+        aclPermissionService.assertCanRead(resource);
         List<VocalLink> links = vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
 
         long songCount = songVocalRepository.countByVocalId(vocal.getId());
@@ -392,8 +399,9 @@ public class ResourceService {
 
     @Transactional
     public VocalResourceDetailResponse getVocalByResourceUuidWithTracking(UUID resourceUuid) {
+        VocalResourceDetailResponse detail = getVocalByResourceUuid(resourceUuid);
         resourcePopularityService.trackView(resourceUuid);
-        return getVocalByResourceUuid(resourceUuid);
+        return detail;
     }
 
     @Transactional(readOnly = true)
@@ -403,6 +411,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
+        aclPermissionService.assertCanRead(resource);
         List<PlaylistSong> songs =
                 playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(
                         playlist.getId());
@@ -431,8 +440,9 @@ public class ResourceService {
 
     @Transactional
     public PlaylistResourceDetailResponse getPlaylistByResourceUuidWithTracking(UUID resourceUuid) {
+        PlaylistResourceDetailResponse detail = getPlaylistByResourceUuid(resourceUuid);
         resourcePopularityService.trackView(resourceUuid);
-        return getPlaylistByResourceUuid(resourceUuid);
+        return detail;
     }
 
     @Transactional(readOnly = true)
@@ -441,6 +451,7 @@ public class ResourceService {
                 resourceRepository
                         .findByUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        aclPermissionService.assertCanRead(resource);
         return new ResourceInfoResponse(
                 resource.getUuid(),
                 loadResourceAcls(resource.getId()),

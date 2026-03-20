@@ -30,6 +30,7 @@ import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.pv.client.PvMetaApiClientResolver;
 import com.vocawik.service.pv.detector.PvUrlDetector;
@@ -72,6 +73,7 @@ class SongServiceTest {
                         mock(SongRelationRepository.class),
                         mock(ArtistRepository.class),
                         mock(VocalRepository.class),
+                        mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
                         mock(EntityManager.class),
                         new ObjectMapper(),

@@ -49,6 +49,7 @@ import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.security.jwt.AuthPrincipal;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -128,6 +129,7 @@ class ResourceServiceTest {
                         artistLinkRepository,
                         vocalRepository,
                         vocalLinkRepository,
+                        mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
                         mock(ResourcePopularityService.class),
                         new ObjectMapper());

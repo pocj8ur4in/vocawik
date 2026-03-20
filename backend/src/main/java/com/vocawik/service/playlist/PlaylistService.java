@@ -28,6 +28,8 @@ import com.vocawik.repository.playlist.PlaylistSongRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongRepository;
+import com.vocawik.security.SecurityRoleUtils;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
@@ -64,6 +66,7 @@ public class PlaylistService {
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
     private final SongRepository songRepository;
+    private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
@@ -158,7 +161,9 @@ public class PlaylistService {
         playlistRepository.save(playlist);
 
         saveResourceNames(resource, canonicalName, request.aliases());
-        saveAcls(resource, request.acls());
+        if (SecurityRoleUtils.isAdmin()) {
+            saveAcls(resource, request.acls());
+        }
         savePlaylistSongs(playlist, request.songs());
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(playlist, resource));
@@ -174,13 +179,16 @@ public class PlaylistService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = playlist.getResource();
+        aclPermissionService.assertCanEdit(resource);
         updatePlaylistFields(playlist, resource, request);
 
         syncResourceNames(
                 resource,
                 toCreateCanonical(request.canonicalName()),
                 toCreateAliases(request.aliases()));
-        syncAcls(resource, toCreateAcls(request.acls()));
+        if (SecurityRoleUtils.isAdmin()) {
+            syncAcls(resource, toCreateAcls(request.acls()));
+        }
         syncPlaylistSongs(playlist, toCreateSongs(request.songs()));
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(playlist, resource));
@@ -196,6 +204,7 @@ public class PlaylistService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = playlist.getResource();
+        aclPermissionService.assertCanDelete(resource);
         JsonNode snapshot = buildHistorySnapshot(playlist, resource);
 
         resource.softDelete();

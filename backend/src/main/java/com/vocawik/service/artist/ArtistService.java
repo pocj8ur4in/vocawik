@@ -30,6 +30,8 @@ import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.security.SecurityRoleUtils;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
@@ -72,6 +74,7 @@ public class ArtistService {
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
     private final AclRepository aclRepository;
+    private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
@@ -96,7 +99,9 @@ public class ArtistService {
 
         saveResourceNames(resource, canonicalName, request.aliases());
         saveArtistLinks(artist, request.links());
-        saveAcls(resource, request.acls());
+        if (SecurityRoleUtils.isAdmin()) {
+            saveAcls(resource, request.acls());
+        }
         saveArtistMemberships(artist, request.members());
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(artist, resource));
@@ -119,13 +124,16 @@ public class ArtistService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = artist.getResource();
+        aclPermissionService.assertCanEdit(resource);
         updateArtistFields(artist, resource, request);
 
         syncResourceNames(
                 resource,
                 toCreateCanonical(request.canonicalName()),
                 toCreateAliases(request.aliases()));
-        syncAcls(resource, toCreateAcls(request.acls()));
+        if (SecurityRoleUtils.isAdmin()) {
+            syncAcls(resource, toCreateAcls(request.acls()));
+        }
         syncArtistLinks(artist, request.links());
         syncArtistMemberships(artist, toCreateMembers(request.members()));
 
@@ -147,6 +155,7 @@ public class ArtistService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = artist.getResource();
+        aclPermissionService.assertCanDelete(resource);
         JsonNode snapshot = buildHistorySnapshot(artist, resource);
 
         resource.softDelete();

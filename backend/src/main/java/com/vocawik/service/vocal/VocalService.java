@@ -27,6 +27,8 @@ import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.vocal.VocalCriteria;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.security.SecurityRoleUtils;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
@@ -67,6 +69,7 @@ public class VocalService {
     private final ResourceNameRepository resourceNameRepository;
     private final VocalLinkRepository vocalLinkRepository;
     private final AclRepository aclRepository;
+    private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
     private final ObjectMapper objectMapper;
 
@@ -90,7 +93,9 @@ public class VocalService {
 
         saveResourceNames(resource, canonicalName, request.aliases());
         saveVocalLinks(vocal, request.links());
-        saveAcls(resource, request.acls());
+        if (SecurityRoleUtils.isAdmin()) {
+            saveAcls(resource, request.acls());
+        }
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(vocal, resource));
         resourceRepository.saveAndFlush(resource);
@@ -112,13 +117,16 @@ public class VocalService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = vocal.getResource();
+        aclPermissionService.assertCanEdit(resource);
         updateVocalFields(vocal, resource, request);
 
         syncResourceNames(
                 resource,
                 toCreateCanonical(request.canonicalName()),
                 toCreateAliases(request.aliases()));
-        syncAcls(resource, toCreateAcls(request.acls()));
+        if (SecurityRoleUtils.isAdmin()) {
+            syncAcls(resource, toCreateAcls(request.acls()));
+        }
         syncVocalLinks(vocal, request.links());
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(vocal, resource));
@@ -139,6 +147,7 @@ public class VocalService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = vocal.getResource();
+        aclPermissionService.assertCanDelete(resource);
         JsonNode snapshot = buildHistorySnapshot(vocal, resource);
 
         resource.softDelete();

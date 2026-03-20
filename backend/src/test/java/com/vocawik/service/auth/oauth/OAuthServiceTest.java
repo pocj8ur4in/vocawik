@@ -110,6 +110,7 @@ class OAuthServiceTest {
         String nickname = userCaptor.getValue().getNickname();
         assertThat(nickname).matches("^user\\d{6}$");
         assertThat(List.of("user000001", "user000002", "user000003")).doesNotContain(nickname);
+        assertThat(userCaptor.getValue().getEmailVerifiedAt()).isNotNull();
     }
 
     @Test

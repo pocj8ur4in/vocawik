@@ -23,6 +23,7 @@ import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.guest.GuestPrincipal;
 import com.vocawik.security.jwt.AuthPrincipal;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import java.util.List;
@@ -46,6 +47,7 @@ public class DebateService {
     private final DebateCommentRepository debateCommentRepository;
     private final UserRepository userRepository;
     private final GuestRepository guestRepository;
+    private final AclPermissionService aclPermissionService;
 
     @Transactional(readOnly = true)
     public DebateListResponse listByResourceUuid(UUID resourceUuid) {
@@ -53,6 +55,7 @@ public class DebateService {
                 resourceRepository
                         .findByUuidAndIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        aclPermissionService.assertCanRead(resource);
 
         List<Debate> debates =
                 debateRepository
@@ -93,6 +96,7 @@ public class DebateService {
                 debateRepository
                         .findByUuidAndResourceUuidAndIsDeletedFalse(debateUuid, resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        aclPermissionService.assertCanRead(debate.getResource());
         List<DebateComment> comments =
                 debateCommentRepository.findAllByDebateIdOrderByCreatedAtAscIdAsc(debate.getId());
 
@@ -117,6 +121,7 @@ public class DebateService {
                 resourceRepository
                         .findByUuidAndIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        aclPermissionService.assertCanCreateDebate(resource);
         User actorUser = currentUser().orElse(null);
         Guest actorGuest = actorUser == null ? currentGuest().orElse(null) : null;
         validateExactlyOneActor(actorUser, actorGuest);
@@ -140,6 +145,7 @@ public class DebateService {
     public DebateCommentResponse createComment(
             UUID resourceUuid, UUID debateUuid, DebateCommentCreateRequest request) {
         Debate debate = findDebate(resourceUuid, debateUuid);
+        aclPermissionService.assertCanCommentDebate(debate.getResource());
         User actorUser = currentUser().orElse(null);
         Guest actorGuest = actorUser == null ? currentGuest().orElse(null) : null;
         validateExactlyOneActor(actorUser, actorGuest);

@@ -22,6 +22,7 @@ import com.vocawik.repository.artist.ArtistLinkRepository;
 import com.vocawik.repository.artist.ArtistRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
@@ -55,6 +56,7 @@ class ArtistServiceTest {
                         mock(ResourceRepository.class),
                         resourceNameRepository,
                         mock(AclRepository.class),
+                        mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
                         mock(EntityManager.class),
                         new ObjectMapper());

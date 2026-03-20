@@ -13,6 +13,7 @@ CREATE TABLE users (
     pv_provider VARCHAR(20) NOT NULL DEFAULT 'UND',
     role VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL,
+    email_verified_at TIMESTAMP,
     last_login_at TIMESTAMP,
     password_hash VARCHAR(255),
     password_updated_at TIMESTAMP,

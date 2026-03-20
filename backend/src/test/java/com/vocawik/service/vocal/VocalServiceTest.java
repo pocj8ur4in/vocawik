@@ -21,6 +21,7 @@ import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +53,7 @@ class VocalServiceTest {
                         resourceNameRepository,
                         mock(VocalLinkRepository.class),
                         mock(AclRepository.class),
+                        mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
                         new ObjectMapper());
     }

@@ -75,6 +75,9 @@ public class OAuthService {
                         .map(UserAuthProvider::getUser)
                         .orElseGet(() -> linkOrCreateGoogleUser(userInfo));
 
+        if (Boolean.TRUE.equals(userInfo.emailVerified())) {
+            user.markEmailVerified();
+        }
         user.touchLastLoginAt();
         return sessionService.issueTokenBundle(user);
     }
