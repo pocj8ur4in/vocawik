@@ -31,6 +31,7 @@ import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.security.guest.GuestPrincipal;
 import com.vocawik.security.jwt.AuthPrincipal;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.web.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -65,7 +66,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d0f6d-f6a5-71d9-bd8e-b1b87dc60851");
         Resource resource = createResource(11L, resourceUuid);
@@ -122,7 +124,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d0f6e-10f6-7667-abcc-879987ecf48f");
         when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
@@ -152,7 +155,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d0f6e-1fb2-7e30-9338-be1547495282");
         when(resourceRepository.findByUuidAndIsDeletedFalse(eq(resourceUuid)))
@@ -178,7 +182,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d20a4-5de0-7135-a6d0-e33068b4d9ff");
         UUID debateUuid = UUID.fromString("019d20a4-5fd0-7e62-b90a-0d8f09ec5ea4");
@@ -258,7 +263,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d16a0-60d9-7a13-b5c8-59bf1c0b29b0");
         UUID userUuid = UUID.fromString("019d16a0-627d-7e2f-9b8b-a13d574bfb77");
@@ -324,7 +330,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d16a0-63ad-72bd-aab5-4bdcaef06cda");
         UUID guestUuid = UUID.fromString("019d16a0-6404-7794-b410-26d772b53903");
@@ -376,7 +383,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d217f-11ea-7db3-b21e-2adf1e3e61c8");
         UUID debateUuid = UUID.fromString("019d217f-1279-7b15-ba08-34c0c575fd7c");
@@ -465,7 +473,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d217f-13fb-7ad6-b456-0b3f4a55cd60");
         UUID debateUuid = UUID.fromString("019d217f-1457-7fe5-b0db-f2ab9ddd42b7");
@@ -526,7 +535,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d217f-155e-7899-8a66-c8650e9d2867");
         UUID debateUuid = UUID.fromString("019d217f-15b8-7353-b3f6-cdd33de97da4");
@@ -579,7 +589,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d2050-7e6a-79ee-a538-c598e6f1f650");
         UUID debateUuid = UUID.fromString("019d2050-7f04-71b1-97dd-d09310af6ac5");
@@ -620,7 +631,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d2050-8007-7fef-841d-4f48d5e23952");
         UUID debateUuid = UUID.fromString("019d2050-805c-7cdd-a7df-59c590016eb0");
@@ -662,7 +674,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d2050-8149-7c88-b5bd-dd2b0c997f2a");
         UUID debateUuid = UUID.fromString("019d2050-8198-7903-8f99-c7de8f268e3f");
@@ -705,7 +718,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d2050-827c-74be-befd-0c79843bfba1");
         UUID debateUuid = UUID.fromString("019d2050-82d1-7723-adad-309a6a5398bb");
@@ -745,7 +759,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d24a8-76fc-711f-afde-4bf92e332eb5");
         UUID debateUuid = UUID.fromString("019d24a8-7775-7e8f-bc42-aef4bd5608df");
@@ -790,7 +805,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d24a8-7824-7d0d-ad77-9d32efa0b4ae");
         UUID debateUuid = UUID.fromString("019d24a8-7874-74c5-b0f2-f3b20f7d69b0");
@@ -836,7 +852,8 @@ class DebateServiceTest {
                         debateRepository,
                         debateCommentRepository,
                         userRepository,
-                        guestRepository);
+                        guestRepository,
+                        mock(AclPermissionService.class));
 
         UUID resourceUuid = UUID.fromString("019d24a8-7961-7e64-b287-1302a8da5ef0");
         UUID debateUuid = UUID.fromString("019d24a8-79bb-7638-b1c2-169d437b08f1");

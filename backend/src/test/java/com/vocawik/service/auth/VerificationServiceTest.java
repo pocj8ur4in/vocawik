@@ -31,6 +31,7 @@ class VerificationServiceTest {
     private StringRedisTemplate stringRedisTemplate;
     private ValueOperations<String, String> valueOperations;
     private EmailService emailService;
+    private PasswordEncoder passwordEncoder;
     private VerificationService verificationService;
 
     @BeforeEach
@@ -40,13 +41,11 @@ class VerificationServiceTest {
         valueOperations = mock(ValueOperations.class);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         emailService = mock(EmailService.class);
+        passwordEncoder = mock(PasswordEncoder.class);
 
         verificationService =
                 new VerificationService(
-                        userRepository,
-                        stringRedisTemplate,
-                        mock(PasswordEncoder.class),
-                        emailService);
+                        userRepository, stringRedisTemplate, passwordEncoder, emailService);
         ReflectionTestUtils.setField(
                 verificationService,
                 "emailVerificationFrontendUrl",
@@ -114,5 +113,24 @@ class VerificationServiceTest {
                         argThat(
                                 (String key) ->
                                         key.startsWith("auth:email:verify:register:email:")));
+    }
+
+    @Test
+    @DisplayName("Register should persist verified email timestamp")
+    void register_shouldPersistVerifiedEmailTimestamp() {
+        when(valueOperations.getAndDelete(anyString())).thenReturn("user@example.com");
+        when(userRepository.findByEmailIgnoreCaseAndIsDeletedFalse("user@example.com"))
+                .thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Password123!")).thenReturn("encoded-password");
+
+        verificationService.register("Password123!", "tester", "register-ticket");
+
+        verify(userRepository)
+                .save(
+                        argThat(
+                                user ->
+                                        user.getEmailVerifiedAt() != null
+                                                && "encoded-password"
+                                                        .equals(user.getPasswordHash())));
     }
 }

@@ -232,6 +232,7 @@ public class VerificationService {
                         UserPvProvider.UND,
                         UserRole.USER);
         user.activate();
+        user.markEmailVerified();
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
         return user.getUuid();
@@ -303,6 +304,7 @@ public class VerificationService {
                                         new IllegalArgumentException(
                                                 INVALID_OR_EXPIRED_VERIFY_TOKEN_MESSAGE));
         user.activate();
+        user.markEmailVerified();
     }
 
     private String buildFrontendVerifyUrl(String email, String registerTicket) {

@@ -22,6 +22,7 @@ import com.vocawik.repository.playlist.PlaylistSongRepository;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongRepository;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -54,6 +55,7 @@ class PlaylistServiceTest {
                         resourceNameRepository,
                         mock(AclRepository.class),
                         mock(SongRepository.class),
+                        mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
                         mock(EntityManager.class),
                         new ObjectMapper());

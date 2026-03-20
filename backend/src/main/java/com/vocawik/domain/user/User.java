@@ -60,6 +60,9 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private UserRole role = UserRole.USER;
 
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
+
     @Column private LocalDateTime lastLoginAt;
 
     @Column(name = "password_hash", length = 255)
@@ -117,6 +120,13 @@ public class User extends BaseEntity {
     /** Marks this account as active. */
     public void activate() {
         this.status = UserStatus.ACTIVE;
+    }
+
+    /** Marks the email address as verified. */
+    public void markEmailVerified() {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = LocalDateTime.now();
+        }
     }
 
     /**

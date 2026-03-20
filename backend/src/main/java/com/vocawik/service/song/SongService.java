@@ -49,6 +49,8 @@ import com.vocawik.repository.song.SongRelationRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
+import com.vocawik.security.SecurityRoleUtils;
+import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.pv.client.PvMetaApiClient;
 import com.vocawik.service.pv.client.PvMetaApiClientResolver;
@@ -100,6 +102,7 @@ public class SongService {
     private final SongRelationRepository songRelationRepository;
     private final ArtistRepository artistRepository;
     private final VocalRepository vocalRepository;
+    private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
@@ -317,7 +320,9 @@ public class SongService {
         songRepository.save(song);
 
         saveResourceNames(resource, canonicalName, request.aliases());
-        saveAcls(resource, request.acls());
+        if (SecurityRoleUtils.isAdmin()) {
+            saveAcls(resource, request.acls());
+        }
         saveSongLinks(song, request.links());
         saveSongLyrics(song, request.lyrics());
         saveSongPvs(song, request.pvs());
@@ -346,13 +351,16 @@ public class SongService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = song.getResource();
+        aclPermissionService.assertCanEdit(resource);
         updateSongFields(song, resource, request);
 
         syncResourceNames(
                 resource,
                 toCreateCanonical(request.canonicalName()),
                 toCreateAliases(request.aliases()));
-        syncAcls(resource, toCreateAcls(request.acls()));
+        if (SecurityRoleUtils.isAdmin()) {
+            syncAcls(resource, toCreateAcls(request.acls()));
+        }
         syncSongLinks(song, request.links());
         syncSongLyrics(song, toCreateLyrics(request.lyrics()));
         syncSongPvs(song, toCreatePvs(request.pvs()));
@@ -379,6 +387,7 @@ public class SongService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = song.getResource();
+        aclPermissionService.assertCanDelete(resource);
         JsonNode snapshot = buildHistorySnapshot(song, resource);
 
         resource.softDelete();
