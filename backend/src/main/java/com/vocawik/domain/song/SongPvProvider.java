@@ -11,6 +11,7 @@ public enum SongPvProvider {
     SOUNDCLOUD(PvProvider.SOUNDCLOUD),
     VIMEO(PvProvider.VIMEO),
     BANDCAMP(PvProvider.BANDCAMP),
+    AUDIO(PvProvider.AUDIO),
     OTHER(null);
 
     private final PvProvider common;

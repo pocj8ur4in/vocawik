@@ -67,6 +67,8 @@ public record SongResourceDetailResponse(
             UUID pvUuid,
             String service,
             String videoKey,
+            String url,
+            String audioUrl,
             String title,
             String thumbnailUrl,
             String uploaderKey,

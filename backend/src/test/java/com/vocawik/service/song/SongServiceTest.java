@@ -14,7 +14,10 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.domain.song.Song;
+import com.vocawik.domain.song.SongPv;
+import com.vocawik.domain.song.SongPvProvider;
 import com.vocawik.domain.song.SongType;
+import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongListResponse;
 import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.repository.acl.AclRepository;
@@ -31,6 +34,7 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.acl.AclPermissionService;
+import com.vocawik.service.audio.SongAudioImportService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.pv.client.PvMetaApiClientResolver;
 import com.vocawik.service.pv.detector.PvUrlDetector;
@@ -46,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class SongServiceTest {
 
@@ -78,7 +83,8 @@ class SongServiceTest {
                         mock(EntityManager.class),
                         new ObjectMapper(),
                         mock(PvUrlDetector.class),
-                        mock(PvMetaApiClientResolver.class));
+                        mock(PvMetaApiClientResolver.class),
+                        mock(SongAudioImportService.class));
     }
 
     @AfterEach
@@ -241,6 +247,53 @@ class SongServiceTest {
                 .containsExactly(
                         new com.vocawik.dto.song.SongSuggestionElementResponse(
                                 null, "메스머라이저", null, true));
+    }
+
+    @Test
+    @DisplayName("normalizeSongPvExtra should preserve audioUrl for AUDIO provider")
+    void normalizeSongPvExtra_withAudioProvider_shouldKeepAudioUrl() {
+        SongCreateRequest.SongPvExtraCreateRequest extraRequest =
+                new SongCreateRequest.SongPvExtraCreateRequest(
+                        " https://cdn.example.com/audio.mp3 ", 123L, "https://example.com/track");
+
+        Object extra =
+                ReflectionTestUtils.invokeMethod(
+                        songService, "normalizeSongPvExtra", SongPvProvider.AUDIO, extraRequest);
+        Object audioUrl = ReflectionTestUtils.invokeMethod(extra, "audioUrl");
+        Object cid = ReflectionTestUtils.invokeMethod(extra, "cid");
+        Object externalUrl = ReflectionTestUtils.invokeMethod(extra, "externalUrl");
+
+        assertThat(audioUrl).isEqualTo("https://cdn.example.com/audio.mp3");
+        assertThat(cid).isNull();
+        assertThat(externalUrl).isNull();
+    }
+
+    @Test
+    @DisplayName("buildAudioImportCandidates should prefer persisted PV sort order")
+    void buildAudioImportCandidates_shouldUsePersistedPvUrls() {
+        SongPv firstPv = mock(SongPv.class);
+        when(firstPv.getUrl()).thenReturn("https://example.com/custom-first");
+        when(firstPv.getTitle()).thenReturn("First");
+        when(firstPv.getThumbnailUrl()).thenReturn(null);
+        when(firstPv.getSortOrder()).thenReturn(10);
+
+        SongPv secondPv = mock(SongPv.class);
+        when(secondPv.getUrl()).thenReturn("https://www.nicovideo.jp/watch/sm9");
+        when(secondPv.getTitle()).thenReturn("Second");
+        when(secondPv.getThumbnailUrl()).thenReturn(null);
+        when(secondPv.getSortOrder()).thenReturn(5);
+
+        List<SongPv> pvs = List.of(firstPv, secondPv);
+
+        @SuppressWarnings("unchecked")
+        List<SongAudioImportService.AudioSourceCandidate> candidates =
+                (List<SongAudioImportService.AudioSourceCandidate>)
+                        ReflectionTestUtils.invokeMethod(
+                                songService, "buildAudioImportCandidates", pvs);
+
+        assertThat(candidates).hasSize(2);
+        assertThat(candidates.get(0).url()).isEqualTo("https://www.nicovideo.jp/watch/sm9");
+        assertThat(candidates.get(1).url()).isEqualTo("https://example.com/custom-first");
     }
 
     private Song song(

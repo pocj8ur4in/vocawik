@@ -139,6 +139,12 @@ auth:
     subject: ${EMAIL_VERIFICATION_SUBJECT}
     content-template: ${EMAIL_VERIFICATION_CONTENT_TEMPLATE}
 
+audio:
+  bucket: vocawik
+  command-timeout-seconds: 1800
+  yt-dlp-command: yt-dlp
+  ffmpeg-command: ffmpeg
+
 mail:
   from-address: ${SMTP_FROM:${SMTP_USERNAME:}}
 

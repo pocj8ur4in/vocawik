@@ -8,5 +8,6 @@ public enum PvProvider {
     PIAPRO,
     SOUNDCLOUD,
     VIMEO,
-    BANDCAMP
+    BANDCAMP,
+    AUDIO
 }

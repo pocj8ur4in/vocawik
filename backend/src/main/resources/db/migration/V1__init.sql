@@ -38,6 +38,7 @@ CREATE TABLE users (
             'SOUNDCLOUD',
             'VIMEO',
             'BANDCAMP',
+            'AUDIO',
             'UND'
         )
     )
@@ -348,6 +349,7 @@ CREATE TABLE song_pvs (
     song_id BIGINT NOT NULL,
     service VARCHAR(20) NOT NULL,
     video_key TEXT NOT NULL,
+    url TEXT,
     title VARCHAR(255),
     thumbnail_url TEXT,
     uploader_key TEXT,
@@ -361,7 +363,7 @@ CREATE TABLE song_pvs (
     sort_order INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT fk_song_pvs_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
     CONSTRAINT chk_song_pvs_service CHECK (
-        service IN ('YOUTUBE', 'NICONICO', 'BILIBILI', 'PIAPRO', 'SOUNDCLOUD', 'VIMEO', 'BANDCAMP', 'OTHER')
+        service IN ('YOUTUBE', 'NICONICO', 'BILIBILI', 'PIAPRO', 'SOUNDCLOUD', 'VIMEO', 'BANDCAMP', 'AUDIO', 'OTHER')
     ),
     CONSTRAINT chk_song_pvs_duration_seconds CHECK (
         duration_seconds IS NULL OR duration_seconds >= 0

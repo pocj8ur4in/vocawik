@@ -51,6 +51,7 @@ import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.security.SecurityRoleUtils;
 import com.vocawik.service.acl.AclPermissionService;
+import com.vocawik.service.audio.SongAudioImportService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.pv.client.PvMetaApiClient;
 import com.vocawik.service.pv.client.PvMetaApiClientResolver;
@@ -78,6 +79,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Service for searching songs. */
 @Service
@@ -108,6 +111,7 @@ public class SongService {
     private final ObjectMapper objectMapper;
     private final PvUrlDetector pvUrlDetector;
     private final PvMetaApiClientResolver pvMetaApiClientResolver;
+    private final SongAudioImportService songAudioImportService;
 
     /**
      * Searches songs with optional filters.
@@ -325,13 +329,14 @@ public class SongService {
         }
         saveSongLinks(song, request.links());
         saveSongLyrics(song, request.lyrics());
-        saveSongPvs(song, request.pvs());
+        List<SongPv> pvs = saveSongPvs(song, request.pvs());
         saveSongArtists(song, request.artists());
         List<SongVocal> vocals = saveSongVocals(song, request.vocals());
         saveSongRelation(song, request.relationsTargetSongResourceUuid());
         validateSongParticipationPresent(vocals);
 
         resourceHistoryService.recordCreate(resource, buildHistorySnapshot(song, resource));
+        scheduleSongAudioImportIfMissing(song, pvs);
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -363,13 +368,14 @@ public class SongService {
         }
         syncSongLinks(song, request.links());
         syncSongLyrics(song, toCreateLyrics(request.lyrics()));
-        syncSongPvs(song, toCreatePvs(request.pvs()));
+        List<SongPv> pvs = syncSongPvs(song, toCreatePvs(request.pvs()));
         syncSongArtists(song, toCreateArtists(request.artists()));
         List<SongVocal> vocals = syncSongVocals(song, toCreateVocals(request.vocals()));
         syncSongRelation(song, request.relationsTargetSongResourceUuid());
         validateSongParticipationPresent(vocals);
 
         resourceHistoryService.recordUpdate(resource, buildHistorySnapshot(song, resource));
+        scheduleSongAudioImportIfMissing(song, pvs);
         resourceRepository.saveAndFlush(resource);
         return resource.getUuid();
     }
@@ -760,6 +766,7 @@ public class SongService {
             if (candidates != null && !candidates.isEmpty()) {
                 SongPv matched = candidates.removeFirst();
                 matched.updateMetadata(
+                        normalizeLinkUrl(item.url()),
                         title,
                         thumbnailUrl,
                         uploaderKey,
@@ -779,6 +786,7 @@ public class SongService {
                             song,
                             service,
                             videoKey,
+                            normalizeLinkUrl(item.url()),
                             title,
                             thumbnailUrl,
                             uploaderKey,
@@ -1051,6 +1059,7 @@ public class SongService {
                                 new SongCreateRequest.SongPvCreateRequest(
                                         item.service(),
                                         item.videoKey(),
+                                        item.url(),
                                         item.title(),
                                         item.thumbnailUrl(),
                                         item.uploaderKey(),
@@ -1064,6 +1073,67 @@ public class SongService {
                                                         item.extra().cid(),
                                                         item.extra().externalUrl()),
                                         item.sortOrder()))
+                .toList();
+    }
+
+    private void scheduleSongAudioImportIfMissing(Song song, List<SongPv> pvs) {
+        if (song == null) {
+            return;
+        }
+
+        List<SongAudioImportService.AudioSourceCandidate> candidates =
+                buildAudioImportCandidates(pvs);
+        if (candidates.isEmpty()) {
+            return;
+        }
+
+        UUID songResourceUuid = song.getResource().getUuid();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            songAudioImportService.importIfMissing(songResourceUuid, candidates);
+                        }
+                    });
+            return;
+        }
+
+        songAudioImportService.importIfMissing(songResourceUuid, candidates);
+    }
+
+    private List<SongAudioImportService.AudioSourceCandidate> buildAudioImportCandidates(
+            List<SongPv> pvs) {
+        if (pvs == null || pvs.isEmpty()) {
+            return List.of();
+        }
+
+        List<SongAudioImportService.AudioSourceCandidate> candidates = new ArrayList<>();
+        for (int index = 0; index < pvs.size(); index++) {
+            SongPv item = pvs.get(index);
+            if (item == null) {
+                continue;
+            }
+
+            String url = normalizeNullable(item.getUrl());
+            if (url == null) {
+                continue;
+            }
+
+            candidates.add(
+                    new SongAudioImportService.AudioSourceCandidate(
+                            url,
+                            normalizeNullable(item.getTitle()),
+                            normalizeNullable(item.getThumbnailUrl()),
+                            item.getSortOrder(),
+                            index));
+        }
+        return candidates.stream()
+                .sorted(
+                        Comparator.comparingInt(
+                                        SongAudioImportService.AudioSourceCandidate::sortOrder)
+                                .thenComparingInt(
+                                        SongAudioImportService.AudioSourceCandidate::index))
                 .toList();
     }
 
@@ -1295,6 +1365,7 @@ public class SongService {
                                             song,
                                             service,
                                             normalizeRequired(item.videoKey(), "videoKey"),
+                                            normalizeLinkUrl(item.url()),
                                             normalizeNullable(item.title()),
                                             normalizeNullable(item.thumbnailUrl()),
                                             normalizeNullable(item.uploaderKey()),
@@ -1482,7 +1553,7 @@ public class SongService {
         String externalUrl = normalizeNullable(extra.externalUrl());
 
         return switch (service) {
-            case PIAPRO -> new SongPvExtraValues(audioUrl, null, null);
+            case PIAPRO, AUDIO -> new SongPvExtraValues(audioUrl, null, null);
             case BILIBILI -> new SongPvExtraValues(null, cid, null);
             case BANDCAMP -> new SongPvExtraValues(null, null, externalUrl);
             default -> SongPvExtraValues.empty();
@@ -1766,6 +1837,11 @@ public class SongService {
             ObjectNode pv = objectMapper.createObjectNode();
             pv.put("service", item.getService().name());
             pv.put("videoKey", item.getVideoKey());
+            if (item.getUrl() == null) {
+                pv.putNull("url");
+            } else {
+                pv.put("url", item.getUrl());
+            }
             if (item.getTitle() == null) {
                 pv.putNull("title");
             } else {

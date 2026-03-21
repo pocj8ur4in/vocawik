@@ -32,6 +32,9 @@ public class SongPv extends BaseEntity {
     @Column(name = "video_key", nullable = false, columnDefinition = "TEXT")
     private String videoKey;
 
+    @Column(name = "url", columnDefinition = "TEXT")
+    private String url;
+
     @Column(length = 255)
     private String title;
 
@@ -75,7 +78,8 @@ public class SongPv extends BaseEntity {
      */
     public static SongPv create(Song song, SongPvProvider service, String videoKey) {
         return create(
-                song, service, videoKey, null, null, null, null, true, null, null, null, null, 0);
+                song, service, videoKey, null, null, null, null, null, true, null, null, null, null,
+                0);
     }
 
     /**
@@ -84,6 +88,7 @@ public class SongPv extends BaseEntity {
      * @param song parent song
      * @param service pv service provider
      * @param videoKey video key in service
+     * @param url pv source url
      * @param title pv title
      * @param thumbnailUrl pv thumbnail url
      * @param uploaderKey uploader key
@@ -100,6 +105,7 @@ public class SongPv extends BaseEntity {
             Song song,
             SongPvProvider service,
             String videoKey,
+            String url,
             String title,
             String thumbnailUrl,
             String uploaderKey,
@@ -133,6 +139,7 @@ public class SongPv extends BaseEntity {
         songPv.song = song;
         songPv.service = service;
         songPv.videoKey = videoKey.trim();
+        songPv.url = url;
         songPv.title = title;
         songPv.thumbnailUrl = thumbnailUrl;
         songPv.uploaderKey = uploaderKey;
@@ -149,6 +156,7 @@ public class SongPv extends BaseEntity {
     /**
      * Updates mutable PV metadata fields.
      *
+     * @param url updated source URL
      * @param title updated title
      * @param thumbnailUrl updated thumbnail URL
      * @param uploaderKey updated uploader key
@@ -161,6 +169,7 @@ public class SongPv extends BaseEntity {
      * @param sortOrder updated sort order
      */
     public void updateMetadata(
+            String url,
             String title,
             String thumbnailUrl,
             String uploaderKey,
@@ -180,6 +189,7 @@ public class SongPv extends BaseEntity {
         if (sortOrder < 0) {
             throw new IllegalArgumentException("sortOrder must be >= 0");
         }
+        this.url = url;
         this.title = title;
         this.thumbnailUrl = thumbnailUrl;
         this.uploaderKey = uploaderKey;

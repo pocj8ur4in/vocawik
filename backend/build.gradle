@@ -41,6 +41,7 @@ dependencyManagement {
 
 def versions = [
 	redisson: '3.41.0',
+	googleCloudStorage: '2.60.0',
 	springdoc: '2.8.6',
 	jjwt: '0.12.6',
 	mapstruct: '1.6.3',
@@ -66,6 +67,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-batch'
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation "org.redisson:redisson:${versions.redisson}"
+	implementation "com.google.cloud:google-cloud-storage:${versions.googleCloudStorage}"
 	implementation 'org.flywaydb:flyway-core'
 	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 	implementation 'org.postgresql:postgresql'
