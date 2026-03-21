@@ -9,9 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.vocawik.security.ip.ClientIpResolver;
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.web.exception.TooManyRequestsException;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.Signature;
 import org.junit.jupiter.api.AfterEach;
@@ -104,6 +106,7 @@ class RateLimitAspectTest {
     @Test
     @DisplayName("Should build user_or_ip key using authenticated user")
     void checkRateLimit_withAuthenticatedUser_shouldUseUserKey() throws Throwable {
+        UUID userUuid = UUID.fromString("11111111-1111-1111-1111-111111111111");
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/test/123");
         request.setRemoteAddr("127.0.0.1");
         request.setAttribute(
@@ -112,7 +115,9 @@ class RateLimitAspectTest {
         when(clientIpResolver.resolve(request)).thenReturn("127.0.0.1");
 
         SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken("42", "N/A", List.of()));
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                new AuthPrincipal(userUuid, "USER"), "N/A", List.of()));
         when(rateLimiter.tryAcquire()).thenReturn(true);
         when(joinPoint.proceed()).thenReturn("ok");
 
@@ -121,7 +126,7 @@ class RateLimitAspectTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(redissonClient).getRateLimiter(captor.capture());
         assertThat(captor.getValue())
-                .isEqualTo("rate_limit:GET:/api/v1/test/{testId}:user:42:auth");
+                .isEqualTo("rate_limit:GET:/api/v1/test/{testId}:user:" + userUuid + ":auth");
     }
 
     @Test
