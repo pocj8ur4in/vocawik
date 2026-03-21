@@ -53,6 +53,7 @@ import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.acl.AclPermissionService;
+import com.vocawik.service.audio.AudioObjectStorageService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
@@ -107,6 +108,7 @@ public class ResourceService {
     private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
     private final ResourcePopularityService resourcePopularityService;
+    private final AudioObjectStorageService audioObjectStorageService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -243,6 +245,10 @@ public class ResourceService {
                                 outgoingRelations,
                                 incomingRelations,
                                 playlists));
+        boolean canViewManagedAudio = canViewSongPvHistory();
+        boolean hasManagedAudio =
+                canViewManagedAudio
+                        && audioObjectStorageService.existsSongAudio(resource.getUuid());
 
         return new SongResourceDetailResponse(
                 resource.getUuid(),
@@ -261,7 +267,9 @@ public class ResourceService {
                 names,
                 acls,
                 lyrics.stream().map(this::toSongLyric).toList(),
-                pvs.stream().map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()))).toList(),
+                pvs.stream()
+                        .map(pv -> toSongPv(pv, pvViewsBySongPvId.get(pv.getId()), hasManagedAudio))
+                        .toList(),
                 artists.stream()
                         .map(item -> toSongArtist(item, localizedNamesByResourceId))
                         .toList(),
@@ -666,11 +674,14 @@ public class ResourceService {
         return objectMapper.convertValue(jsonNode, Object.class);
     }
 
-    private SongResourceDetailResponse.SongPv toSongPv(SongPv pv, List<SongPvView> views) {
+    private SongResourceDetailResponse.SongPv toSongPv(
+            SongPv pv, List<SongPvView> views, boolean hasManagedAudio) {
         return new SongResourceDetailResponse.SongPv(
                 pv.getUuid(),
                 pv.getService().name(),
                 pv.getVideoKey(),
+                pv.getUrl(),
+                toManagedAudioUrl(pv, hasManagedAudio),
                 pv.getTitle(),
                 pv.getThumbnailUrl(),
                 pv.getUploaderKey(),
@@ -690,6 +701,13 @@ public class ResourceService {
                         : List.of(),
                 pv.getCreatedAt(),
                 pv.getUpdatedAt());
+    }
+
+    private String toManagedAudioUrl(SongPv pv, boolean hasManagedAudio) {
+        if (!hasManagedAudio) {
+            return null;
+        }
+        return "/songs/pvs/" + pv.getUuid() + "/audio";
     }
 
     private boolean canViewSongPvHistory() {

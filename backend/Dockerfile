@@ -17,6 +17,13 @@ RUN ./gradlew bootJar --no-daemon -x test
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates \
+    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+        -o /usr/local/bin/yt-dlp \
+    && chmod +x /usr/local/bin/yt-dlp \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/build/libs/*.jar app.jar
 
 EXPOSE 8080

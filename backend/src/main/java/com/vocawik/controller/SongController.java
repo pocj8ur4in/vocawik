@@ -11,6 +11,8 @@ import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongSuggestionListResponse;
 import com.vocawik.dto.song.SongUpdateRequest;
 import com.vocawik.security.guest.AllowGuest;
+import com.vocawik.service.audio.AudioObjectStorageService;
+import com.vocawik.service.audio.SongAudioImportService;
 import com.vocawik.service.captcha.CaptchaVerificationService;
 import com.vocawik.service.resource.ResourceService;
 import com.vocawik.service.song.SongService;
@@ -30,11 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,6 +70,7 @@ public class SongController {
                     "match", "match");
 
     private final SongService songService;
+    private final SongAudioImportService songAudioImportService;
     private final ResourceService resourceService;
     private final CaptchaVerificationService captchaVerificationService;
 
@@ -122,6 +127,20 @@ public class SongController {
     public ResponseEntity<SongResourceDetailResponse> deleteSong(@PathVariable UUID resourceUuid) {
         songService.delete(resourceUuid);
         return ResponseEntity.ok(resourceService.getSongByResourceUuid(resourceUuid));
+    }
+
+    /** Streams the imported song audio for a PV. */
+    @GetMapping("/songs/pvs/{pvUuid}/audio")
+    @Operation(
+            summary = "Stream imported song audio",
+            description = "Streams the imported song audio for the given song PV. Admin only.")
+    public ResponseEntity<InputStreamResource> streamSongAudio(@PathVariable UUID pvUuid) {
+        AudioObjectStorageService.AudioStream audioStream =
+                songAudioImportService.openAudioBySongPvUuid(pvUuid);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, audioStream.contentType())
+                .contentLength(audioStream.contentLength())
+                .body(new InputStreamResource(audioStream.inputStream()));
     }
 
     /**

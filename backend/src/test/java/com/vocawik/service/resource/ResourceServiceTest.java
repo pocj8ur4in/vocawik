@@ -50,6 +50,7 @@ import com.vocawik.repository.vocal.VocalLinkRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.service.acl.AclPermissionService;
+import com.vocawik.service.audio.AudioObjectStorageService;
 import com.vocawik.service.history.ResourceHistoryService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -86,6 +87,7 @@ class ResourceServiceTest {
     private VocalLinkRepository vocalLinkRepository;
     private ResourceNameRepository resourceNameRepository;
     private ResourceRepository resourceRepository;
+    private AudioObjectStorageService audioObjectStorageService;
     private ResourceService resourceService;
 
     @BeforeEach
@@ -109,6 +111,7 @@ class ResourceServiceTest {
         vocalLinkRepository = mock(VocalLinkRepository.class);
         resourceNameRepository = mock(ResourceNameRepository.class);
         resourceRepository = mock(ResourceRepository.class);
+        audioObjectStorageService = mock(AudioObjectStorageService.class);
         resourceService =
                 new ResourceService(
                         resourceRepository,
@@ -132,6 +135,7 @@ class ResourceServiceTest {
                         mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
                         mock(ResourcePopularityService.class),
+                        audioObjectStorageService,
                         new ObjectMapper());
     }
 
@@ -636,10 +640,13 @@ class ResourceServiceTest {
 
     private SongPv songPv(Long id) {
         SongPv pv = mock(SongPv.class);
+        Song song = mock(Song.class);
         when(pv.getId()).thenReturn(id);
         when(pv.getUuid()).thenReturn(UUID.randomUUID());
+        when(pv.getSong()).thenReturn(song);
         when(pv.getService()).thenReturn(SongPvProvider.YOUTUBE);
         when(pv.getVideoKey()).thenReturn("video-" + id);
+        when(pv.getUrl()).thenReturn("https://www.youtube.com/watch?v=video-" + id);
         when(pv.getTitle()).thenReturn("PV " + id);
         when(pv.getThumbnailUrl()).thenReturn(null);
         when(pv.getUploaderKey()).thenReturn(null);
