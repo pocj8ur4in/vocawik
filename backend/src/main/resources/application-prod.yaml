@@ -36,10 +36,6 @@ management:
     health:
       show-details: when-authorized
 
-logging:
-  http:
-    logged-headers:
-      - x-request-id
 
 security:
   cookie:
