@@ -1,6 +1,7 @@
 package com.vocawik.aop;
 
 import com.vocawik.security.ip.ClientIpResolver;
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.web.exception.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
@@ -171,7 +172,12 @@ public class RateLimitAspect {
                 || "anonymousUser".equals(authentication.getPrincipal())) {
             return new AuthContext(false, "anonymous", "anon");
         }
-        return new AuthContext(true, String.valueOf(authentication.getPrincipal()), "auth");
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof AuthPrincipal authPrincipal) {
+            return new AuthContext(true, authPrincipal.userUuid().toString(), "auth");
+        }
+        return new AuthContext(true, authentication.getName(), "auth");
     }
 
     /** Authentication details used to identify the current caller in the rate limit key. */
