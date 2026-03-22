@@ -2,6 +2,7 @@ package com.vocawik.repository.song;
 
 import com.vocawik.domain.song.SongPv;
 import com.vocawik.domain.song.SongPvProvider;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,9 @@ public interface SongPvRepository extends JpaRepository<SongPv, Long> {
 
     /** Finds all PV rows by song id in display order. */
     List<SongPv> findAllBySongIdOrderBySortOrderAscIdAsc(Long songId);
+
+    /** Finds all PV rows by song ids in display order grouped by song id. */
+    List<SongPv> findAllBySongIdInOrderBySongIdAscSortOrderAscIdAsc(Collection<Long> songIds);
 
     /** Finds PV ids by song id. */
     @Query("select sp.id from SongPv sp where sp.song.id = :songId")

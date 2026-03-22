@@ -35,6 +35,7 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.service.acl.AclPermissionService;
+import com.vocawik.service.audio.AudioObjectStorageService;
 import com.vocawik.service.audio.SongAudioImportService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.pv.client.PvMetaApiClientResolver;
@@ -85,6 +86,7 @@ class SongServiceTest {
                         new ObjectMapper(),
                         mock(PvUrlDetector.class),
                         mock(PvMetaApiClientResolver.class),
+                        mock(AudioObjectStorageService.class),
                         mock(SongAudioImportService.class));
     }
 
@@ -306,6 +308,49 @@ class SongServiceTest {
                                         songService, "normalizeRequired", "   ", "pvs.url"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("pvs.url is required");
+    }
+
+    @Test
+    @DisplayName("buildPlaybackSubtitle should combine artists and vocals like player subtitle")
+    void buildPlaybackSubtitle_withArtistsAndVocals_shouldUseFeatFormat() {
+        String subtitle =
+                ReflectionTestUtils.invokeMethod(
+                        songService,
+                        "buildPlaybackSubtitle",
+                        "DECO*27, sasakure.UK",
+                        "Hatsune Miku");
+
+        assertThat(subtitle).isEqualTo("DECO*27, sasakure.UK feat. Hatsune Miku");
+    }
+
+    @Test
+    @DisplayName("sortPlaybackPvs should prioritize preferred service before sort order")
+    void sortPlaybackPvs_withPreferredService_shouldPrioritizeMatches() {
+        SongPv youtubeLater = mock(SongPv.class);
+        when(youtubeLater.getService()).thenReturn(SongPvProvider.YOUTUBE);
+        when(youtubeLater.getSortOrder()).thenReturn(10);
+        when(youtubeLater.getId()).thenReturn(10L);
+
+        SongPv niconicoFirst = mock(SongPv.class);
+        when(niconicoFirst.getService()).thenReturn(SongPvProvider.NICONICO);
+        when(niconicoFirst.getSortOrder()).thenReturn(0);
+        when(niconicoFirst.getId()).thenReturn(20L);
+
+        SongPv youtubeFirst = mock(SongPv.class);
+        when(youtubeFirst.getService()).thenReturn(SongPvProvider.YOUTUBE);
+        when(youtubeFirst.getSortOrder()).thenReturn(1);
+        when(youtubeFirst.getId()).thenReturn(30L);
+
+        @SuppressWarnings("unchecked")
+        List<SongPv> sorted =
+                (List<SongPv>)
+                        ReflectionTestUtils.invokeMethod(
+                                songService,
+                                "sortPlaybackPvs",
+                                List.of(youtubeLater, niconicoFirst, youtubeFirst),
+                                SongPvProvider.YOUTUBE);
+
+        assertThat(sorted).containsExactly(youtubeFirst, youtubeLater, niconicoFirst);
     }
 
     private Song song(

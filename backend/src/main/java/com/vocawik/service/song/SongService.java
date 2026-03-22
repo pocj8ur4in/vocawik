@@ -24,10 +24,13 @@ import com.vocawik.domain.song.SongPvProvider;
 import com.vocawik.domain.song.SongRelation;
 import com.vocawik.domain.song.SongType;
 import com.vocawik.domain.song.SongVocal;
+import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongElementResponse;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongPlaybackElementResponse;
+import com.vocawik.dto.song.SongPlaybackListResponse;
 import com.vocawik.dto.song.SongPvResolveRequest;
 import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongSuggestionElementResponse;
@@ -50,7 +53,9 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.repository.song.SongVocalRepository;
 import com.vocawik.repository.vocal.VocalRepository;
 import com.vocawik.security.SecurityRoleUtils;
+import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.service.acl.AclPermissionService;
+import com.vocawik.service.audio.AudioObjectStorageService;
 import com.vocawik.service.audio.SongAudioImportService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.pv.client.PvMetaApiClient;
@@ -77,6 +82,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -111,6 +118,7 @@ public class SongService {
     private final ObjectMapper objectMapper;
     private final PvUrlDetector pvUrlDetector;
     private final PvMetaApiClientResolver pvMetaApiClientResolver;
+    private final AudioObjectStorageService audioObjectStorageService;
     private final SongAudioImportService songAudioImportService;
 
     /**
@@ -160,6 +168,79 @@ public class SongService {
                         .toList();
 
         return new SongListResponse(
+                items, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    /** Searches songs for player-focused playback payloads. */
+    @Transactional(readOnly = true)
+    public SongPlaybackListResponse searchPlayback(
+            ResourceStatus status,
+            List<SongType> songTypes,
+            String query,
+            List<UUID> artistUuids,
+            List<UUID> vocalUuids,
+            LocalDateTime publishedFrom,
+            LocalDateTime publishedTo,
+            String preferredPvService,
+            Pageable pageable) {
+        String normalizedQuery = normalizeQuery(query);
+        List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
+        List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
+
+        Page<Song> result =
+                songRepository.search(
+                        new SongCriteria(
+                                status,
+                                songTypes,
+                                normalizedQuery,
+                                normalizedArtistUuids,
+                                normalizedVocalUuids,
+                                publishedFrom,
+                                publishedTo),
+                        pageable);
+
+        if (result.isEmpty()) {
+            return new SongPlaybackListResponse(
+                    List.of(), result.getNumber(), result.getSize(), result.getTotalElements());
+        }
+
+        List<Song> songs = result.getContent();
+        List<Long> songIds = songs.stream().map(Song::getId).distinct().toList();
+        List<SongPv> pvs =
+                songPvRepository.findAllBySongIdInOrderBySongIdAscSortOrderAscIdAsc(songIds);
+        List<SongArtist> artists =
+                songArtistRepository
+                        .findAllWithArtistResourceBySongIdInOrderBySongIdAscSortOrderAscIdAsc(
+                                songIds);
+        List<SongVocal> vocals =
+                songVocalRepository
+                        .findAllWithVocalResourceBySongIdInOrderBySongIdAscSortOrderAscIdAsc(
+                                songIds);
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(collectPlaybackResourceIds(songs, artists, vocals));
+        Map<Long, List<SongPv>> pvsBySongId = groupPvsBySongId(pvs);
+        Map<Long, List<SongArtist>> artistsBySongId = groupArtistsBySongId(artists);
+        Map<Long, List<SongVocal>> vocalsBySongId = groupVocalsBySongId(vocals);
+        SongPvProvider preferredProvider = normalizePreferredPvProvider(preferredPvService);
+        boolean canViewManagedAudio = canViewManagedAudio();
+
+        List<SongPlaybackElementResponse> items =
+                songs.stream()
+                        .map(
+                                song ->
+                                        toPlaybackSummary(
+                                                song,
+                                                pvsBySongId.getOrDefault(song.getId(), List.of()),
+                                                artistsBySongId.getOrDefault(
+                                                        song.getId(), List.of()),
+                                                vocalsBySongId.getOrDefault(
+                                                        song.getId(), List.of()),
+                                                localizedNamesByResourceId,
+                                                preferredProvider,
+                                                canViewManagedAudio))
+                        .toList();
+
+        return new SongPlaybackListResponse(
                 items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
@@ -1724,6 +1805,177 @@ public class SongService {
                 song.getPublishedAt(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt());
+    }
+
+    private SongPlaybackElementResponse toPlaybackSummary(
+            Song song,
+            List<SongPv> pvs,
+            List<SongArtist> artists,
+            List<SongVocal> vocals,
+            Map<Long, String> localizedNamesByResourceId,
+            SongPvProvider preferredProvider,
+            boolean canViewManagedAudio) {
+        Resource resource = song.getResource();
+        boolean hasManagedAudio =
+                canViewManagedAudio
+                        && audioObjectStorageService.existsSongAudio(resource.getUuid());
+        List<SongPlaybackElementResponse.SongPlaybackPv> playbackPvs =
+                sortPlaybackPvs(pvs, preferredProvider).stream()
+                        .map(pv -> toPlaybackPv(pv, hasManagedAudio))
+                        .toList();
+
+        return new SongPlaybackElementResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
+                buildPlaybackSubtitle(
+                        joinParticipantNames(
+                                resolveArtistNames(artists, localizedNamesByResourceId)),
+                        joinParticipantNames(
+                                resolveVocalNames(vocals, localizedNamesByResourceId))),
+                playbackPvs);
+    }
+
+    private Map<Long, List<SongPv>> groupPvsBySongId(List<SongPv> pvs) {
+        Map<Long, List<SongPv>> grouped = new HashMap<>();
+        for (SongPv pv : pvs) {
+            grouped.computeIfAbsent(pv.getSong().getId(), ignored -> new ArrayList<>()).add(pv);
+        }
+        return grouped;
+    }
+
+    private Map<Long, List<SongArtist>> groupArtistsBySongId(List<SongArtist> artists) {
+        Map<Long, List<SongArtist>> grouped = new HashMap<>();
+        for (SongArtist artist : artists) {
+            grouped.computeIfAbsent(artist.getSong().getId(), ignored -> new ArrayList<>())
+                    .add(artist);
+        }
+        return grouped;
+    }
+
+    private Map<Long, List<SongVocal>> groupVocalsBySongId(List<SongVocal> vocals) {
+        Map<Long, List<SongVocal>> grouped = new HashMap<>();
+        for (SongVocal vocal : vocals) {
+            grouped.computeIfAbsent(vocal.getSong().getId(), ignored -> new ArrayList<>())
+                    .add(vocal);
+        }
+        return grouped;
+    }
+
+    private List<Long> collectPlaybackResourceIds(
+            List<Song> songs, List<SongArtist> artists, List<SongVocal> vocals) {
+        LinkedHashSet<Long> resourceIds = new LinkedHashSet<>();
+        songs.forEach(song -> resourceIds.add(song.getResource().getId()));
+        artists.forEach(artist -> resourceIds.add(artist.getArtist().getResource().getId()));
+        vocals.forEach(vocal -> resourceIds.add(vocal.getVocal().getResource().getId()));
+        return List.copyOf(resourceIds);
+    }
+
+    private SongPvProvider normalizePreferredPvProvider(String preferredPvService) {
+        if (preferredPvService == null || preferredPvService.isBlank()) {
+            return null;
+        }
+        return parseSongPvProvider(preferredPvService);
+    }
+
+    private List<SongPv> sortPlaybackPvs(List<SongPv> pvs, SongPvProvider preferredProvider) {
+        Comparator<SongPv> comparator =
+                Comparator.comparingInt(
+                                (SongPv pv) ->
+                                        preferredProvider != null
+                                                        && pv.getService() == preferredProvider
+                                                ? 0
+                                                : 1)
+                        .thenComparingInt(SongPv::getSortOrder)
+                        .thenComparing(SongPv::getId);
+        return pvs.stream().sorted(comparator).toList();
+    }
+
+    private SongPlaybackElementResponse.SongPlaybackPv toPlaybackPv(
+            SongPv pv, boolean hasManagedAudio) {
+        return new SongPlaybackElementResponse.SongPlaybackPv(
+                pv.getUuid(),
+                pv.getService().name(),
+                pv.getVideoKey(),
+                pv.getUrl(),
+                toManagedAudioUrl(pv, hasManagedAudio),
+                pv.getTitle(),
+                pv.getThumbnailUrl(),
+                pv.getUploaderKey(),
+                pv.getDurationSeconds(),
+                pv.isOfficial(),
+                pv.getPublishedAt(),
+                toPlaybackPvExtra(pv),
+                pv.getSortOrder());
+    }
+
+    private String toManagedAudioUrl(SongPv pv, boolean hasManagedAudio) {
+        if (!hasManagedAudio) {
+            return null;
+        }
+        return "/songs/pvs/" + pv.getUuid() + "/audio";
+    }
+
+    private SongPlaybackElementResponse.SongPlaybackPvExtra toPlaybackPvExtra(SongPv pv) {
+        String audioUrl = pv.getPiaproAudioUrl();
+        Long cid = pv.getBilibiliCid();
+        String externalUrl = pv.getBandcampExternalUrl();
+        if (audioUrl == null && cid == null && externalUrl == null) {
+            return null;
+        }
+        return new SongPlaybackElementResponse.SongPlaybackPvExtra(audioUrl, cid, externalUrl);
+    }
+
+    private List<String> resolveArtistNames(
+            List<SongArtist> artists, Map<Long, String> localizedNamesByResourceId) {
+        return artists.stream()
+                .map(
+                        artist -> {
+                            Resource resource = artist.getArtist().getResource();
+                            return localizedNamesByResourceId.getOrDefault(
+                                    resource.getId(), resource.getCanonicalName());
+                        })
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
+    }
+
+    private List<String> resolveVocalNames(
+            List<SongVocal> vocals, Map<Long, String> localizedNamesByResourceId) {
+        return vocals.stream()
+                .map(
+                        vocal -> {
+                            Resource resource = vocal.getVocal().getResource();
+                            return localizedNamesByResourceId.getOrDefault(
+                                    resource.getId(), resource.getCanonicalName());
+                        })
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
+    }
+
+    private String joinParticipantNames(List<String> names) {
+        if (names == null || names.isEmpty()) {
+            return null;
+        }
+        return String.join(", ", names);
+    }
+
+    private String buildPlaybackSubtitle(String artistText, String vocalText) {
+        String artist = normalizeNullable(artistText);
+        String vocal = normalizeNullable(vocalText);
+        if (artist != null && vocal != null) {
+            return artist + " feat. " + vocal;
+        }
+        return artist != null ? artist : vocal;
+    }
+
+    private boolean canViewManagedAudio() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof AuthPrincipal principal)) {
+            return false;
+        }
+        return UserRole.ADMIN.name().equals(principal.role());
     }
 
     private JsonNode buildHistorySnapshot(Song song, Resource resource) {

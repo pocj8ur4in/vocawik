@@ -6,6 +6,7 @@ import com.vocawik.domain.song.SongType;
 import com.vocawik.dto.resource.SongResourceDetailResponse;
 import com.vocawik.dto.song.SongCreateRequest;
 import com.vocawik.dto.song.SongListResponse;
+import com.vocawik.dto.song.SongPlaybackListResponse;
 import com.vocawik.dto.song.SongPvResolveRequest;
 import com.vocawik.dto.song.SongPvResolveResponse;
 import com.vocawik.dto.song.SongSuggestionListResponse;
@@ -236,6 +237,63 @@ public class SongController {
                         vocalUuids,
                         publishedFrom,
                         publishedTo,
+                        PageRequest.of(
+                                pageable.getPageNumber(),
+                                pageable.getPageSize(),
+                                sanitizeSort(pageable.getSort(), query))));
+    }
+
+    /** Searches songs for player playback payloads. */
+    @GetMapping("/songs/playback")
+    @RateLimit(requests = 60, seconds = 60)
+    @Operation(
+            summary = "Search songs for playback",
+            description = "Returns player-focused song payloads with ordered PV sources.")
+    public ResponseEntity<SongPlaybackListResponse> searchSongsPlayback(
+            @Parameter(description = "Resource status filter")
+                    @RequestParam(name = "status", required = false)
+                    ResourceStatus status,
+            @Parameter(description = "Song type filters")
+                    @RequestParam(name = "songTypes", required = false)
+                    List<SongType> songTypes,
+            @Parameter(description = "Canonical name keyword")
+                    @RequestParam(name = "query", required = false)
+                    String query,
+            @Parameter(description = "Artist resource UUID filter")
+                    @RequestParam(name = "artistUuids", required = false)
+                    List<UUID> artistUuids,
+            @Parameter(description = "Vocal resource UUID filter")
+                    @RequestParam(name = "vocalUuids", required = false)
+                    List<UUID> vocalUuids,
+            @Parameter(description = "Published-at start datetime, e.g. 2026-03-01T00:00:00")
+                    @RequestParam(name = "publishedFrom", required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                    LocalDateTime publishedFrom,
+            @Parameter(description = "Published-at end datetime, e.g. 2026-03-31T23:59:59")
+                    @RequestParam(name = "publishedTo", required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                    LocalDateTime publishedTo,
+            @Parameter(description = "Preferred PV service to prioritize")
+                    @RequestParam(name = "preferredPvService", required = false)
+                    String preferredPvService,
+            @Parameter(hidden = true)
+                    @PageableDefault(
+                            size = 20,
+                            sort = DEFAULT_SORT_PROPERTY,
+                            direction = Sort.Direction.DESC)
+                    Pageable pageable) {
+        validatePublishedRange(publishedFrom, publishedTo);
+
+        return ResponseEntity.ok(
+                songService.searchPlayback(
+                        status,
+                        songTypes,
+                        query,
+                        artistUuids,
+                        vocalUuids,
+                        publishedFrom,
+                        publishedTo,
+                        preferredPvService,
                         PageRequest.of(
                                 pageable.getPageNumber(),
                                 pageable.getPageSize(),
