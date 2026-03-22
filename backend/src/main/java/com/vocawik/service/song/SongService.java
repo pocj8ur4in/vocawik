@@ -204,7 +204,21 @@ public class SongService {
                     List.of(), result.getNumber(), result.getSize(), result.getTotalElements());
         }
 
-        List<Song> songs = result.getContent();
+        return new SongPlaybackListResponse(
+                buildPlaybackItems(result.getContent(), preferredPvService),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements());
+    }
+
+    /** Builds ordered player-focused playback items for the provided songs. */
+    @Transactional(readOnly = true)
+    public List<SongPlaybackElementResponse> buildPlaybackItems(
+            List<Song> songs, String preferredPvService) {
+        if (songs == null || songs.isEmpty()) {
+            return List.of();
+        }
+
         List<Long> songIds = songs.stream().map(Song::getId).distinct().toList();
         List<SongPv> pvs =
                 songPvRepository.findAllBySongIdInOrderBySongIdAscSortOrderAscIdAsc(songIds);
@@ -224,24 +238,18 @@ public class SongService {
         SongPvProvider preferredProvider = normalizePreferredPvProvider(preferredPvService);
         boolean canViewManagedAudio = canViewManagedAudio();
 
-        List<SongPlaybackElementResponse> items =
-                songs.stream()
-                        .map(
-                                song ->
-                                        toPlaybackSummary(
-                                                song,
-                                                pvsBySongId.getOrDefault(song.getId(), List.of()),
-                                                artistsBySongId.getOrDefault(
-                                                        song.getId(), List.of()),
-                                                vocalsBySongId.getOrDefault(
-                                                        song.getId(), List.of()),
-                                                localizedNamesByResourceId,
-                                                preferredProvider,
-                                                canViewManagedAudio))
-                        .toList();
-
-        return new SongPlaybackListResponse(
-                items, result.getNumber(), result.getSize(), result.getTotalElements());
+        return songs.stream()
+                .map(
+                        song ->
+                                toPlaybackSummary(
+                                        song,
+                                        pvsBySongId.getOrDefault(song.getId(), List.of()),
+                                        artistsBySongId.getOrDefault(song.getId(), List.of()),
+                                        vocalsBySongId.getOrDefault(song.getId(), List.of()),
+                                        localizedNamesByResourceId,
+                                        preferredProvider,
+                                        canViewManagedAudio))
+                .toList();
     }
 
     @Transactional(readOnly = true)

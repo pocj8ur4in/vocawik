@@ -4,6 +4,7 @@ import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
@@ -105,6 +106,19 @@ public class PlaylistController {
             @PathVariable UUID resourceUuid) {
         return ResponseEntity.ok(
                 resourceService.getPlaylistByResourceUuidWithTracking(resourceUuid));
+    }
+
+    /** Gets a playlist playback payload. */
+    @GetMapping("/playlists/{resourceUuid}/playback")
+    @Operation(
+            summary = "Get playlist playback",
+            description = "Returns player-focused playlist payload with ordered song sources.")
+    public ResponseEntity<PlaylistPlaybackResponse> getPlaylistPlayback(
+            @PathVariable UUID resourceUuid,
+            @Parameter(description = "Preferred PV service to prioritize for each song")
+                    @RequestParam(name = "preferredPvService", required = false)
+                    String preferredPvService) {
+        return ResponseEntity.ok(playlistService.getPlayback(resourceUuid, preferredPvService));
     }
 
     /** Searches playlists with optional filters. */

@@ -17,9 +17,11 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistElementResponse;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionElementResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
+import com.vocawik.dto.song.SongPlaybackElementResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.common.ResourceRefProjection;
 import com.vocawik.repository.playlist.PlaylistCriteria;
@@ -31,6 +33,7 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.security.SecurityRoleUtils;
 import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
+import com.vocawik.service.song.SongService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -68,6 +71,7 @@ public class PlaylistService {
     private final SongRepository songRepository;
     private final AclPermissionService aclPermissionService;
     private final ResourceHistoryService resourceHistoryService;
+    private final SongService songService;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
 
@@ -145,6 +149,33 @@ public class PlaylistService {
                                             hasMultipleResources);
                                 })
                         .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PlaylistPlaybackResponse getPlayback(UUID resourceUuid, String preferredPvService) {
+        Playlist playlist =
+                playlistRepository
+                        .findByResourceUuid(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = playlist.getResource();
+        aclPermissionService.assertCanRead(resource);
+
+        List<PlaylistSong> playlistSongs =
+                playlistSongRepository.findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(
+                        playlist.getId());
+        List<SongPlaybackElementResponse> playbackItems =
+                songService.buildPlaybackItems(
+                        playlistSongs.stream().map(PlaylistSong::getSong).toList(),
+                        preferredPvService);
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(List.of(resource.getId()));
+
+        return new PlaylistPlaybackResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
+                toPlaybackSongs(playlistSongs, playbackItems));
     }
 
     @Transactional
@@ -294,6 +325,30 @@ public class PlaylistService {
                 resource.getThumbnailUrl(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt());
+    }
+
+    private List<PlaylistPlaybackResponse.PlaylistPlaybackSong> toPlaybackSongs(
+            List<PlaylistSong> playlistSongs, List<SongPlaybackElementResponse> playbackItems) {
+        if (playlistSongs.size() != playbackItems.size()) {
+            throw new IllegalStateException("playlist songs and playback items size mismatch");
+        }
+
+        List<PlaylistPlaybackResponse.PlaylistPlaybackSong> items =
+                new ArrayList<>(playlistSongs.size());
+        for (int index = 0; index < playlistSongs.size(); index++) {
+            PlaylistSong playlistSong = playlistSongs.get(index);
+            SongPlaybackElementResponse playbackItem = playbackItems.get(index);
+            items.add(
+                    new PlaylistPlaybackResponse.PlaylistPlaybackSong(
+                            playbackItem.resourceUuid(),
+                            playbackItem.canonicalName(),
+                            playbackItem.localizedName(),
+                            playbackItem.thumbnailUrl(),
+                            playbackItem.subtitle(),
+                            playlistSong.getSortOrder(),
+                            playbackItem.pvs()));
+        }
+        return items;
     }
 
     private List<ResourceName> saveResourceNames(
