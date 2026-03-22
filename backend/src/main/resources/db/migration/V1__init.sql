@@ -307,6 +307,7 @@ CREATE TABLE playlists (
     id BIGINT PRIMARY KEY,
     content TEXT,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
+    is_system_managed BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_playlists_resource FOREIGN KEY (id) REFERENCES resources (id) ON DELETE RESTRICT
 );
 

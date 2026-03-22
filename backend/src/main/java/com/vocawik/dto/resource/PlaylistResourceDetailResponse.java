@@ -1,5 +1,6 @@
 package com.vocawik.dto.resource;
 
+import com.vocawik.dto.playlist.PlaylistSongElementResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -15,11 +16,15 @@ public record PlaylistResourceDetailResponse(
         String thumbnailUrl,
         String content,
         boolean isPublic,
+        boolean isSystemManaged,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
+        long songCount,
+        String songsNextCursor,
+        boolean hasMoreSongs,
         List<ResourceNameDetailResponse> names,
         List<ResourceAclDetailResponse> acls,
-        List<PlaylistSong> songs) {
+        List<PlaylistSongElementResponse> songs) {
 
     /** Creates an immutable playlist detail response. */
     public PlaylistResourceDetailResponse {
@@ -27,13 +32,4 @@ public record PlaylistResourceDetailResponse(
         acls = List.copyOf(acls);
         songs = List.copyOf(songs);
     }
-
-    /** Song item in the detailed playlist payload. */
-    public record PlaylistSong(
-            UUID songResourceUuid,
-            String songCanonicalName,
-            String songLocalizedName,
-            String songThumbnailUrl,
-            String songType,
-            int sortOrder) {}
 }

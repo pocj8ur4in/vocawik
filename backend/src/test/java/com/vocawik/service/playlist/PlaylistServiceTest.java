@@ -1,6 +1,7 @@
 package com.vocawik.service.playlist;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -18,6 +19,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistListResponse;
 import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
+import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.song.SongPlaybackElementResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.playlist.PlaylistRepository;
@@ -28,6 +30,8 @@ import com.vocawik.repository.song.SongRepository;
 import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.service.song.SongService;
+import com.vocawik.web.error.ErrorCode;
+import com.vocawik.web.exception.BusinessException;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -262,6 +266,52 @@ class PlaylistServiceTest {
         assertThat(result.songs().getFirst().pvs().getFirst().service()).isEqualTo("YOUTUBE");
     }
 
+    @Test
+    @DisplayName("Update should reject system-managed playlists")
+    void update_shouldRejectSystemManagedPlaylist() {
+        UUID playlistUuid = UUID.randomUUID();
+        Playlist playlist = playlist(1L, playlistUuid, "Managed Playlist");
+        when(playlist.isSystemManaged()).thenReturn(true);
+        when(playlistRepository.findByResourceUuidAndResourceIsDeletedFalse(playlistUuid))
+                .thenReturn(Optional.of(playlist));
+
+        PlaylistUpdateRequest request =
+                new PlaylistUpdateRequest(
+                        new PlaylistUpdateRequest.CanonicalNameUpdateRequest(
+                                Language.EN, "Managed Playlist"),
+                        null,
+                        null,
+                        true,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        null);
+
+        assertThatThrownBy(() -> playlistService.update(playlistUuid, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(
+                        throwable ->
+                                assertThat(((BusinessException) throwable).getErrorCode())
+                                        .isEqualTo(ErrorCode.PLAYLIST_SYSTEM_MANAGED));
+    }
+
+    @Test
+    @DisplayName("Delete should reject system-managed playlists")
+    void delete_shouldRejectSystemManagedPlaylist() {
+        UUID playlistUuid = UUID.randomUUID();
+        Playlist playlist = playlist(1L, playlistUuid, "Managed Playlist");
+        when(playlist.isSystemManaged()).thenReturn(true);
+        when(playlistRepository.findByResourceUuidAndResourceIsDeletedFalse(playlistUuid))
+                .thenReturn(Optional.of(playlist));
+
+        assertThatThrownBy(() -> playlistService.delete(playlistUuid))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(
+                        throwable ->
+                                assertThat(((BusinessException) throwable).getErrorCode())
+                                        .isEqualTo(ErrorCode.PLAYLIST_SYSTEM_MANAGED));
+    }
+
     private ResourceName candidate(UUID uuid, String name) {
         return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
     }
@@ -289,6 +339,7 @@ class PlaylistServiceTest {
         Playlist playlist = mock(Playlist.class);
         when(playlist.getId()).thenReturn(resourceId);
         when(playlist.getResource()).thenReturn(resource);
+        when(playlist.isSystemManaged()).thenReturn(false);
         return playlist;
     }
 

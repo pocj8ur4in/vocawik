@@ -29,7 +29,9 @@ public enum ErrorCode {
 
     EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "Email is already registered."),
     EMAIL_VERIFICATION_ALREADY_REQUESTED(
-            HttpStatus.CONFLICT, "Email verification already requested. Please check your inbox.");
+            HttpStatus.CONFLICT, "Email verification already requested. Please check your inbox."),
+
+    PLAYLIST_SYSTEM_MANAGED(HttpStatus.FORBIDDEN, "System-managed playlists cannot be modified.");
 
     private final HttpStatus httpStatus;
     private final String message;

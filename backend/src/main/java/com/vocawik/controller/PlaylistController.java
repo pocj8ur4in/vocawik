@@ -5,6 +5,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
 import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
+import com.vocawik.dto.playlist.PlaylistSongListResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
@@ -119,6 +120,22 @@ public class PlaylistController {
                     @RequestParam(name = "preferredPvService", required = false)
                     String preferredPvService) {
         return ResponseEntity.ok(playlistService.getPlayback(resourceUuid, preferredPvService));
+    }
+
+    /** Gets a cursor-paginated playlist song list. */
+    @GetMapping("/playlists/{resourceUuid}/songs")
+    @Operation(
+            summary = "Get playlist songs",
+            description = "Returns a cursor-paginated playlist song list.")
+    public ResponseEntity<PlaylistSongListResponse> getPlaylistSongs(
+            @PathVariable UUID resourceUuid,
+            @Parameter(description = "Cursor returned from the previous playlist songs page")
+                    @RequestParam(name = "cursor", required = false)
+                    String cursor,
+            @Parameter(description = "Number of songs to return", example = "50")
+                    @RequestParam(name = "limit", required = false)
+                    Integer limit) {
+        return ResponseEntity.ok(playlistService.getSongs(resourceUuid, cursor, limit));
     }
 
     /** Searches playlists with optional filters. */
