@@ -1,8 +1,10 @@
 package com.vocawik.repository.song;
 
 import com.vocawik.domain.song.Song;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 /** Custom search repository for {@link Song}. */
 public interface SongCriteriaRepository {
@@ -15,4 +17,13 @@ public interface SongCriteriaRepository {
      * @return paged songs
      */
     Page<Song> search(SongCriteria criteria, Pageable pageable);
+
+    /**
+     * Searches all songs matching the given filters without pagination.
+     *
+     * @param criteria search criteria
+     * @param sort sort options
+     * @return ordered songs
+     */
+    List<Song> searchAll(SongCriteria criteria, Sort sort);
 }

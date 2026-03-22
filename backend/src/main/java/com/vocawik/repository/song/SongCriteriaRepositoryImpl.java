@@ -56,6 +56,19 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
         return new PageImpl<>(rows, pageable, totalCount);
     }
 
+    @Override
+    public List<Song> searchAll(SongCriteria criteria, Sort sort) {
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Song> criteriaQuery = criteriaBuilder.createQuery(Song.class);
+        Root<Song> root = criteriaQuery.from(Song.class);
+        List<Predicate> predicates =
+                buildPredicates(criteria, criteriaQuery, root, criteriaBuilder);
+        criteriaQuery.where(predicates.toArray(Predicate[]::new));
+        criteriaQuery.orderBy(toOrders(sort, criteria, criteriaQuery, criteriaBuilder, root));
+
+        return entityManager.createQuery(criteriaQuery).getResultList();
+    }
+
     private long count(SongCriteria criteria, CriteriaBuilder criteriaBuilder) {
         CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
         Root<Song> countRoot = countQuery.from(Song.class);

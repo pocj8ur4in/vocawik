@@ -276,12 +276,9 @@ public class SongController {
             @Parameter(description = "Preferred PV service to prioritize")
                     @RequestParam(name = "preferredPvService", required = false)
                     String preferredPvService,
-            @Parameter(hidden = true)
-                    @PageableDefault(
-                            size = 20,
-                            sort = DEFAULT_SORT_PROPERTY,
-                            direction = Sort.Direction.DESC)
-                    Pageable pageable) {
+            @Parameter(description = "Sort (format: {property},{asc|desc})")
+                    @RequestParam(name = "sort", required = false)
+                    String sort) {
         validatePublishedRange(publishedFrom, publishedTo);
 
         return ResponseEntity.ok(
@@ -294,10 +291,7 @@ public class SongController {
                         publishedFrom,
                         publishedTo,
                         preferredPvService,
-                        PageRequest.of(
-                                pageable.getPageNumber(),
-                                pageable.getPageSize(),
-                                sanitizeSort(pageable.getSort(), query))));
+                        sanitizeSort(parseRequestedSort(sort), query)));
     }
 
     /** Suggests songs matching the current query. */
@@ -336,6 +330,20 @@ public class SongController {
             throw new IllegalArgumentException(
                     "publishedFrom must be earlier than or equal to publishedTo");
         }
+    }
+
+    private Sort parseRequestedSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return Sort.by(DEFAULT_SORT_DIRECTION, DEFAULT_SORT_PROPERTY);
+        }
+
+        String[] parts = sort.split(",", 2);
+        String property = parts[0].trim();
+        Sort.Direction direction =
+                parts.length > 1
+                        ? Sort.Direction.fromString(parts[1].trim())
+                        : DEFAULT_SORT_DIRECTION;
+        return Sort.by(direction, property);
     }
 
     private Sort sanitizeSort(Sort requestedSort, String query) {

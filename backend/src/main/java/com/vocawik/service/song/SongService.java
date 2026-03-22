@@ -182,13 +182,13 @@ public class SongService {
             LocalDateTime publishedFrom,
             LocalDateTime publishedTo,
             String preferredPvService,
-            Pageable pageable) {
+            org.springframework.data.domain.Sort sort) {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
         List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
 
-        Page<Song> result =
-                songRepository.search(
+        List<Song> songs =
+                songRepository.searchAll(
                         new SongCriteria(
                                 status,
                                 songTypes,
@@ -197,18 +197,14 @@ public class SongService {
                                 normalizedVocalUuids,
                                 publishedFrom,
                                 publishedTo),
-                        pageable);
+                        sort);
 
-        if (result.isEmpty()) {
-            return new SongPlaybackListResponse(
-                    List.of(), result.getNumber(), result.getSize(), result.getTotalElements());
+        if (songs.isEmpty()) {
+            return new SongPlaybackListResponse(List.of(), 0);
         }
 
         return new SongPlaybackListResponse(
-                buildPlaybackItems(result.getContent(), preferredPvService),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements());
+                buildPlaybackItems(songs, preferredPvService), songs.size());
     }
 
     /** Builds ordered player-focused playback items for the provided songs. */
