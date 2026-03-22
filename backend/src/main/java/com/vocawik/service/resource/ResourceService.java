@@ -22,6 +22,7 @@ import com.vocawik.domain.song.SongVocal;
 import com.vocawik.domain.user.UserRole;
 import com.vocawik.domain.vocal.Vocal;
 import com.vocawik.domain.vocal.VocalLink;
+import com.vocawik.dto.playlist.PlaylistSongElementResponse;
 import com.vocawik.dto.resource.ArtistResourceDetailResponse;
 import com.vocawik.dto.resource.PlaylistResourceDetailResponse;
 import com.vocawik.dto.resource.ResourceAclDetailResponse;
@@ -58,6 +59,8 @@ import com.vocawik.service.history.ResourceHistoryService;
 import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -86,6 +89,7 @@ public class ResourceService {
 
     private static final int RESOURCE_SUGGESTION_LIMIT = 10;
     private static final int RELATED_SONG_SECTION_LIMIT = 10;
+    private static final int PLAYLIST_DETAIL_INITIAL_SONG_LIMIT = 50;
 
     private final ResourceRepository resourceRepository;
     private final ResourceNameRepository resourceNameRepository;
@@ -420,12 +424,19 @@ public class ResourceService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
         aclPermissionService.assertCanRead(resource);
+        long songCount = playlistSongRepository.countByPlaylistId(playlist.getId());
         List<PlaylistSong> songs =
-                playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(
-                        playlist.getId());
+                playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+                        playlist.getId(),
+                        null,
+                        null,
+                        PageRequest.of(0, PLAYLIST_DETAIL_INITIAL_SONG_LIMIT + 1));
+        boolean hasMoreSongs = songs.size() > PLAYLIST_DETAIL_INITIAL_SONG_LIMIT;
+        List<PlaylistSong> visibleSongs =
+                hasMoreSongs ? songs.subList(0, PLAYLIST_DETAIL_INITIAL_SONG_LIMIT) : songs;
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(
-                        collectPlaylistDetailResourceIds(resource.getId(), songs));
+                        collectPlaylistDetailResourceIds(resource.getId(), visibleSongs));
 
         return new PlaylistResourceDetailResponse(
                 resource.getUuid(),
@@ -437,11 +448,15 @@ public class ResourceService {
                 resource.getThumbnailUrl(),
                 playlist.getContent(),
                 playlist.isPublic(),
+                playlist.isSystemManaged(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt(),
+                songCount,
+                hasMoreSongs ? encodePlaylistSongCursor(visibleSongs.getLast()) : null,
+                hasMoreSongs,
                 loadResourceNames(resource.getId()),
                 loadResourceAcls(resource.getId()),
-                songs.stream()
+                visibleSongs.stream()
                         .map(item -> toPlaylistDetailSong(item, localizedNamesByResourceId))
                         .toList());
     }
@@ -859,17 +874,24 @@ public class ResourceService {
                 vocalLink.isDeleted());
     }
 
-    private PlaylistResourceDetailResponse.PlaylistSong toPlaylistDetailSong(
+    private PlaylistSongElementResponse toPlaylistDetailSong(
             PlaylistSong playlistSong, Map<Long, String> localizedNamesByResourceId) {
         Song song = playlistSong.getSong();
         Resource resource = song.getResource();
-        return new PlaylistResourceDetailResponse.PlaylistSong(
+        return new PlaylistSongElementResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),
                 localizedNamesByResourceId.get(resource.getId()),
                 resource.getThumbnailUrl(),
                 song.getSongType().name(),
                 playlistSong.getSortOrder());
+    }
+
+    private String encodePlaylistSongCursor(PlaylistSong playlistSong) {
+        String raw = playlistSong.getSortOrder() + ":" + playlistSong.getId();
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     private record ResourceSuggestionRef(UUID uuid, String resourceType) {}

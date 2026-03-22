@@ -3,6 +3,7 @@ package com.vocawik.repository.playlist;
 import com.vocawik.domain.playlist.PlaylistSong;
 import jakarta.transaction.Transactional;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +18,9 @@ public interface PlaylistSongRepository extends JpaRepository<PlaylistSong, Long
     /** Finds all playlist-song rows by playlist id in display order. */
     java.util.List<PlaylistSong> findAllByPlaylistIdOrderBySortOrderAscIdAsc(Long playlistId);
 
+    /** Counts all playlist-song rows for a playlist. */
+    long countByPlaylistId(Long playlistId);
+
     /** Finds all playlist-song rows with song resources preloaded in display order. */
     @Query(
             """
@@ -29,6 +33,27 @@ public interface PlaylistSongRepository extends JpaRepository<PlaylistSong, Long
             """)
     List<PlaylistSong> findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(
             @Param("playlistId") Long playlistId);
+
+    /** Finds a cursor-sliced page of playlist-song rows with song resources preloaded. */
+    @Query(
+            """
+            select ps
+            from PlaylistSong ps
+                join fetch ps.song s
+                join fetch s.resource
+            where ps.playlist.id = :playlistId
+              and (
+                    :cursorSortOrder is null
+                    or ps.sortOrder > :cursorSortOrder
+                    or (ps.sortOrder = :cursorSortOrder and ps.id > :cursorId)
+              )
+            order by ps.sortOrder asc, ps.id asc
+            """)
+    List<PlaylistSong> findPageWithSongResourceByPlaylistIdAfterCursor(
+            @Param("playlistId") Long playlistId,
+            @Param("cursorSortOrder") Integer cursorSortOrder,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable);
 
     /** Deletes all playlist-song rows for a playlist. */
     @Modifying

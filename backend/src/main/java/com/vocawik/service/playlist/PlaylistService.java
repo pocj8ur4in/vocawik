@@ -18,6 +18,8 @@ import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistElementResponse;
 import com.vocawik.dto.playlist.PlaylistListResponse;
 import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
+import com.vocawik.dto.playlist.PlaylistSongElementResponse;
+import com.vocawik.dto.playlist.PlaylistSongListResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionElementResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
@@ -38,7 +40,9 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +53,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +67,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlaylistService {
 
     private static final int PLAYLIST_SUGGESTION_LIMIT = 10;
+    private static final int DEFAULT_SONG_PAGE_SIZE = 50;
+    private static final int MAX_SONG_PAGE_SIZE = 100;
 
     private final PlaylistRepository playlistRepository;
     private final PlaylistSongRepository playlistSongRepository;
@@ -178,6 +185,42 @@ public class PlaylistService {
                 toPlaybackSongs(playlistSongs, playbackItems));
     }
 
+    @Transactional(readOnly = true)
+    public PlaylistSongListResponse getSongs(UUID resourceUuid, String cursor, Integer limit) {
+        Playlist playlist =
+                playlistRepository
+                        .findByResourceUuid(resourceUuid)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Resource resource = playlist.getResource();
+        aclPermissionService.assertCanRead(resource);
+
+        PlaylistSongCursor decodedCursor = decodeCursor(cursor);
+        int pageSize = sanitizeSongPageSize(limit);
+        List<PlaylistSong> playlistSongs =
+                playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+                        playlist.getId(),
+                        decodedCursor == null ? null : decodedCursor.sortOrder(),
+                        decodedCursor == null ? null : decodedCursor.id(),
+                        PageRequest.of(0, pageSize + 1));
+
+        boolean hasNext = playlistSongs.size() > pageSize;
+        List<PlaylistSong> visibleSongs =
+                hasNext ? playlistSongs.subList(0, pageSize) : playlistSongs;
+        Map<Long, String> localizedNamesByResourceId =
+                loadLocalizedNamesByResourceIds(
+                        visibleSongs.stream()
+                                .map(playlistSong -> playlistSong.getSong().getResource().getId())
+                                .distinct()
+                                .toList());
+
+        return new PlaylistSongListResponse(
+                visibleSongs.stream()
+                        .map(song -> toPlaylistSongElement(song, localizedNamesByResourceId))
+                        .toList(),
+                hasNext ? encodeCursor(visibleSongs.getLast()) : null,
+                hasNext);
+    }
+
     @Transactional
     public UUID create(PlaylistCreateRequest request) {
         PlaylistCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
@@ -208,6 +251,7 @@ public class PlaylistService {
                 playlistRepository
                         .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        assertMutable(playlist);
 
         Resource resource = playlist.getResource();
         aclPermissionService.assertCanEdit(resource);
@@ -233,6 +277,7 @@ public class PlaylistService {
                 playlistRepository
                         .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        assertMutable(playlist);
 
         Resource resource = playlist.getResource();
         aclPermissionService.assertCanDelete(resource);
@@ -249,6 +294,12 @@ public class PlaylistService {
         }
         String trimmed = query.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void assertMutable(Playlist playlist) {
+        if (playlist.isSystemManaged()) {
+            throw new BusinessException(ErrorCode.PLAYLIST_SYSTEM_MANAGED);
+        }
     }
 
     private String normalizeCanonicalName(String canonicalName) {
@@ -325,6 +376,50 @@ public class PlaylistService {
                 resource.getThumbnailUrl(),
                 resource.getCreatedAt(),
                 resource.getUpdatedAt());
+    }
+
+    private PlaylistSongElementResponse toPlaylistSongElement(
+            PlaylistSong playlistSong, Map<Long, String> localizedNamesByResourceId) {
+        com.vocawik.domain.song.Song song = playlistSong.getSong();
+        Resource resource = song.getResource();
+        return new PlaylistSongElementResponse(
+                resource.getUuid(),
+                resource.getCanonicalName(),
+                localizedNamesByResourceId.get(resource.getId()),
+                resource.getThumbnailUrl(),
+                song.getSongType().name(),
+                playlistSong.getSortOrder());
+    }
+
+    private int sanitizeSongPageSize(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_SONG_PAGE_SIZE;
+        }
+        return Math.max(1, Math.min(limit, MAX_SONG_PAGE_SIZE));
+    }
+
+    private String encodeCursor(PlaylistSong playlistSong) {
+        String raw = playlistSong.getSortOrder() + ":" + playlistSong.getId();
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private PlaylistSongCursor decodeCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+
+        try {
+            String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = raw.split(":", 2);
+            if (parts.length != 2) {
+                throw new IllegalArgumentException("playlist songs cursor is invalid");
+            }
+            return new PlaylistSongCursor(Integer.parseInt(parts[0]), Long.parseLong(parts[1]));
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("playlist songs cursor is invalid");
+        }
     }
 
     private List<PlaylistPlaybackResponse.PlaylistPlaybackSong> toPlaybackSongs(
@@ -936,4 +1031,6 @@ public class PlaylistService {
         }
         objectNode.put(fieldName, value);
     }
+
+    private record PlaylistSongCursor(int sortOrder, long id) {}
 }

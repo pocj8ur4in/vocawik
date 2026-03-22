@@ -35,6 +35,9 @@ public class Playlist {
     @Column(name = "is_public", nullable = false)
     private boolean isPublic = true;
 
+    @Column(name = "is_system_managed", nullable = false)
+    private boolean systemManaged = false;
+
     /**
      * Creates a new playlist detail.
      *

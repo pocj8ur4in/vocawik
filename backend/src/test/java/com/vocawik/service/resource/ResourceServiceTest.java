@@ -430,7 +430,12 @@ class ResourceServiceTest {
         when(playlistRepository.findByResourceUuid(eq(resourceUuid)))
                 .thenReturn(java.util.Optional.of(playlist));
         stubEmptyResourceDetails(1L);
-        when(playlistSongRepository.findAllByPlaylistIdOrderBySortOrderAscIdAsc(eq(1L)))
+        when(playlistSongRepository.countByPlaylistId(eq(1L))).thenReturn(1L);
+        when(playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+                        eq(1L),
+                        eq(null),
+                        eq(null),
+                        argThat(pageable -> pageable.getPageSize() == 51)))
                 .thenReturn(List.of(playlistSong(playlist, song, 0)));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
                         argThat(
@@ -443,6 +448,8 @@ class ResourceServiceTest {
 
         assertThat(result.canonicalName()).isEqualTo("Miku Favorites");
         assertThat(result.localizedName()).isEqualTo("ミクお気に入り");
+        assertThat(result.songCount()).isEqualTo(1);
+        assertThat(result.hasMoreSongs()).isFalse();
         assertThat(result.songs().getFirst().songLocalizedName()).isEqualTo("テル・ユア・ワールド");
     }
 
@@ -611,6 +618,7 @@ class ResourceServiceTest {
         when(playlist.getResource()).thenReturn(resource);
         when(playlist.getContent()).thenReturn(null);
         when(playlist.isPublic()).thenReturn(true);
+        when(playlist.isSystemManaged()).thenReturn(false);
         return playlist;
     }
 
