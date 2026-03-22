@@ -32,7 +32,7 @@ public class SongPv extends BaseEntity {
     @Column(name = "video_key", nullable = false, columnDefinition = "TEXT")
     private String videoKey;
 
-    @Column(name = "url", columnDefinition = "TEXT")
+    @Column(name = "url", nullable = false, columnDefinition = "TEXT")
     private String url;
 
     @Column(length = 255)
@@ -125,6 +125,9 @@ public class SongPv extends BaseEntity {
         if (videoKey == null || videoKey.isBlank()) {
             throw new IllegalArgumentException("videoKey is required");
         }
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("pvs.url is required");
+        }
         if (durationSeconds != null && durationSeconds < 0) {
             throw new IllegalArgumentException("durationSeconds must be >= 0");
         }
@@ -139,7 +142,7 @@ public class SongPv extends BaseEntity {
         songPv.song = song;
         songPv.service = service;
         songPv.videoKey = videoKey.trim();
-        songPv.url = url;
+        songPv.url = url.trim();
         songPv.title = title;
         songPv.thumbnailUrl = thumbnailUrl;
         songPv.uploaderKey = uploaderKey;
@@ -180,6 +183,9 @@ public class SongPv extends BaseEntity {
             Long bilibiliCid,
             String bandcampExternalUrl,
             int sortOrder) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("pvs.url is required");
+        }
         if (durationSeconds != null && durationSeconds < 0) {
             throw new IllegalArgumentException("durationSeconds must be >= 0");
         }
@@ -189,7 +195,7 @@ public class SongPv extends BaseEntity {
         if (sortOrder < 0) {
             throw new IllegalArgumentException("sortOrder must be >= 0");
         }
-        this.url = url;
+        this.url = url.trim();
         this.title = title;
         this.thumbnailUrl = thumbnailUrl;
         this.uploaderKey = uploaderKey;

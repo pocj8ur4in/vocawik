@@ -83,7 +83,7 @@ public record SongUpdateRequest(
     public record SongPvUpdateRequest(
             @NotBlank String service,
             @NotBlank String videoKey,
-            @Size(max = 2048) String url,
+            @NotBlank @Size(max = 2048) String url,
             @Size(max = 255) String title,
             String thumbnailUrl,
             String uploaderKey,
