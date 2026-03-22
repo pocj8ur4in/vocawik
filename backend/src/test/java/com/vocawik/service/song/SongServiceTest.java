@@ -1,6 +1,7 @@
 package com.vocawik.service.song;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -294,6 +295,17 @@ class SongServiceTest {
         assertThat(candidates).hasSize(2);
         assertThat(candidates.get(0).url()).isEqualTo("https://www.nicovideo.jp/watch/sm9");
         assertThat(candidates.get(1).url()).isEqualTo("https://example.com/custom-first");
+    }
+
+    @Test
+    @DisplayName("normalizeRequired should use pvs.url field name for PV URL errors")
+    void normalizeRequired_withBlankPvUrl_shouldUsePvFieldName() {
+        assertThatThrownBy(
+                        () ->
+                                ReflectionTestUtils.invokeMethod(
+                                        songService, "normalizeRequired", "   ", "pvs.url"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("pvs.url is required");
     }
 
     private Song song(

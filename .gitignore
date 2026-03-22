@@ -47,6 +47,7 @@ out/
 .env
 .env.*
 !.env.example
+.secrets/
 
 ### Logs ###
 logs/

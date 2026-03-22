@@ -695,7 +695,7 @@ public class SongService {
                 throw new IllegalArgumentException("links contains null item");
             }
             SongLinkType type = parseSongLinkType(item.type());
-            String url = normalizeLinkUrl(item.url());
+            String url = normalizeRequired(item.url(), "links.url");
             SongLinkKey key = new SongLinkKey(type, url);
             Deque<SongLink> candidates = existingByKey.get(key);
 
@@ -766,7 +766,7 @@ public class SongService {
             if (candidates != null && !candidates.isEmpty()) {
                 SongPv matched = candidates.removeFirst();
                 matched.updateMetadata(
-                        normalizeLinkUrl(item.url()),
+                        normalizeRequired(item.url(), "pvs.url"),
                         title,
                         thumbnailUrl,
                         uploaderKey,
@@ -786,7 +786,7 @@ public class SongService {
                             song,
                             service,
                             videoKey,
-                            normalizeLinkUrl(item.url()),
+                            normalizeRequired(item.url(), "pvs.url"),
                             title,
                             thumbnailUrl,
                             uploaderKey,
@@ -1304,7 +1304,7 @@ public class SongService {
                                     return SongLink.create(
                                             song,
                                             parseSongLinkType(item.type()),
-                                            normalizeLinkUrl(item.url()),
+                                            normalizeRequired(item.url(), "links.url"),
                                             normalizeNullable(item.content()),
                                             item.isDeleted());
                                 })
@@ -1365,7 +1365,7 @@ public class SongService {
                                             song,
                                             service,
                                             normalizeRequired(item.videoKey(), "videoKey"),
-                                            normalizeLinkUrl(item.url()),
+                                            normalizeRequired(item.url(), "pvs.url"),
                                             normalizeNullable(item.title()),
                                             normalizeNullable(item.thumbnailUrl()),
                                             normalizeNullable(item.uploaderKey()),
@@ -1577,13 +1577,6 @@ public class SongService {
             return AclEffect.ALLOW;
         }
         return parseEnum(value, AclEffect.class, "acls.effect");
-    }
-
-    private String normalizeLinkUrl(String url) {
-        if (url == null || url.isBlank()) {
-            throw new IllegalArgumentException("links.url is required");
-        }
-        return url.trim();
     }
 
     private Set<SongArtistRole> parseSongArtistRoles(Set<String> roles) {

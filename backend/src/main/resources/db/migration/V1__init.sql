@@ -349,7 +349,7 @@ CREATE TABLE song_pvs (
     song_id BIGINT NOT NULL,
     service VARCHAR(20) NOT NULL,
     video_key TEXT NOT NULL,
-    url TEXT,
+    url TEXT NOT NULL,
     title VARCHAR(255),
     thumbnail_url TEXT,
     uploader_key TEXT,
@@ -369,7 +369,8 @@ CREATE TABLE song_pvs (
         duration_seconds IS NULL OR duration_seconds >= 0
     ),
     CONSTRAINT chk_song_pvs_sort_order CHECK (sort_order >= 0),
-    CONSTRAINT chk_song_pvs_bilibili_cid CHECK (bilibili_cid IS NULL OR bilibili_cid >= 0)
+    CONSTRAINT chk_song_pvs_bilibili_cid CHECK (bilibili_cid IS NULL OR bilibili_cid >= 0),
+    CONSTRAINT chk_song_pvs_url_not_blank CHECK (BTRIM(url) <> '')
 );
 
 -- song_pv_views
