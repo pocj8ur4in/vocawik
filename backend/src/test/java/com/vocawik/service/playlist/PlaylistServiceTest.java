@@ -11,11 +11,14 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.common.i18n.Language;
 import com.vocawik.domain.playlist.Playlist;
+import com.vocawik.domain.playlist.PlaylistSong;
 import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistListResponse;
+import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
+import com.vocawik.dto.song.SongPlaybackElementResponse;
 import com.vocawik.repository.acl.AclRepository;
 import com.vocawik.repository.playlist.PlaylistRepository;
 import com.vocawik.repository.playlist.PlaylistSongRepository;
@@ -24,9 +27,12 @@ import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.song.SongRepository;
 import com.vocawik.service.acl.AclPermissionService;
 import com.vocawik.service.history.ResourceHistoryService;
+import com.vocawik.service.song.SongService;
 import jakarta.persistence.EntityManager;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +46,8 @@ class PlaylistServiceTest {
 
     private ResourceNameRepository resourceNameRepository;
     private PlaylistRepository playlistRepository;
+    private PlaylistSongRepository playlistSongRepository;
+    private SongService songService;
     private PlaylistService playlistService;
 
     @BeforeEach
@@ -47,16 +55,19 @@ class PlaylistServiceTest {
         LocaleContextHolder.resetLocaleContext();
         resourceNameRepository = mock(ResourceNameRepository.class);
         playlistRepository = mock(PlaylistRepository.class);
+        playlistSongRepository = mock(PlaylistSongRepository.class);
+        songService = mock(SongService.class);
         playlistService =
                 new PlaylistService(
                         playlistRepository,
-                        mock(PlaylistSongRepository.class),
+                        playlistSongRepository,
                         mock(ResourceRepository.class),
                         resourceNameRepository,
                         mock(AclRepository.class),
                         mock(SongRepository.class),
                         mock(AclPermissionService.class),
                         mock(ResourceHistoryService.class),
+                        songService,
                         mock(EntityManager.class),
                         new ObjectMapper());
     }
@@ -193,6 +204,64 @@ class PlaylistServiceTest {
         verifyNoInteractions(resourceNameRepository);
     }
 
+    @Test
+    @DisplayName("Get playback should reuse song playback items and preserve playlist order")
+    void getPlayback_shouldReturnOrderedPlaybackSongs() {
+        LocaleContextHolder.setLocale(Locale.KOREAN);
+        UUID playlistUuid = UUID.randomUUID();
+        UUID songUuid = UUID.randomUUID();
+        Playlist playlist = playlist(1L, playlistUuid, "Miku Favorites");
+        ResourceName koreanName = localizedName(1L, "미쿠 플레이리스트", Language.KO);
+        com.vocawik.domain.song.Song song = mock(com.vocawik.domain.song.Song.class);
+        PlaylistSong playlistSong = mock(PlaylistSong.class);
+        SongPlaybackElementResponse playbackItem =
+                new SongPlaybackElementResponse(
+                        songUuid,
+                        "World is Mine",
+                        "월드 이즈 마인",
+                        "https://cdn.example.com/song.jpg",
+                        "supercell feat. Hatsune Miku",
+                        List.of(
+                                new SongPlaybackElementResponse.SongPlaybackPv(
+                                        UUID.randomUUID(),
+                                        "YOUTUBE",
+                                        "abc123",
+                                        "https://www.youtube.com/watch?v=abc123",
+                                        null,
+                                        "World is Mine",
+                                        "https://cdn.example.com/pv.jpg",
+                                        "supercell",
+                                        255,
+                                        true,
+                                        LocalDateTime.parse("2026-03-01T12:00:00"),
+                                        null,
+                                        0)));
+
+        when(playlistRepository.findByResourceUuid(playlistUuid)).thenReturn(Optional.of(playlist));
+        when(playlistSongRepository.findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(1L))
+                .thenReturn(List.of(playlistSong));
+        when(playlistSong.getSong()).thenReturn(song);
+        when(playlistSong.getSortOrder()).thenReturn(7);
+        when(songService.buildPlaybackItems(
+                        argThat(items -> items.size() == 1 && items.getFirst() == song),
+                        eq("YOUTUBE")))
+                .thenReturn(List.of(playbackItem));
+        when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        eq(List.of(1L))))
+                .thenReturn(List.of(koreanName));
+
+        PlaylistPlaybackResponse result = playlistService.getPlayback(playlistUuid, "YOUTUBE");
+
+        assertThat(result.resourceUuid()).isEqualTo(playlistUuid);
+        assertThat(result.localizedName()).isEqualTo("미쿠 플레이리스트");
+        assertThat(result.songs()).hasSize(1);
+        assertThat(result.songs().getFirst().resourceUuid()).isEqualTo(songUuid);
+        assertThat(result.songs().getFirst().subtitle()).isEqualTo("supercell feat. Hatsune Miku");
+        assertThat(result.songs().getFirst().sortOrder()).isEqualTo(7);
+        assertThat(result.songs().getFirst().pvs()).hasSize(1);
+        assertThat(result.songs().getFirst().pvs().getFirst().service()).isEqualTo("YOUTUBE");
+    }
+
     private ResourceName candidate(UUID uuid, String name) {
         return candidate(Math.abs(uuid.getMostSignificantBits()) % 10_000 + 1, uuid, name);
     }
@@ -215,8 +284,10 @@ class PlaylistServiceTest {
         when(resource.getCanonicalName()).thenReturn(canonicalName);
         when(resource.getStatus()).thenReturn(ResourceStatus.ACTIVE);
         when(resource.getViewCount()).thenReturn(0L);
+        when(resource.getThumbnailUrl()).thenReturn("https://cdn.example.com/playlist.jpg");
 
         Playlist playlist = mock(Playlist.class);
+        when(playlist.getId()).thenReturn(resourceId);
         when(playlist.getResource()).thenReturn(resource);
         return playlist;
     }
