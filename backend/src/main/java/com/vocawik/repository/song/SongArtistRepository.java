@@ -1,6 +1,7 @@
 package com.vocawik.repository.song;
 
 import com.vocawik.domain.song.SongArtist;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,19 @@ public interface SongArtistRepository extends JpaRepository<SongArtist, Long> {
 
     /** Finds all song-artist rows by song id in display order. */
     java.util.List<SongArtist> findAllBySongIdOrderBySortOrderAscIdAsc(Long songId);
+
+    /** Finds all song-artist rows by song ids with artist resources in display order. */
+    @Query(
+            """
+            select sa
+            from SongArtist sa
+                join fetch sa.artist a
+                join fetch a.resource
+            where sa.song.id in :songIds
+            order by sa.song.id asc, sa.sortOrder asc, sa.id asc
+            """)
+    java.util.List<SongArtist> findAllWithArtistResourceBySongIdInOrderBySongIdAscSortOrderAscIdAsc(
+            @Param("songIds") Collection<Long> songIds);
 
     /** Finds all song-artist rows by artist id in display order. */
     java.util.List<SongArtist> findAllByArtistIdOrderBySortOrderAscIdAsc(Long artistId);
