@@ -5,6 +5,7 @@ import com.vocawik.security.ip.ClientIpHeaderFilter;
 import com.vocawik.security.jwt.JwtFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -40,15 +41,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private static final List<String> ALLOWED_ORIGINS =
-            List.of("http://localhost:5173", "http://localhost:3000");
-
     private final JwtFilter jwtFilter;
     private final GuestAuthenticationFilter guestAuthenticationFilter;
     private final RequestLocaleFilter requestLocaleFilter;
     private final ClientIpHeaderFilter clientIpHeaderFilter;
     private final ApiAuthenticationEntryPoint apiAuthenticationEntryPoint;
     private final ApiAccessDeniedHandler apiAccessDeniedHandler;
+
+    @Value("${security.cors.allowed-origins}")
+    private List<String> allowedOrigins;
 
     /**
      * Configures the security filter chain.
@@ -117,7 +118,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(ALLOWED_ORIGINS);
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));

@@ -8,4 +8,5 @@ import jakarta.validation.constraints.Size;
 public record SessionCreateRequest(
         @NotBlank @Email @Size(max = 254) String email,
         @NotBlank @Size(min = 8, max = 64) String password,
-        String captchaToken) {}
+        String captchaToken,
+        Boolean keepSignedIn) {}
