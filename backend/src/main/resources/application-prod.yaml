@@ -40,3 +40,4 @@ management:
 security:
   cookie:
     secure: true
+    same-site: None

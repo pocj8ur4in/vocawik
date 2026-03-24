@@ -74,6 +74,9 @@ server:
 security:
   cookie:
     secure: ${SECURITY_COOKIE_SECURE:true}
+    same-site: ${SECURITY_COOKIE_SAME_SITE:Lax}
+  cors:
+    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,https://vocawik.vercel.app}
   client-ip:
     trusted-proxy-cidrs:
       - 127.0.0.1/32

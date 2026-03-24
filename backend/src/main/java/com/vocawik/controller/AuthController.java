@@ -52,12 +52,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthController {
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
+    private static final String REFRESH_PERSISTENCE_COOKIE = "refresh_persistence";
     private static final String OAUTH_STATE_COOKIE = "oauth_state";
     private static final String REFRESH_COOKIE_PATH = "/api/v1/sessions";
     private static final String OAUTH_STATE_COOKIE_PATH = "/api/v1/oauth";
+    private static final String PERSISTENCE_LOCAL = "local";
+    private static final String PERSISTENCE_SESSION = "session";
 
     @Value("${security.cookie.secure:true}")
     private boolean secureCookie;
+
+    @Value("${security.cookie.same-site:Lax}")
+    private String sameSite;
 
     private final SessionService sessionService;
     private final OAuthService oAuthService;
@@ -148,7 +154,7 @@ public class AuthController {
             HttpServletResponse response) {
         captchaVerificationService.verifyRequired(request.captchaToken(), httpServletRequest);
         AuthTokenBundle tokenBundle = sessionService.login(request.email(), request.password());
-        addRefreshCookie(response, tokenBundle.refreshToken());
+        addRefreshCookie(response, tokenBundle.refreshToken(), isKeepSignedInRequested(request));
         return ResponseEntity.created(URI.create("/api/v1/sessions/current"))
                 .body(
                         new SessionTokenResponse(
@@ -167,9 +173,12 @@ public class AuthController {
             description = "Reissues a new access token from refresh token context.")
     public ResponseEntity<SessionTokenResponse> refresh(
             @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+            @CookieValue(name = REFRESH_PERSISTENCE_COOKIE, required = false)
+                    String refreshPersistence,
             HttpServletResponse response) {
         AuthTokenBundle tokenBundle = sessionService.refresh(refreshToken);
-        addRefreshCookie(response, tokenBundle.refreshToken());
+        addRefreshCookie(
+                response, tokenBundle.refreshToken(), isPersistentSession(refreshPersistence));
 
         return ResponseEntity.ok(
                 new SessionTokenResponse(
@@ -255,7 +264,7 @@ public class AuthController {
 
         AuthTokenBundle tokenBundle = oAuthService.authenticateGoogle(code);
         clearOAuthStateCookie(response);
-        addRefreshCookie(response, tokenBundle.refreshToken());
+        addRefreshCookie(response, tokenBundle.refreshToken(), true);
         return ResponseEntity.ok(
                 new SessionTokenResponse(
                         tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
@@ -269,28 +278,61 @@ public class AuthController {
         }
     }
 
-    private void addRefreshCookie(HttpServletResponse response, String refreshToken) {
-        ResponseCookie cookie =
+    private boolean isKeepSignedInRequested(SessionCreateRequest request) {
+        return !Boolean.FALSE.equals(request.keepSignedIn());
+    }
+
+    private boolean isPersistentSession(String refreshPersistence) {
+        return PERSISTENCE_LOCAL.equalsIgnoreCase(refreshPersistence);
+    }
+
+    private void addRefreshCookie(
+            HttpServletResponse response, String refreshToken, boolean keepSignedIn) {
+        ResponseCookie.ResponseCookieBuilder refreshCookieBuilder =
                 ResponseCookie.from(REFRESH_TOKEN_COOKIE, refreshToken)
                         .httpOnly(true)
                         .secure(secureCookie)
-                        .sameSite("Strict")
-                        .path(REFRESH_COOKIE_PATH)
-                        .maxAge(sessionService.getRefreshExpirationSeconds())
-                        .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+                        .sameSite(sameSite)
+                        .path(REFRESH_COOKIE_PATH);
+
+        ResponseCookie.ResponseCookieBuilder persistenceCookieBuilder =
+                ResponseCookie.from(
+                                REFRESH_PERSISTENCE_COOKIE,
+                                keepSignedIn ? PERSISTENCE_LOCAL : PERSISTENCE_SESSION)
+                        .httpOnly(true)
+                        .secure(secureCookie)
+                        .sameSite(sameSite)
+                        .path(REFRESH_COOKIE_PATH);
+
+        if (keepSignedIn) {
+            long refreshTtlSeconds = sessionService.getRefreshExpirationSeconds();
+            refreshCookieBuilder.maxAge(refreshTtlSeconds);
+            persistenceCookieBuilder.maxAge(refreshTtlSeconds);
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookieBuilder.build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, persistenceCookieBuilder.build().toString());
     }
 
     private void clearRefreshCookie(HttpServletResponse response) {
-        ResponseCookie cookie =
+        ResponseCookie refreshCookie =
                 ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
                         .httpOnly(true)
                         .secure(secureCookie)
-                        .sameSite("Strict")
+                        .sameSite(sameSite)
                         .path(REFRESH_COOKIE_PATH)
                         .maxAge(0)
                         .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        ResponseCookie persistenceCookie =
+                ResponseCookie.from(REFRESH_PERSISTENCE_COOKIE, "")
+                        .httpOnly(true)
+                        .secure(secureCookie)
+                        .sameSite(sameSite)
+                        .path(REFRESH_COOKIE_PATH)
+                        .maxAge(0)
+                        .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, persistenceCookie.toString());
     }
 
     private void addOAuthStateCookie(HttpServletResponse response, String state) {
@@ -298,7 +340,7 @@ public class AuthController {
                 ResponseCookie.from(OAUTH_STATE_COOKIE, state)
                         .httpOnly(true)
                         .secure(secureCookie)
-                        .sameSite("Lax")
+                        .sameSite(sameSite)
                         .path(OAUTH_STATE_COOKIE_PATH)
                         .maxAge(5 * 60)
                         .build();
@@ -310,7 +352,7 @@ public class AuthController {
                 ResponseCookie.from(OAUTH_STATE_COOKIE, "")
                         .httpOnly(true)
                         .secure(secureCookie)
-                        .sameSite("Lax")
+                        .sameSite(sameSite)
                         .path(OAUTH_STATE_COOKIE_PATH)
                         .maxAge(0)
                         .build();
