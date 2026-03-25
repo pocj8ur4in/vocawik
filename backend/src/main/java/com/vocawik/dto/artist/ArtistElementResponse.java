@@ -17,6 +17,8 @@ public record ArtistElementResponse(
                         nullable = true)
                 String localizedName,
         @Schema(description = "Resource status", example = "ACTIVE") String status,
+        @Schema(description = "Whether the resource is soft-deleted", example = "false")
+                boolean isDeleted,
         @Schema(description = "Total view count", example = "123") long viewCount,
         @Schema(description = "Thumbnail URL", nullable = true) String thumbnailUrl,
         @Schema(description = "Created timestamp", nullable = true) LocalDateTime createdAt,

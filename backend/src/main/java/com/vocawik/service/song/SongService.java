@@ -2051,6 +2051,7 @@ public class SongService {
                 resource.getCanonicalName(),
                 localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
+                resource.isDeleted(),
                 song.getSongType().name(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),

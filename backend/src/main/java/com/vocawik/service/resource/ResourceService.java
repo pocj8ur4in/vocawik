@@ -490,6 +490,8 @@ public class ResourceService {
         assertVisibleResource(resource);
         return new ResourceInfoResponse(
                 resource.getUuid(),
+                resource.getStatus().name(),
+                resource.isDeleted(),
                 loadResourceAcls(resource.getId()),
                 resourceHistoryService.listByResourceId(resource.getId()));
     }
@@ -635,6 +637,7 @@ public class ResourceService {
                 localizedNamesByResourceId.get(resource.getId()),
                 resource.getResourceType().name(),
                 resource.getStatus().name(),
+                resource.isDeleted(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
                 resource.getCreatedAt(),

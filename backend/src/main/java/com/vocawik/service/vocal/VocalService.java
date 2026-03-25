@@ -860,6 +860,7 @@ public class VocalService {
                 resource.getCanonicalName(),
                 localizedNamesByResourceId.get(resource.getId()),
                 resource.getStatus().name(),
+                resource.isDeleted(),
                 resource.getViewCount(),
                 resource.getThumbnailUrl(),
                 resource.getCreatedAt(),
