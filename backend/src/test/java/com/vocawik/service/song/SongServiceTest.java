@@ -110,13 +110,14 @@ class SongServiceTest {
         when(songRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.songTypes().isEmpty()
                                                 && criteria.query() == null
                                                 && criteria.artistUuids().isEmpty()
                                                 && criteria.vocalUuids().isEmpty()
                                                 && criteria.publishedFrom() == null
-                                                && criteria.publishedTo() == null),
+                                                && criteria.publishedTo() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(song), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -146,13 +147,14 @@ class SongServiceTest {
         when(songRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.songTypes().isEmpty()
                                                 && criteria.query() == null
                                                 && criteria.artistUuids().isEmpty()
                                                 && criteria.vocalUuids().isEmpty()
                                                 && criteria.publishedFrom() == null
-                                                && criteria.publishedTo() == null),
+                                                && criteria.publishedTo() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(song), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -172,13 +174,14 @@ class SongServiceTest {
         when(songRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.songTypes().isEmpty()
                                                 && criteria.query() == null
                                                 && criteria.artistUuids().isEmpty()
                                                 && criteria.vocalUuids().isEmpty()
                                                 && criteria.publishedFrom() == null
-                                                && criteria.publishedTo() == null),
+                                                && criteria.publishedTo() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -190,13 +193,14 @@ class SongServiceTest {
                 .search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.songTypes().isEmpty()
                                                 && criteria.query() == null
                                                 && criteria.artistUuids().isEmpty()
                                                 && criteria.vocalUuids().isEmpty()
                                                 && criteria.publishedFrom() == null
-                                                && criteria.publishedTo() == null),
+                                                && criteria.publishedTo() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20)));
         verifyNoInteractions(resourceNameRepository);
     }

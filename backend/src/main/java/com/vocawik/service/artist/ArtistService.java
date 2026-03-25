@@ -186,15 +186,18 @@ public class ArtistService {
         List<UUID> normalizedSongUuids = normalizeUuids(songUuids);
         List<UUID> normalizedGroupArtistUuids = normalizeUuids(groupArtistUuids);
         List<UUID> normalizedMemberArtistUuids = normalizeUuids(memberArtistUuids);
+        boolean includeDeleted = aclPermissionService.isCurrentAdmin();
+        ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
 
         Page<Artist> result =
                 artistRepository.search(
                         new ArtistCriteria(
-                                status,
+                                effectiveStatus,
                                 normalizedQuery,
                                 normalizedSongUuids,
                                 normalizedGroupArtistUuids,
-                                normalizedMemberArtistUuids),
+                                normalizedMemberArtistUuids,
+                                includeDeleted),
                         pageable);
 
         Map<Long, String> localizedNamesByResourceId =

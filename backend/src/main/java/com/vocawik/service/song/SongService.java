@@ -147,17 +147,20 @@ public class SongService {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
         List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
+        boolean includeDeleted = aclPermissionService.isCurrentAdmin();
+        ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
 
         Page<Song> result =
                 songRepository.search(
                         new SongCriteria(
-                                status,
+                                effectiveStatus,
                                 songTypes,
                                 normalizedQuery,
                                 normalizedArtistUuids,
                                 normalizedVocalUuids,
                                 publishedFrom,
-                                publishedTo),
+                                publishedTo,
+                                includeDeleted),
                         pageable);
 
         Map<Long, String> localizedNamesByResourceId =
@@ -186,17 +189,20 @@ public class SongService {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
         List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
+        boolean includeDeleted = aclPermissionService.isCurrentAdmin();
+        ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
 
         List<Song> songs =
                 songRepository.searchAll(
                         new SongCriteria(
-                                status,
+                                effectiveStatus,
                                 songTypes,
                                 normalizedQuery,
                                 normalizedArtistUuids,
                                 normalizedVocalUuids,
                                 publishedFrom,
-                                publishedTo),
+                                publishedTo,
+                                includeDeleted),
                         sort);
 
         if (songs.isEmpty()) {

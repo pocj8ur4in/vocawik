@@ -88,7 +88,11 @@ class PlaylistServiceTest {
         Playlist playlist = playlist(1L, UUID.randomUUID(), "Miku Favorites");
         ResourceName japaneseName = localizedName(1L, "ミクお気に入り", Language.JA);
         when(playlistRepository.search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(playlist), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -109,7 +113,11 @@ class PlaylistServiceTest {
         Playlist playlist = playlist(1L, UUID.randomUUID(), "Miku Favorites");
         ResourceName japaneseName = localizedName(1L, "ミクお気に入り", Language.JA);
         when(playlistRepository.search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(playlist), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -126,7 +134,11 @@ class PlaylistServiceTest {
     @DisplayName("Search should not query resource names when result is empty")
     void search_withEmptyResult_shouldSkipLocalizedNameLookup() {
         when(playlistRepository.search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -135,7 +147,11 @@ class PlaylistServiceTest {
         assertThat(result.items()).isEmpty();
         verify(playlistRepository)
                 .search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20)));
         verifyNoInteractions(resourceNameRepository);
     }

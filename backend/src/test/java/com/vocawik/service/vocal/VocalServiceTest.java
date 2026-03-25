@@ -140,9 +140,10 @@ class VocalServiceTest {
         when(vocalRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
-                                                && criteria.songUuids().isEmpty()),
+                                                && criteria.songUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(vocal), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -165,9 +166,10 @@ class VocalServiceTest {
         when(vocalRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
-                                                && criteria.songUuids().isEmpty()),
+                                                && criteria.songUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(vocal), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -186,9 +188,10 @@ class VocalServiceTest {
         when(vocalRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
-                                                && criteria.songUuids().isEmpty()),
+                                                && criteria.songUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -199,9 +202,10 @@ class VocalServiceTest {
                 .search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
-                                                && criteria.songUuids().isEmpty()),
+                                                && criteria.songUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20)));
         verifyNoInteractions(resourceNameRepository);
     }

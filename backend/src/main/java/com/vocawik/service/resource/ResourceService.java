@@ -3,6 +3,7 @@ package com.vocawik.service.resource;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.common.i18n.Language;
+import com.vocawik.domain.acl.AclAction;
 import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.artist.ArtistGroup;
 import com.vocawik.domain.artist.ArtistLink;
@@ -118,8 +119,12 @@ public class ResourceService {
     @Transactional(readOnly = true)
     public ResourceListResponse search(ResourceStatus status, String query, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
+        boolean includeDeleted = aclPermissionService.isCurrentAdmin();
+        ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
         Page<Resource> result =
-                resourceRepository.search(new ResourceCriteria(status, normalizedQuery), pageable);
+                resourceRepository.search(
+                        new ResourceCriteria(effectiveStatus, normalizedQuery, includeDeleted),
+                        pageable);
 
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceId(result.getContent());
@@ -221,7 +226,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = song.getResource();
-        aclPermissionService.assertCanRead(resource);
+        assertVisibleResource(resource);
 
         List<ResourceNameDetailResponse> names = loadResourceNames(resource.getId());
         List<ResourceAclDetailResponse> acls = loadResourceAcls(resource.getId());
@@ -234,6 +239,8 @@ public class ResourceService {
                 songArtistRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
         List<SongVocal> vocals =
                 songVocalRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        artists = filterVisibleSongArtists(artists);
+        vocals = filterVisibleSongVocals(vocals);
         List<SongRelation> outgoingRelations =
                 songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
         List<SongRelation> incomingRelations =
@@ -303,7 +310,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = artist.getResource();
-        aclPermissionService.assertCanRead(resource);
+        assertVisibleResource(resource);
         List<ArtistLink> links = artistLinkRepository.findAllByArtistIdOrderByIdAsc(artist.getId());
         long songCount = songArtistRepository.countByArtistId(artist.getId());
         List<SongArtist> recentSongs =
@@ -369,7 +376,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = vocal.getResource();
-        aclPermissionService.assertCanRead(resource);
+        assertVisibleResource(resource);
         List<VocalLink> links = vocalLinkRepository.findAllByVocalIdOrderByIdAsc(vocal.getId());
 
         long songCount = songVocalRepository.countByVocalId(vocal.getId());
@@ -423,7 +430,7 @@ public class ResourceService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
-        aclPermissionService.assertCanRead(resource);
+        assertVisibleResource(resource);
         long songCount = playlistSongRepository.countByPlaylistId(playlist.getId());
         List<PlaylistSong> songs =
                 playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
@@ -474,11 +481,19 @@ public class ResourceService {
                 resourceRepository
                         .findByUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-        aclPermissionService.assertCanRead(resource);
+        assertVisibleResource(resource);
         return new ResourceInfoResponse(
                 resource.getUuid(),
                 loadResourceAcls(resource.getId()),
                 resourceHistoryService.listByResourceId(resource.getId()));
+    }
+
+    private void assertVisibleResource(Resource resource) {
+        if (!aclPermissionService.isCurrentAdmin()
+                && (resource.isDeleted() || resource.getStatus() != ResourceStatus.ACTIVE)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        aclPermissionService.assertCanRead(resource);
     }
 
     private String normalizeQuery(String query) {
@@ -748,6 +763,27 @@ public class ResourceService {
     private SongResourceDetailResponse.SongPvView toSongPvView(SongPvView view) {
         return new SongResourceDetailResponse.SongPvView(
                 view.getUuid(), view.getViewCount(), view.getCreatedAt(), view.getUpdatedAt());
+    }
+
+    private List<SongArtist> filterVisibleSongArtists(List<SongArtist> artists) {
+        return artists.stream()
+                .filter(songArtist -> isVisibleLinkedResource(songArtist.getArtist().getResource()))
+                .toList();
+    }
+
+    private List<SongVocal> filterVisibleSongVocals(List<SongVocal> vocals) {
+        return vocals.stream()
+                .filter(songVocal -> isVisibleLinkedResource(songVocal.getVocal().getResource()))
+                .toList();
+    }
+
+    private boolean isVisibleLinkedResource(Resource resource) {
+        if (resource == null) {
+            return false;
+        }
+        return !resource.isDeleted()
+                && ResourceStatus.ACTIVE.equals(resource.getStatus())
+                && aclPermissionService.isAllowed(resource, AclAction.READ);
     }
 
     private SongResourceDetailResponse.SongArtist toSongArtist(

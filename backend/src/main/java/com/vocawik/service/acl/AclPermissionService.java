@@ -58,6 +58,10 @@ public class AclPermissionService {
         assertAllowed(resource, AclAction.DEBATE_COMMENT);
     }
 
+    public boolean isCurrentAdmin() {
+        return currentPrincipal().isAdmin();
+    }
+
     public boolean isAllowed(Resource resource, AclAction action) {
         if (resource == null) {
             return false;

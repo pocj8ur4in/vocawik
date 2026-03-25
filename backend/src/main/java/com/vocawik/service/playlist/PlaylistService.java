@@ -85,8 +85,12 @@ public class PlaylistService {
     @Transactional(readOnly = true)
     public PlaylistListResponse search(ResourceStatus status, String query, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
+        boolean includeDeleted = aclPermissionService.isCurrentAdmin();
+        ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
         Page<Playlist> result =
-                playlistRepository.search(new PlaylistCriteria(status, normalizedQuery), pageable);
+                playlistRepository.search(
+                        new PlaylistCriteria(effectiveStatus, normalizedQuery, includeDeleted),
+                        pageable);
 
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceId(result.getContent());

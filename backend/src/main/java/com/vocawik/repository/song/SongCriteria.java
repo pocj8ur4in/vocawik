@@ -16,6 +16,7 @@ import java.util.UUID;
  * @param vocalUuids optional vocal resource UUID filters
  * @param publishedFrom optional published-at start datetime (inclusive)
  * @param publishedTo optional published-at end datetime (inclusive)
+ * @param includeDeleted whether soft-deleted rows should be included
  */
 public record SongCriteria(
         ResourceStatus status,
@@ -24,7 +25,8 @@ public record SongCriteria(
         List<UUID> artistUuids,
         List<UUID> vocalUuids,
         LocalDateTime publishedFrom,
-        LocalDateTime publishedTo) {
+        LocalDateTime publishedTo,
+        boolean includeDeleted) {
 
     public SongCriteria {
         songTypes = songTypes == null ? List.of() : List.copyOf(songTypes);

@@ -19,6 +19,7 @@ import com.vocawik.repository.history.RecentChangeProjection;
 import com.vocawik.repository.resource.ResourceNameRepository;
 import com.vocawik.repository.resource.ResourceRepository;
 import com.vocawik.repository.user.UserRepository;
+import com.vocawik.service.acl.AclPermissionService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +49,7 @@ class ResourceHistoryServiceTest {
                         resourceNameRepository,
                         mock(UserRepository.class),
                         mock(GuestRepository.class),
+                        mock(AclPermissionService.class),
                         new ObjectMapper());
     }
 

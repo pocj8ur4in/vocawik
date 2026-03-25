@@ -169,10 +169,17 @@ public class VocalService {
             ResourceStatus status, String query, List<UUID> songUuids, Pageable pageable) {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedSongUuids = normalizeUuids(songUuids);
+        boolean includeDeleted = aclPermissionService.isCurrentAdmin();
+        ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
 
         Page<Vocal> result =
                 vocalRepository.search(
-                        new VocalCriteria(status, normalizedQuery, normalizedSongUuids), pageable);
+                        new VocalCriteria(
+                                effectiveStatus,
+                                normalizedQuery,
+                                normalizedSongUuids,
+                                includeDeleted),
+                        pageable);
 
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceId(result.getContent());

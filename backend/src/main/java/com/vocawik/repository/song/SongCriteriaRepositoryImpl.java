@@ -85,7 +85,9 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
             Root<Song> root,
             CriteriaBuilder criteriaBuilder) {
         List<Predicate> predicates = new ArrayList<>();
-        predicates.add(criteriaBuilder.isFalse(root.get("resource").get("isDeleted")));
+        if (!criteria.includeDeleted()) {
+            predicates.add(criteriaBuilder.isFalse(root.get("resource").get("isDeleted")));
+        }
         if (criteria.status() != null) {
             predicates.add(
                     criteriaBuilder.equal(root.get("resource").get("status"), criteria.status()));

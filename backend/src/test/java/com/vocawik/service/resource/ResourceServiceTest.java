@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.common.i18n.Language;
+import com.vocawik.domain.acl.AclAction;
 import com.vocawik.domain.artist.Artist;
 import com.vocawik.domain.artist.ArtistGroup;
 import com.vocawik.domain.playlist.Playlist;
@@ -88,6 +89,7 @@ class ResourceServiceTest {
     private ResourceNameRepository resourceNameRepository;
     private ResourceRepository resourceRepository;
     private AudioObjectStorageService audioObjectStorageService;
+    private AclPermissionService aclPermissionService;
     private ResourceService resourceService;
 
     @BeforeEach
@@ -112,6 +114,10 @@ class ResourceServiceTest {
         resourceNameRepository = mock(ResourceNameRepository.class);
         resourceRepository = mock(ResourceRepository.class);
         audioObjectStorageService = mock(AudioObjectStorageService.class);
+        aclPermissionService = mock(AclPermissionService.class);
+        when(aclPermissionService.isAllowed(
+                        org.mockito.ArgumentMatchers.any(Resource.class), eq(AclAction.READ)))
+                .thenReturn(true);
         resourceService =
                 new ResourceService(
                         resourceRepository,
@@ -132,7 +138,7 @@ class ResourceServiceTest {
                         artistLinkRepository,
                         vocalRepository,
                         vocalLinkRepository,
-                        mock(AclPermissionService.class),
+                        aclPermissionService,
                         mock(ResourceHistoryService.class),
                         mock(ResourcePopularityService.class),
                         audioObjectStorageService,
@@ -221,7 +227,11 @@ class ResourceServiceTest {
         Resource resource = resource(1L, UUID.randomUUID(), "Hatsune Miku", ResourceType.VOCAL);
         ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
         when(resourceRepository.search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(resource), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -242,7 +252,11 @@ class ResourceServiceTest {
         Resource resource = resource(1L, UUID.randomUUID(), "Hatsune Miku", ResourceType.VOCAL);
         ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
         when(resourceRepository.search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(resource), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -259,7 +273,11 @@ class ResourceServiceTest {
     @DisplayName("Search should not query resource names when result is empty")
     void search_withEmptyResult_shouldSkipLocalizedNameLookup() {
         when(resourceRepository.search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -268,7 +286,11 @@ class ResourceServiceTest {
         assertThat(result.items()).isEmpty();
         verify(resourceRepository)
                 .search(
-                        argThat(criteria -> criteria.status() == null && criteria.query() == null),
+                        argThat(
+                                criteria ->
+                                        criteria.status() == ResourceStatus.ACTIVE
+                                                && criteria.query() == null
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20)));
         verifyNoInteractions(resourceNameRepository);
     }
