@@ -1,5 +1,6 @@
 package com.vocawik.service.song;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -46,6 +47,7 @@ import com.vocawik.repository.song.SongArtistRepository;
 import com.vocawik.repository.song.SongCriteria;
 import com.vocawik.repository.song.SongLinkRepository;
 import com.vocawik.repository.song.SongLyricRepository;
+import com.vocawik.repository.song.SongPlaybackCursorCriteria;
 import com.vocawik.repository.song.SongPvRepository;
 import com.vocawik.repository.song.SongPvViewRepository;
 import com.vocawik.repository.song.SongRelationRepository;
@@ -65,9 +67,11 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
@@ -75,6 +79,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -82,6 +87,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -98,6 +104,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
                 "ObjectMapper is a Spring-managed infrastructure bean and is not exposed externally.")
 public class SongService {
     private static final int SONG_SUGGESTION_LIMIT = 10;
+    private static final int DEFAULT_PLAYBACK_PAGE_SIZE = 50;
+    private static final int MAX_PLAYBACK_PAGE_SIZE = 100;
 
     private final SongRepository songRepository;
     private final ResourceRepository resourceRepository;
@@ -185,32 +193,47 @@ public class SongService {
             LocalDateTime publishedFrom,
             LocalDateTime publishedTo,
             String preferredPvService,
-            org.springframework.data.domain.Sort sort) {
+            org.springframework.data.domain.Sort sort,
+            String cursor,
+            Integer limit) {
         String normalizedQuery = normalizeQuery(query);
         List<UUID> normalizedArtistUuids = normalizeUuids(artistUuids);
         List<UUID> normalizedVocalUuids = normalizeUuids(vocalUuids);
         boolean includeDeleted = aclPermissionService.isCurrentAdmin();
         ResourceStatus effectiveStatus = includeDeleted ? status : ResourceStatus.ACTIVE;
+        Sort.Order playbackSortOrder = resolvePlaybackSortOrder(sort);
+        SongPlaybackCursorCriteria playbackCursor = decodePlaybackCursor(cursor, playbackSortOrder);
+        int pageSize = sanitizePlaybackPageSize(limit);
+        SongCriteria criteria =
+                new SongCriteria(
+                        effectiveStatus,
+                        songTypes,
+                        normalizedQuery,
+                        normalizedArtistUuids,
+                        normalizedVocalUuids,
+                        publishedFrom,
+                        publishedTo,
+                        includeDeleted);
 
-        List<Song> songs =
-                songRepository.searchAll(
-                        new SongCriteria(
-                                effectiveStatus,
-                                songTypes,
-                                normalizedQuery,
-                                normalizedArtistUuids,
-                                normalizedVocalUuids,
-                                publishedFrom,
-                                publishedTo,
-                                includeDeleted),
-                        sort);
+        List<Song> rows =
+                songRepository.searchPlaybackSlice(
+                        criteria, playbackCursor, playbackSortOrder, pageSize + 1);
+        long totalCount = songRepository.count(criteria);
+        boolean hasNext = rows.size() > pageSize;
+        List<Song> pageSongs = hasNext ? List.copyOf(rows.subList(0, pageSize)) : List.copyOf(rows);
 
-        if (songs.isEmpty()) {
-            return new SongPlaybackListResponse(List.of(), 0);
+        if (pageSongs.isEmpty()) {
+            return new SongPlaybackListResponse(List.of(), totalCount, null, false);
         }
 
         return new SongPlaybackListResponse(
-                buildPlaybackItems(songs, preferredPvService), songs.size());
+                buildPlaybackItems(pageSongs, preferredPvService),
+                totalCount,
+                hasNext
+                        ? encodePlaybackCursor(
+                                pageSongs.getLast(), playbackSortOrder, normalizedQuery)
+                        : null,
+                hasNext);
     }
 
     /** Builds ordered player-focused playback items for the provided songs. */
@@ -284,6 +307,194 @@ public class SongService {
                 && ResourceStatus.ACTIVE.equals(resource.getStatus())
                 && aclPermissionService.isAllowed(resource, AclAction.READ);
     }
+
+    private int sanitizePlaybackPageSize(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_PLAYBACK_PAGE_SIZE;
+        }
+        return Math.max(1, Math.min(limit, MAX_PLAYBACK_PAGE_SIZE));
+    }
+
+    private Sort.Order resolvePlaybackSortOrder(org.springframework.data.domain.Sort sort) {
+        Sort.Order order = sort == null ? null : sort.stream().findFirst().orElse(null);
+        if (order == null) {
+            return new Sort.Order(Sort.Direction.DESC, "resource.updatedAt");
+        }
+        return switch (order.getProperty()) {
+            case "match" -> {
+                if (order.isDescending()) {
+                    throw new IllegalArgumentException("match sort only supports ascending order");
+                }
+                yield order;
+            }
+            case "resource.updatedAt",
+                            "resource.createdAt",
+                            "publishedAt",
+                            "resource.viewCount",
+                            "resource.canonicalName" ->
+                    order;
+            default ->
+                    throw new IllegalArgumentException(
+                            "Unsupported playback sort property: " + order.getProperty());
+        };
+    }
+
+    private String encodePlaybackCursor(Song song, Sort.Order sortOrder, String normalizedQuery) {
+        SongPlaybackCursorCriteria cursorCriteria =
+                buildPlaybackCursorCriteria(song, sortOrder, normalizedQuery);
+        PlaybackCursorPayload payload =
+                new PlaybackCursorPayload(
+                        cursorCriteria.sortProperty(),
+                        cursorCriteria.ascending(),
+                        cursorCriteria.stringValue(),
+                        cursorCriteria.longValue(),
+                        cursorCriteria.dateTimeValue() == null
+                                ? null
+                                : cursorCriteria.dateTimeValue().toString(),
+                        cursorCriteria.intValue(),
+                        cursorCriteria.secondaryIntValue(),
+                        cursorCriteria.songId());
+        try {
+            String raw = objectMapper.writeValueAsString(payload);
+            return Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Failed to encode playback cursor", ex);
+        }
+    }
+
+    private SongPlaybackCursorCriteria decodePlaybackCursor(String cursor, Sort.Order sortOrder) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+
+        try {
+            String raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            PlaybackCursorPayload payload =
+                    objectMapper.readValue(raw, PlaybackCursorPayload.class);
+            if (!sortOrder.getProperty().equals(payload.sortProperty())
+                    || sortOrder.isAscending() != payload.ascending()) {
+                throw new IllegalArgumentException("playback cursor does not match sort");
+            }
+            return new SongPlaybackCursorCriteria(
+                    payload.sortProperty(),
+                    payload.ascending(),
+                    payload.stringValue(),
+                    payload.longValue(),
+                    payload.dateTimeValue() == null
+                            ? null
+                            : LocalDateTime.parse(payload.dateTimeValue()),
+                    payload.intValue(),
+                    payload.secondaryIntValue(),
+                    payload.songId());
+        } catch (IllegalArgumentException | JsonProcessingException ex) {
+            throw new IllegalArgumentException("playback cursor is invalid");
+        }
+    }
+
+    private SongPlaybackCursorCriteria buildPlaybackCursorCriteria(
+            Song song, Sort.Order sortOrder, String normalizedQuery) {
+        return switch (sortOrder.getProperty()) {
+            case "resource.updatedAt", "resource.createdAt", "publishedAt" ->
+                    new SongPlaybackCursorCriteria(
+                            sortOrder.getProperty(),
+                            sortOrder.isAscending(),
+                            null,
+                            null,
+                            "publishedAt".equals(sortOrder.getProperty())
+                                    ? song.getPublishedAt()
+                                    : ("resource.updatedAt".equals(sortOrder.getProperty())
+                                            ? song.getResource().getUpdatedAt()
+                                            : song.getResource().getCreatedAt()),
+                            null,
+                            null,
+                            song.getId());
+            case "resource.viewCount" ->
+                    new SongPlaybackCursorCriteria(
+                            sortOrder.getProperty(),
+                            sortOrder.isAscending(),
+                            null,
+                            song.getResource().getViewCount(),
+                            null,
+                            null,
+                            null,
+                            song.getId());
+            case "resource.canonicalName" ->
+                    new SongPlaybackCursorCriteria(
+                            sortOrder.getProperty(),
+                            sortOrder.isAscending(),
+                            song.getResource().getCanonicalName(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            song.getId());
+            case "match" ->
+                    new SongPlaybackCursorCriteria(
+                            sortOrder.getProperty(),
+                            sortOrder.isAscending(),
+                            song.getResource().getCanonicalName(),
+                            song.getResource().getViewCount(),
+                            song.getResource().getUpdatedAt(),
+                            calculatePlaybackMatchRank(song, normalizedQuery),
+                            SongType.ORIGINAL.equals(song.getSongType()) ? 0 : 1,
+                            song.getId());
+            default ->
+                    throw new IllegalArgumentException(
+                            "Unsupported playback cursor sort property: "
+                                    + sortOrder.getProperty());
+        };
+    }
+
+    private int calculatePlaybackMatchRank(Song song, String normalizedQuery) {
+        if (normalizedQuery == null) {
+            return 2;
+        }
+
+        String query = normalizedQuery.toLowerCase(Locale.ROOT);
+        ArrayList<String> candidates = new ArrayList<>();
+        candidates.add(song.getResource().getCanonicalName());
+        resourceNameRepository
+                .findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
+                        List.of(song.getResource().getId()))
+                .stream()
+                .map(ResourceName::getName)
+                .forEach(candidates::add);
+
+        boolean exact = false;
+        boolean prefix = false;
+        for (String candidate : candidates) {
+            if (candidate == null) {
+                continue;
+            }
+            String normalizedCandidate = candidate.toLowerCase(Locale.ROOT);
+            if (normalizedCandidate.equals(query)) {
+                exact = true;
+                break;
+            }
+            if (normalizedCandidate.startsWith(query)) {
+                prefix = true;
+            }
+        }
+        if (exact) {
+            return 0;
+        }
+        if (prefix) {
+            return 1;
+        }
+        return 2;
+    }
+
+    private record PlaybackCursorPayload(
+            String sortProperty,
+            boolean ascending,
+            String stringValue,
+            Long longValue,
+            String dateTimeValue,
+            Integer intValue,
+            Integer secondaryIntValue,
+            Long songId) {}
 
     @Transactional(readOnly = true)
     public SongSuggestionListResponse suggest(String query) {

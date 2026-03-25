@@ -3,7 +3,11 @@ package com.vocawik.dto.song;
 import java.util.List;
 
 /** Response payload for player-focused song searches. */
-public record SongPlaybackListResponse(List<SongPlaybackElementResponse> items, long totalCount) {
+public record SongPlaybackListResponse(
+        List<SongPlaybackElementResponse> items,
+        long totalCount,
+        String nextCursor,
+        boolean hasNext) {
 
     /** Creates an immutable playback list response. */
     public SongPlaybackListResponse {
