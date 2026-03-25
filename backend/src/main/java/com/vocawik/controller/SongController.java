@@ -279,6 +279,12 @@ public class SongController {
             @Parameter(description = "Preferred PV service to prioritize")
                     @RequestParam(name = "preferredPvService", required = false)
                     String preferredPvService,
+            @Parameter(description = "Cursor for the next playback page")
+                    @RequestParam(name = "cursor", required = false)
+                    String cursor,
+            @Parameter(description = "Playback page size")
+                    @RequestParam(name = "limit", required = false)
+                    Integer limit,
             @Parameter(description = "Sort (format: {property},{asc|desc})")
                     @RequestParam(name = "sort", required = false)
                     String sort) {
@@ -294,7 +300,9 @@ public class SongController {
                         publishedFrom,
                         publishedTo,
                         preferredPvService,
-                        sanitizeSort(parseRequestedSort(sort), query)));
+                        sanitizeSort(parseRequestedSort(sort), query),
+                        cursor,
+                        limit));
     }
 
     /** Suggests songs matching the current query. */

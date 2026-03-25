@@ -16,6 +16,7 @@ import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -69,6 +70,37 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
         return entityManager.createQuery(criteriaQuery).getResultList();
     }
 
+    @Override
+    public List<Song> searchPlaybackSlice(
+            SongCriteria criteria,
+            SongPlaybackCursorCriteria cursor,
+            Sort.Order sortOrder,
+            int limit) {
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Song> criteriaQuery = criteriaBuilder.createQuery(Song.class);
+        Root<Song> root = criteriaQuery.from(Song.class);
+        List<Predicate> predicates =
+                buildPredicates(criteria, criteriaQuery, root, criteriaBuilder);
+        Predicate cursorPredicate =
+                buildPlaybackCursorPredicate(
+                        criteria, criteriaQuery, cursor, sortOrder, criteriaBuilder, root);
+        if (cursorPredicate != null) {
+            predicates.add(cursorPredicate);
+        }
+        criteriaQuery.where(predicates.toArray(Predicate[]::new));
+        criteriaQuery.orderBy(
+                toPlaybackOrders(criteria, criteriaQuery, sortOrder, criteriaBuilder, root));
+
+        TypedQuery<Song> typedQuery = entityManager.createQuery(criteriaQuery);
+        typedQuery.setMaxResults(limit);
+        return typedQuery.getResultList();
+    }
+
+    @Override
+    public long count(SongCriteria criteria) {
+        return count(criteria, entityManager.getCriteriaBuilder());
+    }
+
     private long count(SongCriteria criteria, CriteriaBuilder criteriaBuilder) {
         CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
         Root<Song> countRoot = countQuery.from(Song.class);
@@ -119,6 +151,223 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
                     hasAnyVocalUuid(criteria.vocalUuids(), criteriaQuery, root, criteriaBuilder));
         }
         return predicates;
+    }
+
+    private Predicate buildPlaybackCursorPredicate(
+            SongCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            SongPlaybackCursorCriteria cursor,
+            Sort.Order sortOrder,
+            CriteriaBuilder criteriaBuilder,
+            Root<Song> root) {
+        if (cursor == null || sortOrder == null) {
+            return null;
+        }
+
+        Path<Long> idPath = root.get("id");
+        return switch (cursor.sortProperty()) {
+            case "resource.updatedAt", "resource.createdAt" -> {
+                Expression<LocalDateTime> path =
+                        root.get("resource")
+                                .get(
+                                        cursor.sortProperty().endsWith("updatedAt")
+                                                ? "updatedAt"
+                                                : "createdAt");
+                yield buildComparableCursorPredicate(
+                        path,
+                        cursor.dateTimeValue(),
+                        idPath,
+                        sortOrder.isAscending(),
+                        criteriaBuilder,
+                        cursor.songId());
+            }
+            case "publishedAt" -> {
+                Expression<LocalDateTime> path =
+                        normalizedPublishedAtExpression(
+                                root, criteriaBuilder, sortOrder.isAscending());
+                LocalDateTime cursorValue =
+                        normalizePublishedAtValue(cursor.dateTimeValue(), sortOrder.isAscending());
+                yield buildComparableCursorPredicate(
+                        path,
+                        cursorValue,
+                        idPath,
+                        sortOrder.isAscending(),
+                        criteriaBuilder,
+                        cursor.songId());
+            }
+            case "resource.viewCount" -> {
+                Expression<Long> path = root.get("resource").get("viewCount");
+                yield buildComparableCursorPredicate(
+                        path,
+                        cursor.longValue(),
+                        idPath,
+                        sortOrder.isAscending(),
+                        criteriaBuilder,
+                        cursor.songId());
+            }
+            case "resource.canonicalName" -> {
+                Expression<String> path = root.get("resource").get("canonicalName");
+                yield buildComparableCursorPredicate(
+                        path,
+                        cursor.stringValue(),
+                        idPath,
+                        sortOrder.isAscending(),
+                        criteriaBuilder,
+                        cursor.songId());
+            }
+            case "match" ->
+                    buildMatchPlaybackCursorPredicate(
+                            criteria, criteriaQuery, cursor, criteriaBuilder, root, idPath);
+            default ->
+                    throw new IllegalArgumentException(
+                            "Unsupported playback cursor sort property: " + cursor.sortProperty());
+        };
+    }
+
+    private <T extends Comparable<? super T>> Predicate buildComparableCursorPredicate(
+            Expression<T> sortPath,
+            T cursorValue,
+            Path<Long> idPath,
+            boolean ascending,
+            CriteriaBuilder criteriaBuilder,
+            Long cursorSongId) {
+        if (cursorValue == null || cursorSongId == null) {
+            return null;
+        }
+
+        Predicate valuePredicate =
+                ascending
+                        ? criteriaBuilder.greaterThan(sortPath, cursorValue)
+                        : criteriaBuilder.lessThan(sortPath, cursorValue);
+        Predicate tieBreakPredicate =
+                criteriaBuilder.and(
+                        criteriaBuilder.equal(sortPath, cursorValue),
+                        ascending
+                                ? criteriaBuilder.greaterThan(idPath, cursorSongId)
+                                : criteriaBuilder.lessThan(idPath, cursorSongId));
+        return criteriaBuilder.or(valuePredicate, tieBreakPredicate);
+    }
+
+    private List<Order> toPlaybackOrders(
+            SongCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            Sort.Order sortOrder,
+            CriteriaBuilder criteriaBuilder,
+            Root<Song> root) {
+        if ("match".equals(sortOrder.getProperty())) {
+            Expression<Integer> matchRank =
+                    buildMatchRank(criteria.query(), criteriaQuery, root, criteriaBuilder);
+            ArrayList<Order> orders = new ArrayList<>(6);
+            orders.add(criteriaBuilder.asc(matchRank));
+            orders.add(criteriaBuilder.asc(root.get("resource").get("canonicalName")));
+            orders.add(criteriaBuilder.asc(buildOriginalFirstExpression(criteriaBuilder, root)));
+            orders.add(criteriaBuilder.desc(root.get("resource").get("viewCount")));
+            orders.add(criteriaBuilder.desc(root.get("resource").get("updatedAt")));
+            orders.add(criteriaBuilder.asc(root.get("id")));
+            return orders;
+        }
+
+        Expression<?> sortExpression =
+                switch (sortOrder.getProperty()) {
+                    case "resource.updatedAt" -> root.get("resource").get("updatedAt");
+                    case "resource.createdAt" -> root.get("resource").get("createdAt");
+                    case "publishedAt" ->
+                            normalizedPublishedAtExpression(
+                                    root, criteriaBuilder, sortOrder.isAscending());
+                    case "resource.viewCount" -> root.get("resource").get("viewCount");
+                    case "resource.canonicalName" -> root.get("resource").get("canonicalName");
+                    default ->
+                            throw new IllegalArgumentException(
+                                    "Unsupported playback sort property: "
+                                            + sortOrder.getProperty());
+                };
+
+        ArrayList<Order> orders = new ArrayList<>(2);
+        orders.add(
+                sortOrder.isAscending()
+                        ? criteriaBuilder.asc(sortExpression)
+                        : criteriaBuilder.desc(sortExpression));
+        orders.add(
+                sortOrder.isAscending()
+                        ? criteriaBuilder.asc(root.get("id"))
+                        : criteriaBuilder.desc(root.get("id")));
+        return orders;
+    }
+
+    private Predicate buildMatchPlaybackCursorPredicate(
+            SongCriteria criteria,
+            CriteriaQuery<?> criteriaQuery,
+            SongPlaybackCursorCriteria cursor,
+            CriteriaBuilder criteriaBuilder,
+            Root<Song> root,
+            Path<Long> idPath) {
+        if (cursor.intValue() == null
+                || cursor.stringValue() == null
+                || cursor.secondaryIntValue() == null
+                || cursor.longValue() == null
+                || cursor.dateTimeValue() == null
+                || cursor.songId() == null) {
+            return null;
+        }
+
+        Expression<Integer> matchRank =
+                buildMatchRank(criteria.query(), criteriaQuery, root, criteriaBuilder);
+        Expression<String> canonicalName = root.get("resource").get("canonicalName");
+        Expression<Integer> originalRank = buildOriginalFirstExpression(criteriaBuilder, root);
+        Expression<Long> viewCount = root.get("resource").get("viewCount");
+        Expression<LocalDateTime> updatedAt = root.get("resource").get("updatedAt");
+
+        Predicate rankAfter = criteriaBuilder.greaterThan(matchRank, cursor.intValue());
+        Predicate nameAfter =
+                criteriaBuilder.and(
+                        criteriaBuilder.equal(matchRank, cursor.intValue()),
+                        criteriaBuilder.greaterThan(canonicalName, cursor.stringValue()));
+        Predicate originalAfter =
+                criteriaBuilder.and(
+                        criteriaBuilder.equal(matchRank, cursor.intValue()),
+                        criteriaBuilder.equal(canonicalName, cursor.stringValue()),
+                        criteriaBuilder.greaterThan(originalRank, cursor.secondaryIntValue()));
+        Predicate viewCountAfter =
+                criteriaBuilder.and(
+                        criteriaBuilder.equal(matchRank, cursor.intValue()),
+                        criteriaBuilder.equal(canonicalName, cursor.stringValue()),
+                        criteriaBuilder.equal(originalRank, cursor.secondaryIntValue()),
+                        criteriaBuilder.lessThan(viewCount, cursor.longValue()));
+        Predicate updatedAtAfter =
+                criteriaBuilder.and(
+                        criteriaBuilder.equal(matchRank, cursor.intValue()),
+                        criteriaBuilder.equal(canonicalName, cursor.stringValue()),
+                        criteriaBuilder.equal(originalRank, cursor.secondaryIntValue()),
+                        criteriaBuilder.equal(viewCount, cursor.longValue()),
+                        criteriaBuilder.lessThan(updatedAt, cursor.dateTimeValue()));
+        Predicate idAfter =
+                criteriaBuilder.and(
+                        criteriaBuilder.equal(matchRank, cursor.intValue()),
+                        criteriaBuilder.equal(canonicalName, cursor.stringValue()),
+                        criteriaBuilder.equal(originalRank, cursor.secondaryIntValue()),
+                        criteriaBuilder.equal(viewCount, cursor.longValue()),
+                        criteriaBuilder.equal(updatedAt, cursor.dateTimeValue()),
+                        criteriaBuilder.greaterThan(idPath, cursor.songId()));
+        return criteriaBuilder.or(
+                rankAfter, nameAfter, originalAfter, viewCountAfter, updatedAtAfter, idAfter);
+    }
+
+    private Expression<LocalDateTime> normalizedPublishedAtExpression(
+            Root<Song> root, CriteriaBuilder criteriaBuilder, boolean ascending) {
+        LocalDateTime sentinel =
+                ascending
+                        ? LocalDateTime.of(9999, 12, 31, 23, 59, 59)
+                        : LocalDateTime.MIN.plusYears(1000);
+        return criteriaBuilder.coalesce(root.get("publishedAt"), criteriaBuilder.literal(sentinel));
+    }
+
+    private LocalDateTime normalizePublishedAtValue(LocalDateTime value, boolean ascending) {
+        if (value != null) {
+            return value;
+        }
+        return ascending
+                ? LocalDateTime.of(9999, 12, 31, 23, 59, 59)
+                : LocalDateTime.MIN.plusYears(1000);
     }
 
     private Predicate hasAnyResourceNameLike(
@@ -247,15 +496,19 @@ public class SongCriteriaRepositoryImpl implements SongCriteriaRepository {
     }
 
     private Order buildOriginalFirstOrder(CriteriaBuilder criteriaBuilder, Root<Song> root) {
-        return criteriaBuilder.asc(
-                criteriaBuilder
-                        .selectCase()
-                        .when(criteriaBuilder.equal(root.get("songType"), SongType.ORIGINAL), 0)
-                        .otherwise(1));
+        return criteriaBuilder.asc(buildOriginalFirstExpression(criteriaBuilder, root));
     }
 
     private Order buildViewCountOrder(CriteriaBuilder criteriaBuilder, Root<Song> root) {
         return criteriaBuilder.desc(root.get("resource").get("viewCount"));
+    }
+
+    private Expression<Integer> buildOriginalFirstExpression(
+            CriteriaBuilder criteriaBuilder, Root<Song> root) {
+        return criteriaBuilder
+                .<Integer>selectCase()
+                .when(criteriaBuilder.equal(root.get("songType"), SongType.ORIGINAL), 0)
+                .otherwise(1);
     }
 
     private boolean isNameSort(Sort.Order order) {
