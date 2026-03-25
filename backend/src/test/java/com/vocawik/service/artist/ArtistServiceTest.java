@@ -144,11 +144,12 @@ class ArtistServiceTest {
         when(artistRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
                                                 && criteria.songUuids().isEmpty()
                                                 && criteria.groupArtistUuids().isEmpty()
-                                                && criteria.memberArtistUuids().isEmpty()),
+                                                && criteria.memberArtistUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(artist), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -172,11 +173,12 @@ class ArtistServiceTest {
         when(artistRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
                                                 && criteria.songUuids().isEmpty()
                                                 && criteria.groupArtistUuids().isEmpty()
-                                                && criteria.memberArtistUuids().isEmpty()),
+                                                && criteria.memberArtistUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(artist), PageRequest.of(0, 20), 1));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
@@ -196,11 +198,12 @@ class ArtistServiceTest {
         when(artistRepository.search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
                                                 && criteria.songUuids().isEmpty()
                                                 && criteria.groupArtistUuids().isEmpty()
-                                                && criteria.memberArtistUuids().isEmpty()),
+                                                && criteria.memberArtistUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -212,11 +215,12 @@ class ArtistServiceTest {
                 .search(
                         argThat(
                                 criteria ->
-                                        criteria.status() == null
+                                        criteria.status() == ResourceStatus.ACTIVE
                                                 && criteria.query() == null
                                                 && criteria.songUuids().isEmpty()
                                                 && criteria.groupArtistUuids().isEmpty()
-                                                && criteria.memberArtistUuids().isEmpty()),
+                                                && criteria.memberArtistUuids().isEmpty()
+                                                && !criteria.includeDeleted()),
                         eq(PageRequest.of(0, 20)));
         verifyNoInteractions(resourceNameRepository);
     }

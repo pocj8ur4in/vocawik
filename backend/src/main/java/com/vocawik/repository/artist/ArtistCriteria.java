@@ -12,13 +12,15 @@ import java.util.UUID;
  * @param songUuids optional song resource UUID filters
  * @param groupArtistUuids optional group artist resource UUID filters
  * @param memberArtistUuids optional member artist resource UUID filters
+ * @param includeDeleted whether soft-deleted rows should be included
  */
 public record ArtistCriteria(
         ResourceStatus status,
         String query,
         List<UUID> songUuids,
         List<UUID> groupArtistUuids,
-        List<UUID> memberArtistUuids) {
+        List<UUID> memberArtistUuids,
+        boolean includeDeleted) {
 
     public ArtistCriteria {
         songUuids = songUuids == null ? List.of() : List.copyOf(songUuids);
