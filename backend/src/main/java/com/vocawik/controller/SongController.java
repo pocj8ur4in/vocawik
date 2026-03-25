@@ -67,6 +67,7 @@ public class SongController {
                     "updatedAt", "resource.updatedAt",
                     "createdAt", "resource.createdAt",
                     "publishedAt", "publishedAt",
+                    "viewCount", "resource.viewCount",
                     "name", "resource.canonicalName",
                     "match", "match");
 
@@ -191,6 +192,8 @@ public class SongController {
                                     "createdAt,desc",
                                     "publishedAt,asc",
                                     "publishedAt,desc",
+                                    "viewCount,asc",
+                                    "viewCount,desc",
                                     "name,asc",
                                     "name,desc",
                                     "match,asc"
