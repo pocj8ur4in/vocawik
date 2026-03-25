@@ -221,26 +221,45 @@ public class SongService {
             return List.of();
         }
 
-        List<Long> songIds = songs.stream().map(Song::getId).distinct().toList();
+        List<Song> visibleSongs =
+                songs.stream()
+                        .filter(song -> isVisiblePlaybackResource(song.getResource()))
+                        .toList();
+        if (visibleSongs.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> songIds = visibleSongs.stream().map(Song::getId).distinct().toList();
         List<SongPv> pvs =
                 songPvRepository.findAllBySongIdInOrderBySongIdAscSortOrderAscIdAsc(songIds);
         List<SongArtist> artists =
                 songArtistRepository
                         .findAllWithArtistResourceBySongIdInOrderBySongIdAscSortOrderAscIdAsc(
                                 songIds);
+        artists =
+                artists.stream()
+                        .filter(
+                                artist ->
+                                        isVisiblePlaybackResource(artist.getArtist().getResource()))
+                        .toList();
         List<SongVocal> vocals =
                 songVocalRepository
                         .findAllWithVocalResourceBySongIdInOrderBySongIdAscSortOrderAscIdAsc(
                                 songIds);
+        vocals =
+                vocals.stream()
+                        .filter(vocal -> isVisiblePlaybackResource(vocal.getVocal().getResource()))
+                        .toList();
         Map<Long, String> localizedNamesByResourceId =
-                loadLocalizedNamesByResourceIds(collectPlaybackResourceIds(songs, artists, vocals));
+                loadLocalizedNamesByResourceIds(
+                        collectPlaybackResourceIds(visibleSongs, artists, vocals));
         Map<Long, List<SongPv>> pvsBySongId = groupPvsBySongId(pvs);
         Map<Long, List<SongArtist>> artistsBySongId = groupArtistsBySongId(artists);
         Map<Long, List<SongVocal>> vocalsBySongId = groupVocalsBySongId(vocals);
         SongPvProvider preferredProvider = normalizePreferredPvProvider(preferredPvService);
         boolean canViewManagedAudio = canViewManagedAudio();
 
-        return songs.stream()
+        return visibleSongs.stream()
                 .map(
                         song ->
                                 toPlaybackSummary(
@@ -252,6 +271,18 @@ public class SongService {
                                         preferredProvider,
                                         canViewManagedAudio))
                 .toList();
+    }
+
+    private boolean isVisiblePlaybackResource(Resource resource) {
+        if (resource == null) {
+            return false;
+        }
+        if (aclPermissionService.isCurrentAdmin()) {
+            return aclPermissionService.isAllowed(resource, AclAction.READ);
+        }
+        return !resource.isDeleted()
+                && ResourceStatus.ACTIVE.equals(resource.getStatus())
+                && aclPermissionService.isAllowed(resource, AclAction.READ);
     }
 
     @Transactional(readOnly = true)

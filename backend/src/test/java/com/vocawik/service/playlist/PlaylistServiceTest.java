@@ -52,6 +52,7 @@ class PlaylistServiceTest {
     private PlaylistRepository playlistRepository;
     private PlaylistSongRepository playlistSongRepository;
     private SongService songService;
+    private AclPermissionService aclPermissionService;
     private PlaylistService playlistService;
 
     @BeforeEach
@@ -61,6 +62,11 @@ class PlaylistServiceTest {
         playlistRepository = mock(PlaylistRepository.class);
         playlistSongRepository = mock(PlaylistSongRepository.class);
         songService = mock(SongService.class);
+        aclPermissionService = mock(AclPermissionService.class);
+        when(aclPermissionService.isAllowed(
+                        org.mockito.ArgumentMatchers.any(Resource.class),
+                        eq(com.vocawik.domain.acl.AclAction.READ)))
+                .thenReturn(true);
         playlistService =
                 new PlaylistService(
                         playlistRepository,
@@ -69,7 +75,7 @@ class PlaylistServiceTest {
                         resourceNameRepository,
                         mock(AclRepository.class),
                         mock(SongRepository.class),
-                        mock(AclPermissionService.class),
+                        aclPermissionService,
                         mock(ResourceHistoryService.class),
                         songService,
                         mock(EntityManager.class),
@@ -261,6 +267,10 @@ class PlaylistServiceTest {
         when(playlistSongRepository.findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(1L))
                 .thenReturn(List.of(playlistSong));
         when(playlistSong.getSong()).thenReturn(song);
+        Resource songResource = mock(Resource.class);
+        when(song.getResource()).thenReturn(songResource);
+        when(songResource.getStatus()).thenReturn(ResourceStatus.ACTIVE);
+        when(songResource.isDeleted()).thenReturn(false);
         when(playlistSong.getSortOrder()).thenReturn(7);
         when(songService.buildPlaybackItems(
                         argThat(items -> items.size() == 1 && items.getFirst() == song),
