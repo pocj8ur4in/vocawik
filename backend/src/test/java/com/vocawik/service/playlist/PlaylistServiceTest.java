@@ -17,7 +17,7 @@ import com.vocawik.domain.resource.Resource;
 import com.vocawik.domain.resource.ResourceName;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistListResponse;
-import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
+import com.vocawik.dto.playlist.PlaylistPlaybackListResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
 import com.vocawik.dto.song.SongPlaybackElementResponse;
@@ -264,7 +264,11 @@ class PlaylistServiceTest {
                                         0)));
 
         when(playlistRepository.findByResourceUuid(playlistUuid)).thenReturn(Optional.of(playlist));
-        when(playlistSongRepository.findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(1L))
+        when(playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+                        eq(1L),
+                        eq(null),
+                        eq(null),
+                        argThat(pageable -> pageable.getPageSize() >= 51)))
                 .thenReturn(List.of(playlistSong));
         when(playlistSong.getSong()).thenReturn(song);
         Resource songResource = mock(Resource.class);
@@ -280,16 +284,19 @@ class PlaylistServiceTest {
                         eq(List.of(1L))))
                 .thenReturn(List.of(koreanName));
 
-        PlaylistPlaybackResponse result = playlistService.getPlayback(playlistUuid, "YOUTUBE");
+        PlaylistPlaybackListResponse result =
+                playlistService.getPlayback(playlistUuid, "YOUTUBE", null, null);
 
         assertThat(result.resourceUuid()).isEqualTo(playlistUuid);
         assertThat(result.localizedName()).isEqualTo("미쿠 플레이리스트");
-        assertThat(result.songs()).hasSize(1);
-        assertThat(result.songs().getFirst().resourceUuid()).isEqualTo(songUuid);
-        assertThat(result.songs().getFirst().subtitle()).isEqualTo("supercell feat. Hatsune Miku");
-        assertThat(result.songs().getFirst().sortOrder()).isEqualTo(7);
-        assertThat(result.songs().getFirst().pvs()).hasSize(1);
-        assertThat(result.songs().getFirst().pvs().getFirst().service()).isEqualTo("YOUTUBE");
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().getFirst().resourceUuid()).isEqualTo(songUuid);
+        assertThat(result.items().getFirst().subtitle()).isEqualTo("supercell feat. Hatsune Miku");
+        assertThat(result.items().getFirst().sortOrder()).isEqualTo(7);
+        assertThat(result.items().getFirst().pvs()).hasSize(1);
+        assertThat(result.items().getFirst().pvs().getFirst().service()).isEqualTo("YOUTUBE");
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.nextCursor()).isNull();
     }
 
     @Test

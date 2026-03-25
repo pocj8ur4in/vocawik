@@ -17,7 +17,7 @@ import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistElementResponse;
 import com.vocawik.dto.playlist.PlaylistListResponse;
-import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
+import com.vocawik.dto.playlist.PlaylistPlaybackListResponse;
 import com.vocawik.dto.playlist.PlaylistSongElementResponse;
 import com.vocawik.dto.playlist.PlaylistSongListResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionElementResponse;
@@ -163,7 +163,8 @@ public class PlaylistService {
     }
 
     @Transactional(readOnly = true)
-    public PlaylistPlaybackResponse getPlayback(UUID resourceUuid, String preferredPvService) {
+    public PlaylistPlaybackListResponse getPlayback(
+            UUID resourceUuid, String preferredPvService, String cursor, Integer limit) {
         Playlist playlist =
                 playlistRepository
                         .findByResourceUuid(resourceUuid)
@@ -171,15 +172,16 @@ public class PlaylistService {
         Resource resource = playlist.getResource();
         assertVisiblePlaylistResource(resource);
 
-        List<PlaylistSong> playlistSongs =
-                playlistSongRepository.findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(
-                        playlist.getId());
-        playlistSongs =
-                playlistSongs.stream()
-                        .filter(
-                                playlistSong ->
-                                        isVisibleLinkedSong(playlistSong.getSong().getResource()))
-                        .toList();
+        PlaylistSongCursor decodedCursor = decodeCursor(cursor);
+        int pageSize = sanitizeSongPageSize(limit);
+        PlaylistSongSlice playlistSongSlice =
+                loadVisiblePlaylistSongs(
+                        playlist.getId(),
+                        decodedCursor == null ? null : decodedCursor.sortOrder(),
+                        decodedCursor == null ? null : decodedCursor.id(),
+                        pageSize);
+        boolean hasNext = playlistSongSlice.hasNext();
+        List<PlaylistSong> playlistSongs = playlistSongSlice.items();
         List<SongPlaybackElementResponse> playbackItems =
                 songService.buildPlaybackItems(
                         playlistSongs.stream().map(PlaylistSong::getSong).toList(),
@@ -187,12 +189,14 @@ public class PlaylistService {
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(List.of(resource.getId()));
 
-        return new PlaylistPlaybackResponse(
+        return new PlaylistPlaybackListResponse(
                 resource.getUuid(),
                 resource.getCanonicalName(),
                 localizedNamesByResourceId.get(resource.getId()),
                 resource.getThumbnailUrl(),
-                toPlaybackSongs(playlistSongs, playbackItems));
+                toPlaybackSongs(playlistSongs, playbackItems),
+                hasNext && !playlistSongs.isEmpty() ? encodeCursor(playlistSongs.getLast()) : null,
+                hasNext);
     }
 
     @Transactional(readOnly = true)
@@ -489,19 +493,19 @@ public class PlaylistService {
         }
     }
 
-    private List<PlaylistPlaybackResponse.PlaylistPlaybackSong> toPlaybackSongs(
+    private List<PlaylistPlaybackListResponse.PlaylistPlaybackSong> toPlaybackSongs(
             List<PlaylistSong> playlistSongs, List<SongPlaybackElementResponse> playbackItems) {
         if (playlistSongs.size() != playbackItems.size()) {
             throw new IllegalStateException("playlist songs and playback items size mismatch");
         }
 
-        List<PlaylistPlaybackResponse.PlaylistPlaybackSong> items =
+        List<PlaylistPlaybackListResponse.PlaylistPlaybackSong> items =
                 new ArrayList<>(playlistSongs.size());
         for (int index = 0; index < playlistSongs.size(); index++) {
             PlaylistSong playlistSong = playlistSongs.get(index);
             SongPlaybackElementResponse playbackItem = playbackItems.get(index);
             items.add(
-                    new PlaylistPlaybackResponse.PlaylistPlaybackSong(
+                    new PlaylistPlaybackListResponse.PlaylistPlaybackSong(
                             playbackItem.resourceUuid(),
                             playbackItem.canonicalName(),
                             playbackItem.localizedName(),
