@@ -10,6 +10,7 @@ import java.nio.channels.Channels;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** Stores imported song audio files in GCS. */
@@ -19,6 +20,7 @@ public class AudioObjectStorageService {
     private final AudioImportProperties properties;
     private final Storage storage;
 
+    @Autowired
     public AudioObjectStorageService(AudioImportProperties properties) {
         this(properties, StorageOptions.getDefaultInstance().getService());
     }
