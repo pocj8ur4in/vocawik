@@ -4,7 +4,7 @@ import com.vocawik.aop.RateLimit;
 import com.vocawik.domain.resource.ResourceStatus;
 import com.vocawik.dto.playlist.PlaylistCreateRequest;
 import com.vocawik.dto.playlist.PlaylistListResponse;
-import com.vocawik.dto.playlist.PlaylistPlaybackResponse;
+import com.vocawik.dto.playlist.PlaylistPlaybackListResponse;
 import com.vocawik.dto.playlist.PlaylistSongListResponse;
 import com.vocawik.dto.playlist.PlaylistSuggestionListResponse;
 import com.vocawik.dto.playlist.PlaylistUpdateRequest;
@@ -114,12 +114,19 @@ public class PlaylistController {
     @Operation(
             summary = "Get playlist playback",
             description = "Returns player-focused playlist payload with ordered song sources.")
-    public ResponseEntity<PlaylistPlaybackResponse> getPlaylistPlayback(
+    public ResponseEntity<PlaylistPlaybackListResponse> getPlaylistPlayback(
             @PathVariable UUID resourceUuid,
             @Parameter(description = "Preferred PV service to prioritize for each song")
                     @RequestParam(name = "preferredPvService", required = false)
-                    String preferredPvService) {
-        return ResponseEntity.ok(playlistService.getPlayback(resourceUuid, preferredPvService));
+                    String preferredPvService,
+            @Parameter(description = "Cursor returned from the previous playlist playback page")
+                    @RequestParam(name = "cursor", required = false)
+                    String cursor,
+            @Parameter(description = "Number of songs to return", example = "50")
+                    @RequestParam(name = "limit", required = false)
+                    Integer limit) {
+        return ResponseEntity.ok(
+                playlistService.getPlayback(resourceUuid, preferredPvService, cursor, limit));
     }
 
     /** Gets a cursor-paginated playlist song list. */
