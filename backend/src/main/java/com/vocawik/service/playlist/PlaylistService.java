@@ -169,11 +169,17 @@ public class PlaylistService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
-        aclPermissionService.assertCanRead(resource);
+        assertVisiblePlaylistResource(resource);
 
         List<PlaylistSong> playlistSongs =
                 playlistSongRepository.findAllWithSongResourceByPlaylistIdOrderBySortOrderAscIdAsc(
                         playlist.getId());
+        playlistSongs =
+                playlistSongs.stream()
+                        .filter(
+                                playlistSong ->
+                                        isVisibleLinkedSong(playlistSong.getSong().getResource()))
+                        .toList();
         List<SongPlaybackElementResponse> playbackItems =
                 songService.buildPlaybackItems(
                         playlistSongs.stream().map(PlaylistSong::getSong).toList(),
@@ -196,20 +202,18 @@ public class PlaylistService {
                         .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         Resource resource = playlist.getResource();
-        aclPermissionService.assertCanRead(resource);
+        assertVisiblePlaylistResource(resource);
 
         PlaylistSongCursor decodedCursor = decodeCursor(cursor);
         int pageSize = sanitizeSongPageSize(limit);
-        List<PlaylistSong> playlistSongs =
-                playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+        PlaylistSongSlice playlistSongSlice =
+                loadVisiblePlaylistSongs(
                         playlist.getId(),
                         decodedCursor == null ? null : decodedCursor.sortOrder(),
                         decodedCursor == null ? null : decodedCursor.id(),
-                        PageRequest.of(0, pageSize + 1));
-
-        boolean hasNext = playlistSongs.size() > pageSize;
-        List<PlaylistSong> visibleSongs =
-                hasNext ? playlistSongs.subList(0, pageSize) : playlistSongs;
+                        pageSize);
+        boolean hasNext = playlistSongSlice.hasNext();
+        List<PlaylistSong> visibleSongs = playlistSongSlice.items();
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(
                         visibleSongs.stream()
@@ -393,6 +397,64 @@ public class PlaylistService {
                 resource.getThumbnailUrl(),
                 song.getSongType().name(),
                 playlistSong.getSortOrder());
+    }
+
+    private PlaylistSongSlice loadVisiblePlaylistSongs(
+            Long playlistId, Integer cursorSortOrder, Long cursorId, int pageSize) {
+        ArrayList<PlaylistSong> visibleSongs = new ArrayList<>(pageSize + 1);
+        Integer nextSortOrder = cursorSortOrder;
+        Long nextCursorId = cursorId;
+        int fetchSize = Math.max(pageSize + 1, 100);
+
+        while (visibleSongs.size() < pageSize + 1) {
+            List<PlaylistSong> batch =
+                    playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+                            playlistId, nextSortOrder, nextCursorId, PageRequest.of(0, fetchSize));
+            if (batch.isEmpty()) {
+                break;
+            }
+
+            batch.stream()
+                    .filter(
+                            playlistSong ->
+                                    isVisibleLinkedSong(playlistSong.getSong().getResource()))
+                    .forEach(visibleSongs::add);
+
+            PlaylistSong last = batch.getLast();
+            nextSortOrder = last.getSortOrder();
+            nextCursorId = last.getId();
+
+            if (batch.size() < fetchSize) {
+                break;
+            }
+        }
+
+        boolean hasNext = visibleSongs.size() > pageSize;
+        List<PlaylistSong> items =
+                hasNext
+                        ? List.copyOf(visibleSongs.subList(0, pageSize))
+                        : List.copyOf(visibleSongs);
+        return new PlaylistSongSlice(items, hasNext);
+    }
+
+    private void assertVisiblePlaylistResource(Resource resource) {
+        if (!aclPermissionService.isCurrentAdmin()
+                && (resource.isDeleted() || resource.getStatus() != ResourceStatus.ACTIVE)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        aclPermissionService.assertCanRead(resource);
+    }
+
+    private boolean isVisibleLinkedSong(Resource resource) {
+        if (resource == null) {
+            return false;
+        }
+        if (aclPermissionService.isCurrentAdmin()) {
+            return aclPermissionService.isAllowed(resource, AclAction.READ);
+        }
+        return !resource.isDeleted()
+                && ResourceStatus.ACTIVE.equals(resource.getStatus())
+                && aclPermissionService.isAllowed(resource, AclAction.READ);
     }
 
     private int sanitizeSongPageSize(Integer limit) {
@@ -970,6 +1032,8 @@ public class PlaylistService {
             AclAction action, AclSubjectType subjectType, String subjectValue, int priority) {}
 
     private record PlaylistSongSortUpdate(PlaylistSong playlistSong, int targetSortOrder) {}
+
+    private record PlaylistSongSlice(List<PlaylistSong> items, boolean hasNext) {}
 
     private JsonNode buildHistorySnapshot(Playlist playlist, Resource resource) {
         ObjectNode data = objectMapper.createObjectNode();

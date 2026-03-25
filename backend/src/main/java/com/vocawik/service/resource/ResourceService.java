@@ -61,6 +61,7 @@ import com.vocawik.web.error.ErrorCode;
 import com.vocawik.web.exception.BusinessException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -245,8 +246,11 @@ public class ResourceService {
                 songRelationRepository.findAllBySourceSongIdOrderByIdAsc(song.getId());
         List<SongRelation> incomingRelations =
                 songRelationRepository.findAllByTargetSongIdOrderByIdAsc(song.getId());
+        outgoingRelations = filterVisibleOutgoingSongRelations(outgoingRelations);
+        incomingRelations = filterVisibleIncomingSongRelations(incomingRelations);
         List<PlaylistSong> playlists =
                 playlistSongRepository.findAllBySongIdOrderBySortOrderAscIdAsc(song.getId());
+        playlists = filterVisibleSongPlaylists(playlists);
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(
                         collectSongDetailResourceIds(
@@ -319,12 +323,16 @@ public class ResourceService {
         List<SongArtist> popularSongs =
                 songArtistRepository.findPopularByArtistId(
                         artist.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT));
+        recentSongs = filterVisibleArtistSongs(recentSongs);
+        popularSongs = filterVisibleArtistSongs(popularSongs);
         List<ArtistGroup> groups =
                 artistGroupRepository.findAllByGroupArtistIdOrderBySortOrderAscIdAsc(
                         artist.getId());
         List<ArtistGroup> members =
                 artistGroupRepository.findAllByMemberArtistIdOrderBySortOrderAscIdAsc(
                         artist.getId());
+        groups = filterVisibleArtistGroups(groups);
+        members = filterVisibleArtistMembers(members);
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(
                         collectArtistDetailResourceIds(
@@ -386,6 +394,8 @@ public class ResourceService {
         List<SongVocal> popularSongs =
                 songVocalRepository.findPopularByVocalId(
                         vocal.getId(), PageRequest.of(0, RELATED_SONG_SECTION_LIMIT));
+        recentSongs = filterVisibleVocalSongs(recentSongs);
+        popularSongs = filterVisibleVocalSongs(popularSongs);
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(
                         collectVocalDetailResourceIds(resource.getId(), recentSongs, popularSongs));
@@ -432,15 +442,11 @@ public class ResourceService {
         Resource resource = playlist.getResource();
         assertVisibleResource(resource);
         long songCount = playlistSongRepository.countByPlaylistId(playlist.getId());
-        List<PlaylistSong> songs =
-                playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
-                        playlist.getId(),
-                        null,
-                        null,
-                        PageRequest.of(0, PLAYLIST_DETAIL_INITIAL_SONG_LIMIT + 1));
-        boolean hasMoreSongs = songs.size() > PLAYLIST_DETAIL_INITIAL_SONG_LIMIT;
-        List<PlaylistSong> visibleSongs =
-                hasMoreSongs ? songs.subList(0, PLAYLIST_DETAIL_INITIAL_SONG_LIMIT) : songs;
+        PlaylistSongPage visibleSongPage =
+                loadVisiblePlaylistSongsPage(
+                        playlist.getId(), null, null, PLAYLIST_DETAIL_INITIAL_SONG_LIMIT);
+        boolean hasMoreSongs = visibleSongPage.hasMore();
+        List<PlaylistSong> visibleSongs = visibleSongPage.items();
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceIds(
                         collectPlaylistDetailResourceIds(resource.getId(), visibleSongs));
@@ -777,9 +783,92 @@ public class ResourceService {
                 .toList();
     }
 
+    private List<SongRelation> filterVisibleOutgoingSongRelations(List<SongRelation> relations) {
+        return relations.stream()
+                .filter(relation -> isVisibleLinkedResource(relation.getTargetSong().getResource()))
+                .toList();
+    }
+
+    private List<SongRelation> filterVisibleIncomingSongRelations(List<SongRelation> relations) {
+        return relations.stream()
+                .filter(relation -> isVisibleLinkedResource(relation.getSourceSong().getResource()))
+                .toList();
+    }
+
+    private List<PlaylistSong> filterVisibleSongPlaylists(List<PlaylistSong> playlists) {
+        return playlists.stream()
+                .filter(
+                        playlistSong ->
+                                isVisibleLinkedResource(playlistSong.getPlaylist().getResource()))
+                .toList();
+    }
+
+    private List<SongArtist> filterVisibleArtistSongs(List<SongArtist> songs) {
+        return songs.stream()
+                .filter(songArtist -> isVisibleLinkedResource(songArtist.getSong().getResource()))
+                .toList();
+    }
+
+    private List<ArtistGroup> filterVisibleArtistGroups(List<ArtistGroup> groups) {
+        return groups.stream()
+                .filter(group -> isVisibleLinkedResource(group.getMemberArtist().getResource()))
+                .toList();
+    }
+
+    private List<ArtistGroup> filterVisibleArtistMembers(List<ArtistGroup> members) {
+        return members.stream()
+                .filter(member -> isVisibleLinkedResource(member.getGroupArtist().getResource()))
+                .toList();
+    }
+
+    private List<SongVocal> filterVisibleVocalSongs(List<SongVocal> songs) {
+        return songs.stream()
+                .filter(songVocal -> isVisibleLinkedResource(songVocal.getSong().getResource()))
+                .toList();
+    }
+
+    private PlaylistSongPage loadVisiblePlaylistSongsPage(
+            Long playlistId, Integer cursorSortOrder, Long cursorId, int limit) {
+        ArrayList<PlaylistSong> visibleSongs = new ArrayList<>(limit + 1);
+        Integer nextSortOrder = cursorSortOrder;
+        Long nextCursorId = cursorId;
+        int fetchSize = Math.max(limit + 1, 100);
+
+        while (visibleSongs.size() < limit + 1) {
+            List<PlaylistSong> batch =
+                    playlistSongRepository.findPageWithSongResourceByPlaylistIdAfterCursor(
+                            playlistId, nextSortOrder, nextCursorId, PageRequest.of(0, fetchSize));
+            if (batch.isEmpty()) {
+                break;
+            }
+
+            batch.stream()
+                    .filter(
+                            playlistSong ->
+                                    isVisibleLinkedResource(playlistSong.getSong().getResource()))
+                    .forEach(visibleSongs::add);
+
+            PlaylistSong last = batch.getLast();
+            nextSortOrder = last.getSortOrder();
+            nextCursorId = last.getId();
+
+            if (batch.size() < fetchSize) {
+                break;
+            }
+        }
+
+        boolean hasMore = visibleSongs.size() > limit;
+        List<PlaylistSong> items =
+                hasMore ? List.copyOf(visibleSongs.subList(0, limit)) : List.copyOf(visibleSongs);
+        return new PlaylistSongPage(items, hasMore);
+    }
+
     private boolean isVisibleLinkedResource(Resource resource) {
         if (resource == null) {
             return false;
+        }
+        if (aclPermissionService.isCurrentAdmin()) {
+            return aclPermissionService.isAllowed(resource, AclAction.READ);
         }
         return !resource.isDeleted()
                 && ResourceStatus.ACTIVE.equals(resource.getStatus())
@@ -922,6 +1011,8 @@ public class ResourceService {
                 song.getSongType().name(),
                 playlistSong.getSortOrder());
     }
+
+    private record PlaylistSongPage(List<PlaylistSong> items, boolean hasMore) {}
 
     private String encodePlaylistSongCursor(PlaylistSong playlistSong) {
         String raw = playlistSong.getSortOrder() + ":" + playlistSong.getId();

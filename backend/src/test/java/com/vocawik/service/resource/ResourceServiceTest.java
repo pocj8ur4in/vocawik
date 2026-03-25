@@ -457,7 +457,7 @@ class ResourceServiceTest {
                         eq(1L),
                         eq(null),
                         eq(null),
-                        argThat(pageable -> pageable.getPageSize() == 51)))
+                        argThat(pageable -> pageable.getPageSize() == 100)))
                 .thenReturn(List.of(playlistSong(playlist, song, 0)));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
                         argThat(

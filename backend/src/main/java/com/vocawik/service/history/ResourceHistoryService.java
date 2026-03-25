@@ -253,6 +253,11 @@ public class ResourceHistoryService {
         ObjectNode resolved = snapshotData.deepCopy();
         filterSnapshotResourceArray(resolved, "artists", "artistResourceUuid");
         filterSnapshotResourceArray(resolved, "vocals", "vocalResourceUuid");
+        filterSnapshotResourceArray(resolved, "relations", "targetSongResourceUuid");
+        filterSnapshotResourceArray(resolved, "songs", "songResourceUuid");
+        filterSnapshotResourceArray(resolved, "members", "groupArtistResourceUuid");
+        filterSnapshotResourceArray(resolved, "groups", "memberArtistResourceUuid");
+        filterSnapshotResourceArray(resolved, "playlists", "playlistResourceUuid");
         return resolved;
     }
 
