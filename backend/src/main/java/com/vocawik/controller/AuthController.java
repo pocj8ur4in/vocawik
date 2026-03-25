@@ -245,13 +245,34 @@ public class AuthController {
                     "Receives OAuth callback query parameters and validates provider identifier.")
     public ResponseEntity<Void> callback(
             @PathVariable String provider,
-            @RequestParam String code,
+            @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
             @CookieValue(name = OAUTH_STATE_COOKIE, required = false) String cookieState,
             HttpServletResponse response) {
         if (!AuthProvider.GOOGLE.equals(parseProvider(provider))) {
             throw new ResponseStatusException(BAD_REQUEST, "Unsupported OAuth provider.");
         }
+
+        if (error != null && !error.isBlank()) {
+            clearOAuthStateCookie(response);
+            return ResponseEntity.status(302)
+                    .location(
+                            URI.create(
+                                    oAuthService.buildFrontendCallbackUrl(
+                                            "error", "oauth_callback_failed")))
+                    .build();
+        }
+
+        if (code == null || code.isBlank()) {
+            clearOAuthStateCookie(response);
+            return ResponseEntity.status(302)
+                    .location(
+                            URI.create(
+                                    oAuthService.buildFrontendCallbackUrl("error", "missing_code")))
+                    .build();
+        }
+
         if (!oAuthStateService.isValid(state, cookieState)) {
             clearOAuthStateCookie(response);
             return ResponseEntity.status(302)
