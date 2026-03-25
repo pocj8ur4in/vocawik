@@ -14,6 +14,7 @@ public class OAuthProperties {
     private final String tokenUri;
     private final String userInfoUri;
     private final String redirectUri;
+    private final String frontendCallbackUri;
 
     /**
      * Creates OAuth properties from configuration values.
@@ -24,6 +25,7 @@ public class OAuthProperties {
      * @param tokenUri google token endpoint
      * @param userInfoUri google userinfo endpoint
      * @param redirectUri oauth callback redirect uri
+     * @param frontendCallbackUri frontend oauth callback uri
      */
     public OAuthProperties(
             @Value("${oauth.google.client-id:}") String clientId,
@@ -33,12 +35,16 @@ public class OAuthProperties {
             @Value("${oauth.google.token-uri:https://oauth2.googleapis.com/token}") String tokenUri,
             @Value("${oauth.google.user-info-uri:https://openidconnect.googleapis.com/v1/userinfo}")
                     String userInfoUri,
-            @Value("${oauth.google.redirect-uri:}") String redirectUri) {
+            @Value("${oauth.google.redirect-uri:}") String redirectUri,
+            @Value(
+                            "${oauth.google.frontend-callback-uri:https://vocawik.vercel.app/oauth/callback/google}")
+                    String frontendCallbackUri) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.authUri = authUri;
         this.tokenUri = tokenUri;
         this.userInfoUri = userInfoUri;
         this.redirectUri = redirectUri;
+        this.frontendCallbackUri = frontendCallbackUri;
     }
 }

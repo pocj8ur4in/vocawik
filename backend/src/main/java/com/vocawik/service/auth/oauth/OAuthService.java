@@ -11,6 +11,7 @@ import com.vocawik.repository.user.UserAuthProviderRepository;
 import com.vocawik.repository.user.UserRepository;
 import com.vocawik.service.auth.AuthTokenBundle;
 import com.vocawik.service.auth.SessionService;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -126,5 +127,21 @@ public class OAuthService {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    public String buildFrontendCallbackUrl(String status, String error) {
+        String baseUrl = oAuthProperties.getFrontendCallbackUri();
+        String delimiter = baseUrl.contains("?") ? "&" : "?";
+        StringBuilder url =
+                new StringBuilder(baseUrl)
+                        .append(delimiter)
+                        .append("status=")
+                        .append(encode(status));
+
+        if (error != null && !error.isBlank()) {
+            url.append("&error=").append(encode(error));
+        }
+
+        return URI.create(url.toString()).toString();
     }
 }

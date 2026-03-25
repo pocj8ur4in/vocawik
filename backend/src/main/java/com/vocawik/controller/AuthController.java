@@ -3,7 +3,6 @@ package com.vocawik.controller;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CREATED;
 import static org.springframework.http.HttpStatus.NO_CONTENT;
-import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.vocawik.aop.RateLimit;
 import com.vocawik.common.auth.AuthProvider;
@@ -28,7 +27,6 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -208,14 +206,14 @@ public class AuthController {
      * Starts OAuth authorization for the given provider.
      *
      * @param provider provider path value (e.g. google)
-     * @return provider metadata and placeholder authorization URL
+     * @return redirect to provider authorization URL
      */
     @GetMapping("/oauth/authorizations/{provider}")
     @RateLimit(requests = 20, seconds = 60)
     @Operation(
             summary = "Start OAuth authorization",
-            description = "Builds authorization entry data for OAuth login flow.")
-    public ResponseEntity<Map<String, String>> authorize(
+            description = "Sets OAuth state cookie and redirects to provider authorization URL.")
+    public ResponseEntity<Void> authorize(
             @PathVariable String provider, HttpServletResponse response) {
         AuthProvider authProvider = parseProvider(provider);
 
@@ -226,12 +224,9 @@ public class AuthController {
         String state = oAuthStateService.generate();
         addOAuthStateCookie(response, state);
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "provider",
-                        authProvider.name(),
-                        "authorizeUrl",
-                        oAuthService.buildGoogleAuthorizeUrl(state)));
+        return ResponseEntity.status(302)
+                .location(URI.create(oAuthService.buildGoogleAuthorizeUrl(state)))
+                .build();
     }
 
     /**
@@ -248,7 +243,7 @@ public class AuthController {
             summary = "Handle OAuth callback",
             description =
                     "Receives OAuth callback query parameters and validates provider identifier.")
-    public ResponseEntity<SessionTokenResponse> callback(
+    public ResponseEntity<Void> callback(
             @PathVariable String provider,
             @RequestParam String code,
             @RequestParam(required = false) String state,
@@ -259,15 +254,30 @@ public class AuthController {
         }
         if (!oAuthStateService.isValid(state, cookieState)) {
             clearOAuthStateCookie(response);
-            throw new ResponseStatusException(UNAUTHORIZED, "Invalid OAuth state.");
+            return ResponseEntity.status(302)
+                    .location(
+                            URI.create(
+                                    oAuthService.buildFrontendCallbackUrl(
+                                            "error", "invalid_state")))
+                    .build();
         }
 
-        AuthTokenBundle tokenBundle = oAuthService.authenticateGoogle(code);
-        clearOAuthStateCookie(response);
-        addRefreshCookie(response, tokenBundle.refreshToken(), true);
-        return ResponseEntity.ok(
-                new SessionTokenResponse(
-                        tokenBundle.accessToken(), "Bearer", tokenBundle.expiresIn()));
+        try {
+            AuthTokenBundle tokenBundle = oAuthService.authenticateGoogle(code);
+            clearOAuthStateCookie(response);
+            addRefreshCookie(response, tokenBundle.refreshToken(), true);
+            return ResponseEntity.status(302)
+                    .location(URI.create(oAuthService.buildFrontendCallbackUrl("success", null)))
+                    .build();
+        } catch (RuntimeException ex) {
+            clearOAuthStateCookie(response);
+            return ResponseEntity.status(302)
+                    .location(
+                            URI.create(
+                                    oAuthService.buildFrontendCallbackUrl(
+                                            "error", "oauth_callback_failed")))
+                    .build();
+        }
     }
 
     private AuthProvider parseProvider(String provider) {
