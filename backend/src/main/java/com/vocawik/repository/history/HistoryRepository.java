@@ -49,4 +49,24 @@ public interface HistoryRepository extends JpaRepository<History, Long> {
             order by h.createdAt desc, h.id desc
             """)
     List<RecentChangeProjection> findRecentChanges(Pageable pageable);
+
+    /** Finds recent visible change rows for public clients in reverse creation order. */
+    @Query(
+            """
+            select
+                h.createdAt as createdAt,
+                r.id as resourceId,
+                r.uuid as resourceUuid,
+                r.canonicalName as canonicalName,
+                r.resourceType as resourceType,
+                h.actionType as actionType,
+                u.nickname as actorUserNickname
+            from History h
+            join h.resource r
+            left join h.actorUser u
+            where r.isDeleted = false
+              and r.status = com.vocawik.domain.resource.ResourceStatus.ACTIVE
+            order by h.createdAt desc, h.id desc
+            """)
+    List<RecentChangeProjection> findRecentVisibleChanges(Pageable pageable);
 }

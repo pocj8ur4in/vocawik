@@ -35,6 +35,7 @@ class ResourceHistoryServiceTest {
 
     private HistoryRepository historyRepository;
     private ResourceNameRepository resourceNameRepository;
+    private AclPermissionService aclPermissionService;
     private ResourceHistoryService resourceHistoryService;
 
     @BeforeEach
@@ -42,6 +43,8 @@ class ResourceHistoryServiceTest {
         LocaleContextHolder.resetLocaleContext();
         historyRepository = mock(HistoryRepository.class);
         resourceNameRepository = mock(ResourceNameRepository.class);
+        aclPermissionService = mock(AclPermissionService.class);
+        when(aclPermissionService.isCurrentAdmin()).thenReturn(false);
         resourceHistoryService =
                 new ResourceHistoryService(
                         historyRepository,
@@ -49,7 +52,7 @@ class ResourceHistoryServiceTest {
                         resourceNameRepository,
                         mock(UserRepository.class),
                         mock(GuestRepository.class),
-                        mock(AclPermissionService.class),
+                        aclPermissionService,
                         new ObjectMapper());
     }
 
@@ -71,7 +74,7 @@ class ResourceHistoryServiceTest {
                         ResourceType.VOCAL,
                         HistoryActionType.UPDATE);
         ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
-        when(historyRepository.findRecentChanges(eq(PageRequest.of(0, 5))))
+        when(historyRepository.findRecentVisibleChanges(eq(PageRequest.of(0, 5))))
                 .thenReturn(List.of(projection));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
                         eq(List.of(1L))))
@@ -98,7 +101,7 @@ class ResourceHistoryServiceTest {
                         ResourceType.VOCAL,
                         HistoryActionType.UPDATE);
         ResourceName japaneseName = localizedName(1L, "初音ミク", Language.JA);
-        when(historyRepository.findRecentChanges(eq(PageRequest.of(0, 5))))
+        when(historyRepository.findRecentVisibleChanges(eq(PageRequest.of(0, 5))))
                 .thenReturn(List.of(projection));
         when(resourceNameRepository.findAllByResourceIdInOrderByResourceIdAscSortOrderAscIdAsc(
                         eq(List.of(1L))))
@@ -121,7 +124,7 @@ class ResourceHistoryServiceTest {
                         "Hatsune Miku",
                         ResourceType.VOCAL,
                         HistoryActionType.UPDATE);
-        when(historyRepository.findRecentChanges(eq(PageRequest.of(0, 5))))
+        when(historyRepository.findRecentVisibleChanges(eq(PageRequest.of(0, 5))))
                 .thenReturn(List.of(projection));
 
         RecentChangeListResponse result = resourceHistoryService.listRecentChanges(5);
