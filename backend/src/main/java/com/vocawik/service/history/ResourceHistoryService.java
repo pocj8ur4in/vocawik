@@ -130,7 +130,10 @@ public class ResourceHistoryService {
     public RecentChangeListResponse listRecentChanges(int size) {
         int effectiveSize = Math.min(Math.max(size, 1), MAX_RECENT_CHANGES_SIZE);
         List<RecentChangeProjection> recentChanges =
-                historyRepository.findRecentChanges(PageRequest.of(0, effectiveSize));
+                aclPermissionService.isCurrentAdmin()
+                        ? historyRepository.findRecentChanges(PageRequest.of(0, effectiveSize))
+                        : historyRepository.findRecentVisibleChanges(
+                                PageRequest.of(0, effectiveSize));
         Map<Long, String> localizedNamesByResourceId =
                 loadLocalizedNamesByResourceId(recentChanges);
         List<RecentChangeElementResponse> items =
