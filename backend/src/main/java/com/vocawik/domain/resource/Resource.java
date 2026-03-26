@@ -70,6 +70,27 @@ public class Resource extends BaseEntity {
     }
 
     /**
+     * Updates resource publication status.
+     *
+     * @param status updated resource status
+     */
+    public void updateStatus(ResourceStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("status is required");
+        }
+        this.status = status;
+    }
+
+    /**
+     * Updates soft-delete flag.
+     *
+     * @param isDeleted updated deleted flag
+     */
+    public void updateDeleted(boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
+    /**
      * Updates canonical display name.
      *
      * @param canonicalName updated canonical name

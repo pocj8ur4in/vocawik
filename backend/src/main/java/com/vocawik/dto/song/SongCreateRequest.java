@@ -1,6 +1,7 @@
 package com.vocawik.dto.song;
 
 import com.vocawik.common.i18n.Language;
+import com.vocawik.domain.resource.ResourceStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -27,6 +28,8 @@ public record SongCreateRequest(
         @Valid List<SongArtistCreateRequest> artists,
         @Valid List<SongVocalCreateRequest> vocals,
         UUID relationsTargetSongResourceUuid,
+        ResourceStatus status,
+        Boolean isDeleted,
         String captchaToken) {
 
     /** Defensive copy for mutable request fields. */

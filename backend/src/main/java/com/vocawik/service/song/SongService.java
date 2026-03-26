@@ -655,6 +655,7 @@ public class SongService {
 
         Resource resource = resourceRepository.save(song.getResource());
         songRepository.save(song);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         saveResourceNames(resource, canonicalName, request.aliases());
         if (SecurityRoleUtils.isAdmin()) {
@@ -685,12 +686,13 @@ public class SongService {
     public UUID update(UUID resourceUuid, SongUpdateRequest request) {
         Song song =
                 songRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = song.getResource();
         aclPermissionService.assertCanEdit(resource);
         updateSongFields(song, resource, request);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         syncResourceNames(
                 resource,
@@ -796,6 +798,19 @@ public class SongService {
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
         song.update(content, publishedAt, songType);
+    }
+
+    private void applyAdminResourceState(
+            Resource resource, ResourceStatus status, Boolean isDeleted) {
+        if (!SecurityRoleUtils.isAdmin()) {
+            return;
+        }
+        if (status != null) {
+            resource.updateStatus(status);
+        }
+        if (isDeleted != null) {
+            resource.updateDeleted(isDeleted);
+        }
     }
 
     private List<ResourceName> syncResourceNames(

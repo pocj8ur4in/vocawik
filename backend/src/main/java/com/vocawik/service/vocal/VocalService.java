@@ -90,6 +90,7 @@ public class VocalService {
 
         Resource resource = resourceRepository.save(vocal.getResource());
         vocalRepository.save(vocal);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         saveResourceNames(resource, canonicalName, request.aliases());
         saveVocalLinks(vocal, request.links());
@@ -113,12 +114,13 @@ public class VocalService {
     public UUID update(UUID resourceUuid, VocalUpdateRequest request) {
         Vocal vocal =
                 vocalRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = vocal.getResource();
         aclPermissionService.assertCanEdit(resource);
         updateVocalFields(vocal, resource, request);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         syncResourceNames(
                 resource,
@@ -461,6 +463,19 @@ public class VocalService {
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
         vocal.update(content);
+    }
+
+    private void applyAdminResourceState(
+            Resource resource, ResourceStatus status, Boolean isDeleted) {
+        if (!SecurityRoleUtils.isAdmin()) {
+            return;
+        }
+        if (status != null) {
+            resource.updateStatus(status);
+        }
+        if (isDeleted != null) {
+            resource.updateDeleted(isDeleted);
+        }
     }
 
     private List<ResourceName> syncResourceNames(

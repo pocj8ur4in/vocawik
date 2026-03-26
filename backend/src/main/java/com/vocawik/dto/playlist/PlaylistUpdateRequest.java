@@ -1,6 +1,7 @@
 package com.vocawik.dto.playlist;
 
 import com.vocawik.common.i18n.Language;
+import com.vocawik.domain.resource.ResourceStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -19,6 +20,8 @@ public record PlaylistUpdateRequest(
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
         @Valid List<PlaylistSongUpdateRequest> songs,
+        ResourceStatus status,
+        Boolean isDeleted,
         String captchaToken) {
 
     /** Defensive copy for mutable request fields while preserving null semantics. */

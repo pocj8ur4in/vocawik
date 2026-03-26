@@ -40,6 +40,8 @@ class SongRequestValidationTest {
                         List.of(),
                         List.of(),
                         null,
+                        null,
+                        null,
                         null);
 
         assertThat(validator.validate(request))
@@ -67,6 +69,8 @@ class SongRequestValidationTest {
                                         null, null, 0)),
                         List.of(),
                         List.of(),
+                        null,
+                        null,
                         null,
                         null);
 

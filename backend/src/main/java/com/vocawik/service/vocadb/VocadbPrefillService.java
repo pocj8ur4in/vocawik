@@ -274,7 +274,7 @@ public class VocadbPrefillService {
                 """
                 SELECT r.uuid
                 FROM resources r
-                JOIN songs s ON s.resource_id = r.id
+                JOIN songs s ON s.id = r.id
                 JOIN song_links sl ON sl.song_id = s.id
                 WHERE sl.song_link_type = 'VOCADB'
                   AND substring(sl.url from '([0-9]+)$')::bigint = ?
@@ -289,7 +289,7 @@ public class VocadbPrefillService {
                 """
                 SELECT r.uuid
                 FROM resources r
-                JOIN artists a ON a.resource_id = r.id
+                JOIN artists a ON a.id = r.id
                 JOIN artist_links al ON al.artist_id = a.id
                 WHERE al.artist_link_type = 'VOCADB'
                   AND substring(al.url from '([0-9]+)$')::bigint = ?
@@ -304,7 +304,7 @@ public class VocadbPrefillService {
                 """
                 SELECT r.uuid
                 FROM resources r
-                JOIN vocals v ON v.resource_id = r.id
+                JOIN vocals v ON v.id = r.id
                 JOIN vocal_links vl ON vl.vocal_id = v.id
                 WHERE vl.vocal_link_type = 'VOCADB'
                   AND substring(vl.url from '([0-9]+)$')::bigint = ?
