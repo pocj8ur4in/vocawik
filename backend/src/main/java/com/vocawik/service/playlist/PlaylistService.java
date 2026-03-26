@@ -245,6 +245,7 @@ public class PlaylistService {
 
         Resource resource = resourceRepository.save(playlist.getResource());
         playlistRepository.save(playlist);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         saveResourceNames(resource, canonicalName, request.aliases());
         if (SecurityRoleUtils.isAdmin()) {
@@ -261,13 +262,14 @@ public class PlaylistService {
     public UUID update(UUID resourceUuid, PlaylistUpdateRequest request) {
         Playlist playlist =
                 playlistRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         assertMutable(playlist);
 
         Resource resource = playlist.getResource();
         aclPermissionService.assertCanEdit(resource);
         updatePlaylistFields(playlist, resource, request);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         syncResourceNames(
                 resource,
@@ -327,6 +329,19 @@ public class PlaylistService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void applyAdminResourceState(
+            Resource resource, ResourceStatus status, Boolean isDeleted) {
+        if (!SecurityRoleUtils.isAdmin()) {
+            return;
+        }
+        if (status != null) {
+            resource.updateStatus(status);
+        }
+        if (isDeleted != null) {
+            resource.updateDeleted(isDeleted);
+        }
     }
 
     private Map<Long, String> loadLocalizedNamesByResourceId(List<Playlist> playlists) {

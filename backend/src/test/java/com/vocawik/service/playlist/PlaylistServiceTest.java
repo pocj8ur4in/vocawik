@@ -305,8 +305,7 @@ class PlaylistServiceTest {
         UUID playlistUuid = UUID.randomUUID();
         Playlist playlist = playlist(1L, playlistUuid, "Managed Playlist");
         when(playlist.isSystemManaged()).thenReturn(true);
-        when(playlistRepository.findByResourceUuidAndResourceIsDeletedFalse(playlistUuid))
-                .thenReturn(Optional.of(playlist));
+        when(playlistRepository.findByResourceUuid(playlistUuid)).thenReturn(Optional.of(playlist));
 
         PlaylistUpdateRequest request =
                 new PlaylistUpdateRequest(
@@ -318,6 +317,8 @@ class PlaylistServiceTest {
                         List.of(),
                         List.of(),
                         List.of(),
+                        null,
+                        null,
                         null);
 
         assertThatThrownBy(() -> playlistService.update(playlistUuid, request))

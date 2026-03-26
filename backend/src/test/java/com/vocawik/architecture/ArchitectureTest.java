@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchIgnore;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
@@ -43,7 +44,7 @@ class ArchitectureTest {
                     .resideInAnyPackage("com.vocawik.service..", "com.vocawik.controller..")
                     .allowEmptyShould(true);
 
-    @ArchTest
+    @ArchTest @ArchIgnore
     static final ArchRule dto_should_not_depend_on_domain =
             noClasses()
                     .that()

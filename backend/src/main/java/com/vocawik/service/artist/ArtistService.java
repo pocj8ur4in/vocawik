@@ -96,6 +96,7 @@ public class ArtistService {
 
         Resource resource = resourceRepository.save(artist.getResource());
         artistRepository.saveAndFlush(artist);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         saveResourceNames(resource, canonicalName, request.aliases());
         saveArtistLinks(artist, request.links());
@@ -120,12 +121,13 @@ public class ArtistService {
     public UUID update(UUID resourceUuid, ArtistUpdateRequest request) {
         Artist artist =
                 artistRepository
-                        .findByResourceUuidAndResourceIsDeletedFalse(resourceUuid)
+                        .findByResourceUuid(resourceUuid)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
 
         Resource resource = artist.getResource();
         aclPermissionService.assertCanEdit(resource);
         updateArtistFields(artist, resource, request);
+        applyAdminResourceState(resource, request.status(), request.isDeleted());
 
         syncResourceNames(
                 resource,
@@ -305,6 +307,19 @@ public class ArtistService {
         resource.updateCanonicalName(canonicalName);
         resource.updateThumbnailUrl(thumbnailUrl);
         artist.update(content);
+    }
+
+    private void applyAdminResourceState(
+            Resource resource, ResourceStatus status, Boolean isDeleted) {
+        if (!SecurityRoleUtils.isAdmin()) {
+            return;
+        }
+        if (status != null) {
+            resource.updateStatus(status);
+        }
+        if (isDeleted != null) {
+            resource.updateDeleted(isDeleted);
+        }
     }
 
     private List<UUID> normalizeUuids(List<UUID> uuids) {
