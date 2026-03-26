@@ -248,7 +248,6 @@ public class SongController {
 
     /** Searches songs for player playback payloads. */
     @GetMapping("/songs/playback")
-    @RateLimit(requests = 60, seconds = 60)
     @Operation(
             summary = "Search songs for playback",
             description = "Returns player-focused song payloads with ordered PV sources.")
