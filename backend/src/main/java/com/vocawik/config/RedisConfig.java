@@ -30,6 +30,9 @@ public class RedisConfig {
     @Value("${spring.data.redis.port}")
     private int redisPort;
 
+    @Value("${spring.data.redis.password:}")
+    private String redisPassword;
+
     /**
      * Configures a {@link RedisTemplate} with String keys and JSON-serialized values.
      *
@@ -60,7 +63,9 @@ public class RedisConfig {
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient() {
         Config config = new Config();
-        config.useSingleServer().setAddress("redis://" + redisHost + ":" + redisPort);
+        config.useSingleServer()
+                .setAddress("redis://" + redisHost + ":" + redisPort)
+                .setPassword(redisPassword == null || redisPassword.isBlank() ? null : redisPassword);
         return Redisson.create(config);
     }
 }

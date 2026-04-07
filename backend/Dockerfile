@@ -7,11 +7,10 @@ COPY gradle gradle
 COPY build.gradle .
 COPY settings.gradle .
 COPY lombok.config .
+ENV GRADLE_OPTS="-Xmx512m -Dorg.gradle.jvmargs=-Xmx512m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
 RUN chmod +x gradlew
-RUN ./gradlew dependencies --no-daemon
-
 COPY src src
-RUN ./gradlew bootJar --no-daemon -x test
+RUN ./gradlew bootJar --no-daemon -x test -x spotlessApply -x spotlessJavaApply -x spotlessJava
 
 # Run
 FROM eclipse-temurin:21-jre
