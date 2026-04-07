@@ -1,5 +1,6 @@
 package com.vocawik.aop;
 
+import com.vocawik.security.internal.InternalApiAuthenticationFilter;
 import com.vocawik.security.ip.ClientIpResolver;
 import com.vocawik.security.jwt.AuthPrincipal;
 import com.vocawik.web.exception.TooManyRequestsException;
@@ -58,6 +59,9 @@ public class RateLimitAspect {
     @Around("@annotation(rateLimit)")
     public Object checkRateLimit(ProceedingJoinPoint joinPoint, RateLimit rateLimit)
             throws Throwable {
+        if (isInternalRequest()) {
+            return joinPoint.proceed();
+        }
 
         String key = buildRateLimitKey(joinPoint);
         RateLimitPolicy expectedPolicy =
@@ -73,6 +77,16 @@ public class RateLimitAspect {
         }
 
         return joinPoint.proceed();
+    }
+
+    private boolean isInternalRequest() {
+        ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            return false;
+        }
+        Object value = attrs.getRequest().getAttribute(InternalApiAuthenticationFilter.INTERNAL_REQUEST_ATTRIBUTE);
+        return Boolean.TRUE.equals(value);
     }
 
     /**
