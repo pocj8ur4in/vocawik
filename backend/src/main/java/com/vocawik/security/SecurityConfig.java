@@ -1,6 +1,7 @@
 package com.vocawik.security;
 
 import com.vocawik.security.guest.GuestAuthenticationFilter;
+import com.vocawik.security.internal.InternalApiAuthenticationFilter;
 import com.vocawik.security.ip.ClientIpHeaderFilter;
 import com.vocawik.security.jwt.JwtFilter;
 import java.util.List;
@@ -42,6 +43,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final InternalApiAuthenticationFilter internalApiAuthenticationFilter;
     private final GuestAuthenticationFilter guestAuthenticationFilter;
     private final RequestLocaleFilter requestLocaleFilter;
     private final ClientIpHeaderFilter clientIpHeaderFilter;
@@ -96,6 +98,8 @@ public class SecurityConfig {
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
+                .addFilterBefore(
+                        internalApiAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         guestAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
