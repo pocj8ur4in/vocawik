@@ -6,5 +6,10 @@ public enum SongArtistRole {
     ARRANGER,
     COMPOSER,
     LYRICIST,
+    INSTRUMENTALIST,
+    VOCALIST,
+    MASTERING,
+    MIXER,
+    VOICE_MANIPULATOR,
     OTHER
 }
