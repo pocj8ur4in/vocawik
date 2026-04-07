@@ -34,6 +34,7 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:}
 
   flyway:
     enabled: true
@@ -72,6 +73,9 @@ server:
       force: true
 
 security:
+  internal-api:
+    token: ${SECURITY_INTERNAL_API_TOKEN:}
+    user-id: ${SECURITY_INTERNAL_API_USER_ID:2}
   cookie:
     secure: ${SECURITY_COOKIE_SECURE:true}
     same-site: ${SECURITY_COOKIE_SAME_SITE:Lax}
