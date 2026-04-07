@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -19,7 +19,7 @@ public record SongUpdateRequest(
         String thumbnailUrl,
         String content,
         @Valid List<SongLinkUpdateRequest> links,
-        LocalDateTime publishedAt,
+        OffsetDateTime publishedAt,
         @NotBlank String songType,
         @Valid List<ResourceAliasUpdateRequest> aliases,
         @Valid List<ResourceAclUpdateRequest> acls,
@@ -67,7 +67,7 @@ public record SongUpdateRequest(
             String subjectValue,
             String effect,
             @Min(0) Integer priority,
-            LocalDateTime expiresAt) {}
+            OffsetDateTime expiresAt) {}
 
     /** Song lyric input. */
     public record SongLyricUpdateRequest(
@@ -92,7 +92,7 @@ public record SongUpdateRequest(
             String uploaderKey,
             @Min(0) Integer durationSeconds,
             boolean isOfficial,
-            LocalDateTime publishedAt,
+            OffsetDateTime publishedAt,
             @Valid SongPvExtraUpdateRequest extra,
             @Min(0) Integer sortOrder) {}
 
