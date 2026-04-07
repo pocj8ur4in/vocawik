@@ -278,7 +278,25 @@ CREATE TABLE song_links (
     content TEXT,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_song_links_song FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_song_links_song_link_type CHECK (song_link_type IN ('VOCADB', 'OTHER')),
+    CONSTRAINT chk_song_links_song_link_type CHECK (
+        song_link_type IN (
+            'VOCADB',
+            'OTHER',
+            'PIAPRO',
+            'SOUNDCLOUD',
+            'ATWIKI',
+            'PIXIV',
+            'NETEASE_MUSIC',
+            'X',
+            'SPOTIFY',
+            'APPLE_MUSIC',
+            'UTAITEDB',
+            'YOUTUBE',
+            'NICONICO',
+            'NICONICO_PEDIA',
+            'NICOMMONS'
+        )
+    ),
     CONSTRAINT chk_song_links_url_not_blank CHECK (BTRIM(url) <> '')
 );
 
@@ -407,7 +425,52 @@ CREATE TABLE artist_links (
     CONSTRAINT fk_artist_links_artist FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE RESTRICT,
     CONSTRAINT chk_artist_links_artist_link_type CHECK (
         artist_link_type IN (
-            'YOUTUBE', 'NICONICO', 'BILIBILI', 'PIAPRO', 'SOUNDCLOUD', 'VIMEO', 'BANDCAMP', 'VOCADB', 'OTHER'
+            'AMEBLO',
+            'APPLE_MUSIC',
+            'ATWIKI',
+            'BANDCAMP',
+            'BILIBILI',
+            'BLUESKY',
+            'BOWLROLL',
+            'DEVIANTART',
+            'DISCOGS',
+            'FACEBOOK',
+            'FANDOM',
+            'FC2_WIKI',
+            'GOOGLE_SITES',
+            'INSTAGRAM',
+            'KARENT',
+            'KOFI',
+            'LINKTREE',
+            'LITLINK',
+            'MIRAHEZE',
+            'MUSICBRAINZ',
+            'NETEASE_MUSIC',
+            'NICONICO',
+            'NICONICO_PEDIA',
+            'NOTE',
+            'OTHER',
+            'PIAPRO',
+            'PIXIV',
+            'SKEB',
+            'SOUNDCLOUD',
+            'SPOTIFY',
+            'TIKTOK',
+            'TOUHOUDB',
+            'TUMBLR',
+            'TUNECORE',
+            'TWITCH',
+            'TWPF',
+            'UTAITEDB',
+            'UTAU_WIKI',
+            'VGMDB',
+            'VIMEO',
+            'VOCADB',
+            'WEIBO',
+            'WIKIDOT',
+            'WIKIPEDIA',
+            'X',
+            'YOUTUBE'
         )
     ),
     CONSTRAINT chk_artist_links_url_not_blank CHECK (BTRIM(url) <> '')
@@ -446,7 +509,18 @@ CREATE TABLE song_artists (
     CONSTRAINT uk_song_artists_song_artist_role UNIQUE (song_id, artist_id, role),
     CONSTRAINT chk_song_artists_role_not_empty CHECK (cardinality(role) > 0),
     CONSTRAINT chk_song_artists_role CHECK (
-        role <@ ARRAY['PRODUCER', 'ARRANGER', 'COMPOSER', 'LYRICIST', 'OTHER']::TEXT[]
+        role <@ ARRAY[
+            'PRODUCER',
+            'ARRANGER',
+            'COMPOSER',
+            'LYRICIST',
+            'INSTRUMENTALIST',
+            'VOCALIST',
+            'MASTERING',
+            'MIXER',
+            'VOICE_MANIPULATOR',
+            'OTHER'
+        ]::TEXT[]
     ),
     CONSTRAINT chk_song_artists_sort_order CHECK (sort_order >= 0)
 );
@@ -470,7 +544,56 @@ CREATE TABLE vocal_links (
     content TEXT,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_vocal_links_vocal FOREIGN KEY (vocal_id) REFERENCES vocals (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_vocal_links_vocal_link_type CHECK (vocal_link_type IN ('VOCADB', 'OTHER')),
+    CONSTRAINT chk_vocal_links_vocal_link_type CHECK (
+        vocal_link_type IN (
+            'AMEBLO',
+            'APPLE_MUSIC',
+            'ATWIKI',
+            'BANDCAMP',
+            'BILIBILI',
+            'BLUESKY',
+            'BOWLROLL',
+            'DEVIANTART',
+            'DISCOGS',
+            'FACEBOOK',
+            'FANDOM',
+            'FC2_WIKI',
+            'GOOGLE_SITES',
+            'INSTAGRAM',
+            'KARENT',
+            'KOFI',
+            'LINKTREE',
+            'LITLINK',
+            'MIRAHEZE',
+            'MUSICBRAINZ',
+            'NETEASE_MUSIC',
+            'NICONICO',
+            'NICONICO_PEDIA',
+            'NOTE',
+            'OTHER',
+            'PIAPRO',
+            'PIXIV',
+            'SKEB',
+            'SOUNDCLOUD',
+            'SPOTIFY',
+            'TIKTOK',
+            'TOUHOUDB',
+            'TUMBLR',
+            'TUNECORE',
+            'TWITCH',
+            'TWPF',
+            'UTAITEDB',
+            'UTAU_WIKI',
+            'VGMDB',
+            'VIMEO',
+            'VOCADB',
+            'WEIBO',
+            'WIKIDOT',
+            'WIKIPEDIA',
+            'X',
+            'YOUTUBE'
+        )
+    ),
     CONSTRAINT chk_vocal_links_url_not_blank CHECK (BTRIM(url) <> '')
 );
 
