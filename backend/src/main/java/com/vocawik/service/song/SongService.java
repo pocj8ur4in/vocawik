@@ -69,6 +69,8 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -645,12 +647,13 @@ public class SongService {
     @Transactional
     public UUID create(SongCreateRequest request) {
         SongCreateRequest.CanonicalNameCreateRequest canonicalName = request.canonicalName();
+        LocalDateTime publishedAt = normalizeOffsetDateTime(request.publishedAt());
         Song song =
                 Song.create(
                         normalizeCanonicalName(canonicalName.name()),
                         normalizeNullable(request.thumbnailUrl()),
                         normalizeNullable(request.content()),
-                        request.publishedAt(),
+                        publishedAt,
                         parseSongType(request.songType()));
 
         Resource resource = resourceRepository.save(song.getResource());
@@ -758,6 +761,13 @@ public class SongService {
         return List.copyOf(normalizedSet);
     }
 
+    private LocalDateTime normalizeOffsetDateTime(OffsetDateTime value) {
+        if (value == null) {
+            return null;
+        }
+        return value.atZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+    }
+
     private String normalizeCanonicalName(String canonicalName) {
         if (canonicalName == null) {
             throw new IllegalArgumentException("canonicalName is required");
@@ -792,7 +802,7 @@ public class SongService {
         String canonicalName = normalizeCanonicalName(request.canonicalName().name());
         String thumbnailUrl = normalizeNullable(request.thumbnailUrl());
         String content = normalizeNullable(request.content());
-        LocalDateTime publishedAt = request.publishedAt();
+        LocalDateTime publishedAt = normalizeOffsetDateTime(request.publishedAt());
         SongType songType = parseSongType(request.songType());
 
         resource.updateCanonicalName(canonicalName);
@@ -939,10 +949,10 @@ public class SongService {
                                 subjectValue,
                                 effect,
                                 priority,
-                                item.expiresAt()));
+                                normalizeOffsetDateTime(item.expiresAt())));
                 continue;
             }
-            existing.updateRule(effect, item.expiresAt());
+            existing.updateRule(effect, normalizeOffsetDateTime(item.expiresAt()));
         }
 
         if (!existingByKey.isEmpty()) {
@@ -1107,6 +1117,7 @@ public class SongService {
             String title = normalizeNullable(item.title());
             String thumbnailUrl = normalizeNullable(item.thumbnailUrl());
             String uploaderKey = normalizeNullable(item.uploaderKey());
+            LocalDateTime publishedAt = normalizeOffsetDateTime(item.publishedAt());
             SongPvExtraValues extra = normalizeSongPvExtra(service, item.extra());
             int sortOrder = item.sortOrder() == null ? 0 : item.sortOrder();
 
@@ -1120,7 +1131,7 @@ public class SongService {
                         uploaderKey,
                         item.durationSeconds(),
                         item.isOfficial(),
-                        item.publishedAt(),
+                        publishedAt,
                         extra.audioUrl(),
                         extra.cid(),
                         extra.externalUrl(),
@@ -1140,7 +1151,7 @@ public class SongService {
                             uploaderKey,
                             item.durationSeconds(),
                             item.isOfficial(),
-                            item.publishedAt(),
+                            publishedAt,
                             extra.audioUrl(),
                             extra.cid(),
                             extra.externalUrl(),
@@ -1626,7 +1637,7 @@ public class SongService {
                                             normalizedSubjectValue,
                                             parseAclEffect(item.effect()),
                                             item.priority() == null ? 100 : item.priority(),
-                                            item.expiresAt());
+                                            normalizeOffsetDateTime(item.expiresAt()));
                                 })
                         .toList();
 
@@ -1709,6 +1720,8 @@ public class SongService {
                                     SongPvProvider service = parseSongPvProvider(item.service());
                                     SongPvExtraValues extra =
                                             normalizeSongPvExtra(service, item.extra());
+                                    LocalDateTime publishedAt =
+                                            normalizeOffsetDateTime(item.publishedAt());
                                     return SongPv.create(
                                             song,
                                             service,
@@ -1719,7 +1732,7 @@ public class SongService {
                                             normalizeNullable(item.uploaderKey()),
                                             item.durationSeconds(),
                                             item.isOfficial(),
-                                            item.publishedAt(),
+                                            publishedAt,
                                             extra.audioUrl(),
                                             extra.cid(),
                                             extra.externalUrl(),
