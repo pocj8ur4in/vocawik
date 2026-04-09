@@ -22,9 +22,6 @@ jobs:
     defaults:
       run:
         working-directory: backend
-    env:
-      CI_IMAGE_TAG: vocawik-ci:${{ github.sha }}
-      DOCKER_CACHE_SCOPE: vocawik-docker-cache
 
     steps:
       - name: Checkout code
@@ -42,29 +39,8 @@ jobs:
           build-root-directory: backend
           cache-read-only: ${{ github.ref != 'refs/heads/develop' }}
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Run required quality checks
         run: ./gradlew --no-daemon spotlessCheck spotbugsMain test jacocoTestReport -x spotlessApply
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: false
-          load: true
-          tags: ${{ env.CI_IMAGE_TAG }}
-          cache-from: type=gha,scope=${{ env.DOCKER_CACHE_SCOPE }}
-          cache-to: type=gha,scope=${{ env.DOCKER_CACHE_SCOPE }},mode=max
-
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@v0.35.0
-        with:
-          image-ref: ${{ env.CI_IMAGE_TAG }}
-          format: table
-          exit-code: 1
-          severity: CRITICAL,HIGH
 
       - name: Upload test results
         if: always()

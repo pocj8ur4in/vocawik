@@ -12,9 +12,6 @@ flags:
       - backend/
 
 ignore:
-  - "src/main/java/com/vocawik/MainApplication.java"
-  - "src/main/java/com/vocawik/config/**"
-  - "src/main/java/com/vocawik/dto/**"
   - "**/package-info.java"
 
 comment:
