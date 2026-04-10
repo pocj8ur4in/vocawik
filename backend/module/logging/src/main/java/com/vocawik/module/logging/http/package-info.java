@@ -1,2 +1,2 @@
-/** HTTP request logging and client IP resolution. */
+/** HTTP request logging. */
 package com.vocawik.module.logging.http;

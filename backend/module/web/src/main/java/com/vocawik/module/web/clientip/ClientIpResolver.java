@@ -1,6 +1,5 @@
-package com.vocawik.module.logging.http;
+package com.vocawik.module.web.clientip;
 
-import com.vocawik.module.logging.config.LoggingHttpProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -9,13 +8,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /** Resolves the effective client IP using trusted proxy CIDR validation. */
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "vocawik.logging.http", name = "enabled", havingValue = "true")
 public class ClientIpResolver {
 
     // Forwarding headers are trusted only when the direct peer matches a trusted proxy CIDR.
@@ -26,7 +23,12 @@ public class ClientIpResolver {
 
     private final List<CidrRange> trustedProxyRanges;
 
-    public ClientIpResolver(LoggingHttpProperties properties) {
+    /**
+     * Creates a resolver with trusted proxy CIDR configuration.
+     *
+     * @param properties client IP resolution properties
+     */
+    public ClientIpResolver(WebClientIpProperties properties) {
         this.trustedProxyRanges = parseTrustedProxyCidrs(properties.trustedProxyCidrs());
     }
 

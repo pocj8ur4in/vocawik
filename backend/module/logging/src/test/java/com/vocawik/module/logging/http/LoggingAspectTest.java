@@ -5,7 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.vocawik.module.logging.config.LoggingHttpProperties;
+import com.vocawik.module.web.clientip.ClientIpResolver;
+import com.vocawik.module.web.clientip.WebClientIpProperties;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -41,7 +42,7 @@ class LoggingAspectTest {
     void setUp() {
         ClientIpResolver clientIpResolver =
                 new ClientIpResolver(
-                        new LoggingHttpProperties(
+                        new WebClientIpProperties(
                                 "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128"));
         loggingAspect = new LoggingAspect(clientIpResolver);
         joinPoint = mock(ProceedingJoinPoint.class);

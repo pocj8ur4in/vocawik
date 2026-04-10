@@ -1,5 +1,6 @@
 package com.vocawik.module.logging.http;
 
+import com.vocawik.module.web.clientip.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;

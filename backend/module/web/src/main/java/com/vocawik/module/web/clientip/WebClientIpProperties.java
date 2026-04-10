@@ -1,12 +1,12 @@
-package com.vocawik.module.logging.config;
+package com.vocawik.module.web.clientip;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * Properties for HTTP logging.
+ * Properties for client IP resolution.
  *
  * @param trustedProxyCidrs comma-separated trusted proxy CIDR ranges
  */
-@ConfigurationProperties(prefix = "vocawik.logging.http")
-public record LoggingHttpProperties(@DefaultValue("") String trustedProxyCidrs) {}
+@ConfigurationProperties(prefix = "web.client-ip")
+public record WebClientIpProperties(@DefaultValue("") String trustedProxyCidrs) {}

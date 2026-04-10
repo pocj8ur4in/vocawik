@@ -1,18 +1,18 @@
-package com.vocawik.module.logging.http;
+package com.vocawik.module.web.clientip;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.vocawik.module.logging.config.LoggingHttpProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 class ClientIpResolverTest {
 
+    private static final String TRUSTED_PROXY_CIDRS =
+            "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128";
+
     private final ClientIpResolver clientIpResolver =
-            new ClientIpResolver(
-                    new LoggingHttpProperties(
-                            "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128"));
+            new ClientIpResolver(new WebClientIpProperties(TRUSTED_PROXY_CIDRS));
 
     @Test
     @DisplayName("Should use X-Forwarded-For header only for trusted proxy IP")
