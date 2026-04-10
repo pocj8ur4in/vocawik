@@ -1,3 +1,4 @@
 rootProject.name = 'vocawik-backend'
 
+include 'module:web'
 include 'module:logging'

@@ -1,0 +1,16 @@
+plugins {
+	id 'java-library'
+}
+
+dependencies {
+	api libs.jakarta.servlet.api
+
+	implementation libs.spring.boot
+	implementation libs.spring.context
+	implementation libs.slf4j.api
+	compileOnly libs.lombok
+	annotationProcessor libs.lombok
+
+	testImplementation libs.spring.boot.starter.test
+	testRuntimeOnly libs.junit.platform.launcher
+}
