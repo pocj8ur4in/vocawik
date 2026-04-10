@@ -53,6 +53,15 @@ configure(javaProjects) {
 		}
 	}
 
+	configurations {
+		compileOnly {
+			extendsFrom annotationProcessor
+		}
+		configureEach {
+			exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+		}
+	}
+
 	tasks.named('test') {
 		useJUnitPlatform()
 		finalizedBy jacocoTestReport

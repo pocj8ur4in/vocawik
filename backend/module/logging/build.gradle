@@ -1,0 +1,15 @@
+plugins {
+	id 'java-library'
+}
+
+dependencies {
+	api libs.spring.boot.starter.log4j2
+
+	implementation libs.spring.boot.starter.aop
+	implementation libs.spring.boot.starter.web
+	compileOnly libs.lombok
+	annotationProcessor libs.lombok
+
+	testImplementation libs.spring.boot.starter.test
+	testRuntimeOnly libs.junit.platform.launcher
+}
