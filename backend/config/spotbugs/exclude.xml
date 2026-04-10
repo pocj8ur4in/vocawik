@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- CSRF is intentionally disabled for the stateless REST API. -->
+    <Match>
+        <Class name="com.vocawik.module.security.http.SecurityHttpConfiguration" />
+        <Bug pattern="SPRING_CSRF_PROTECTION_DISABLED" />
+    </Match>
+
+    <!-- These collaborators are Spring-managed singletons, not mutable internal state. -->
+    <Match>
+        <Class name="com.vocawik.module.security.error.ApiAccessDeniedHandler" />
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+    <Match>
+        <Class name="com.vocawik.module.security.error.ApiAuthenticationEntryPoint" />
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+    <Match>
+        <Class name="com.vocawik.module.security.guest.GuestAuthenticationFilter" />
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+</FindBugsFilter>
