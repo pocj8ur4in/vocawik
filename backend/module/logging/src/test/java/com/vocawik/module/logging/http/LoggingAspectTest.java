@@ -7,14 +7,17 @@ import static org.mockito.Mockito.when;
 
 import com.vocawik.module.web.clientip.ClientIpResolver;
 import com.vocawik.module.web.clientip.WebClientIpProperties;
+import com.vocawik.module.web.request.RequestIdFilter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.config.Property;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -34,9 +37,12 @@ class LoggingAspectTest {
 
     private LoggingAspect loggingAspect;
     private ProceedingJoinPoint joinPoint;
-    private Logger loggingAspectLogger;
+    private LoggerContext loggerContext;
+    private Configuration loggerConfiguration;
+    private LoggerConfig loggerConfig;
     private TestLogAppender logAppender;
     private Level originalLoggerLevel;
+    private boolean createdLoggerConfig;
 
     @BeforeEach
     void setUp() {
@@ -46,20 +52,35 @@ class LoggingAspectTest {
                                 "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128"));
         loggingAspect = new LoggingAspect(clientIpResolver);
         joinPoint = mock(ProceedingJoinPoint.class);
-        loggingAspectLogger = (Logger) LogManager.getLogger(LoggingAspect.class);
-        originalLoggerLevel = loggingAspectLogger.getLevel();
-        loggingAspectLogger.setLevel(Level.INFO);
+        loggerContext = (LoggerContext) LogManager.getContext(false);
+        loggerConfiguration = loggerContext.getConfiguration();
         logAppender = new TestLogAppender();
         logAppender.start();
-        loggingAspectLogger.addAppender(logAppender);
+        loggerConfiguration.addAppender(logAppender);
+        loggerConfig = loggerConfiguration.getLoggerConfig(LoggingAspect.class.getName());
+        createdLoggerConfig = !LoggingAspect.class.getName().equals(loggerConfig.getName());
+        if (createdLoggerConfig) {
+            loggerConfig = new LoggerConfig(LoggingAspect.class.getName(), Level.INFO, false);
+            loggerConfiguration.addLogger(LoggingAspect.class.getName(), loggerConfig);
+        } else {
+            originalLoggerLevel = loggerConfig.getLevel();
+            loggerConfig.setLevel(Level.INFO);
+        }
+        loggerConfig.addAppender(logAppender, Level.INFO, null);
+        loggerContext.updateLoggers();
     }
 
     @AfterEach
     void tearDown() {
         RequestContextHolder.resetRequestAttributes();
         MDC.clear();
-        loggingAspectLogger.removeAppender(logAppender);
-        loggingAspectLogger.setLevel(originalLoggerLevel);
+        loggerConfig.removeAppender(logAppender.getName());
+        if (createdLoggerConfig) {
+            loggerConfiguration.removeLogger(LoggingAspect.class.getName());
+        } else {
+            loggerConfig.setLevel(originalLoggerLevel);
+        }
+        loggerContext.updateLoggers();
         logAppender.stop();
     }
 
@@ -116,8 +137,7 @@ class LoggingAspectTest {
     @Test
     @DisplayName("Should log and rethrow exception from controller")
     void logAround_exception_shouldRethrow() throws Throwable {
-        MockHttpServletRequest request = setServletRequest("GET", "/api/v1/fail");
-        request.addHeader("X-Request-Id", "request-123");
+        setServletRequest("GET", "/api/v1/fail");
         when(joinPoint.proceed()).thenThrow(new RuntimeException("test error"));
 
         assertThatThrownBy(() -> loggingAspect.logAround(joinPoint))
@@ -156,10 +176,10 @@ class LoggingAspectTest {
     }
 
     @Test
-    @DisplayName("Should use header request ID for log correlation when present")
-    void logAround_shouldUseHeaderRequestIdWhenPresent() throws Throwable {
-        MockHttpServletRequest request = setServletRequest("GET", "/api/v1/users");
-        request.addHeader("X-Request-Id", "request-abc");
+    @DisplayName("Should use MDC request ID for log correlation")
+    void logAround_withMdcRequestId_shouldIncludeRequestIdInLogs() throws Throwable {
+        MDC.put(RequestIdFilter.MDC_REQUEST_ID, "request-abc");
+        setServletRequest("GET", "/api/v1/users");
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = loggingAspect.logAround(joinPoint);
@@ -169,35 +189,21 @@ class LoggingAspectTest {
     }
 
     @Test
-    @DisplayName("Should generate request ID for log correlation when header is missing")
-    void logAround_shouldGenerateRequestIdWhenHeaderMissing() throws Throwable {
+    @DisplayName("Should keep existing MDC request ID")
+    void logAround_withExistingMdcRequestId_shouldKeepIt() throws Throwable {
+        MDC.put(RequestIdFilter.MDC_REQUEST_ID, "outer-request");
         setServletRequest("GET", "/api/v1/users");
         when(joinPoint.proceed()).thenReturn("result");
 
         Object result = loggingAspect.logAround(joinPoint);
 
         assertThat(result).isEqualTo("result");
-        assertThat(logAppender.requestIds()).hasSize(2).doesNotContainNull();
-        assertThat(logAppender.requestIds().getFirst()).isNotBlank();
+        assertThat(MDC.get(RequestIdFilter.MDC_REQUEST_ID)).isEqualTo("outer-request");
     }
 
     @Test
-    @DisplayName("Should restore previous MDC request ID")
-    void logAround_withExistingMdcRequestId_shouldRestoreIt() throws Throwable {
-        MDC.put("requestId", "outer-request");
-        MockHttpServletRequest request = setServletRequest("GET", "/api/v1/users");
-        request.addHeader("X-Request-Id", "request-abc");
-        when(joinPoint.proceed()).thenReturn("result");
-
-        Object result = loggingAspect.logAround(joinPoint);
-
-        assertThat(result).isEqualTo("result");
-        assertThat(MDC.get("requestId")).isEqualTo("outer-request");
-    }
-
-    @Test
-    @DisplayName("Should mask sensitive request headers")
-    void logAround_withSensitiveHeaders_shouldMaskHeaderValues() throws Throwable {
+    @DisplayName("Should log request headers without masking")
+    void logAround_withRequestHeaders_shouldLogHeaderValues() throws Throwable {
         MockHttpServletRequest request = setServletRequest("GET", "/api/v1/users");
         request.addHeader("Authorization", "Bearer secret-token");
         request.addHeader("Cookie", "refresh_token=secret");
@@ -210,14 +216,9 @@ class LoggingAspectTest {
         assertThat(logAppender.messages())
                 .anyMatch(
                         message ->
-                                message.contains("Authorization=[masked]")
-                                        && message.contains("Cookie=[masked]")
+                                message.contains("Authorization=Bearer secret-token")
+                                        && message.contains("Cookie=refresh_token=secret")
                                         && message.contains("User-Agent=test-agent"));
-        assertThat(logAppender.messages())
-                .noneMatch(
-                        message ->
-                                message.contains("secret-token")
-                                        || message.contains("refresh_token=secret"));
     }
 
     private MockHttpServletRequest setServletRequest(String method, String uri) {
@@ -262,7 +263,9 @@ class LoggingAspectTest {
                     .map(
                             logEvent ->
                                     Objects.toString(
-                                            logEvent.getContextData().getValue("requestId"), null))
+                                            logEvent.getContextData()
+                                                    .getValue(RequestIdFilter.MDC_REQUEST_ID),
+                                            null))
                     .toList();
         }
     }

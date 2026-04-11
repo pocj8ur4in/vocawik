@@ -7,16 +7,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
-import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -30,19 +26,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 @ConditionalOnProperty(prefix = "logging.http", name = "enabled", havingValue = "true")
 public class LoggingAspect {
-
-    // Request correlation and header masking constants used in structured request logs.
-    private static final String REQUEST_ID_HEADER = "X-Request-Id";
-    private static final String MDC_REQUEST_ID = "requestId";
-    private static final String MASKED_HEADER_VALUE = "[masked]";
-    private static final Set<String> SENSITIVE_HEADERS =
-            Set.of(
-                    "authorization",
-                    "cookie",
-                    "proxy-authorization",
-                    "set-cookie",
-                    "x-api-key",
-                    "x-auth-token");
 
     private final ClientIpResolver clientIpResolver;
 
@@ -77,15 +60,11 @@ public class LoggingAspect {
 
         HttpServletRequest request = attrs.getRequest();
         HttpServletResponse response = attrs.getResponse();
-        String requestId = resolveRequestId(request);
         String method = request.getMethod();
         String fullUri = resolveFullUri(request);
         String clientIp = clientIpResolver.resolve(request);
         String headers = collectHeaders(request);
-        String previousRequestId = MDC.get(MDC_REQUEST_ID);
 
-        // Restore the previous value after execution to avoid leaking request IDs into async work.
-        MDC.put(MDC_REQUEST_ID, requestId);
         logger.info(">>> {} {} | IP: {} | Headers: {}", method, fullUri, clientIp, headers);
 
         long start = System.nanoTime();
@@ -107,23 +86,7 @@ public class LoggingAspect {
                     elapsed,
                     ex);
             throw ex;
-        } finally {
-            restoreRequestId(previousRequestId);
         }
-    }
-
-    /**
-     * Resolves the request ID used for log correlation.
-     *
-     * @param request HTTP request
-     * @return trimmed {@code X-Request-Id} header value, or a generated UUID when absent
-     */
-    private String resolveRequestId(HttpServletRequest request) {
-        String requestId = request.getHeader(REQUEST_ID_HEADER);
-        if (requestId == null || requestId.isBlank()) {
-            return UUID.randomUUID().toString();
-        }
-        return requestId.trim();
     }
 
     /**
@@ -142,7 +105,7 @@ public class LoggingAspect {
      * Collects request headers into a single log-friendly string.
      *
      * @param request HTTP request
-     * @return formatted header map, with sensitive values masked
+     * @return formatted header map
      */
     private String collectHeaders(HttpServletRequest request) {
         List<String> values = new ArrayList<>();
@@ -158,16 +121,13 @@ public class LoggingAspect {
     }
 
     /**
-     * Formats one header value for logging, masking sensitive headers.
+     * Formats one header value for logging.
      *
      * @param name header name
      * @param request HTTP request
-     * @return masked value for sensitive headers, or comma-joined header values
+     * @return comma-joined header values
      */
     private String formatHeaderValue(String name, HttpServletRequest request) {
-        if (SENSITIVE_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
-            return MASKED_HEADER_VALUE;
-        }
         List<String> headerValues = Collections.list(request.getHeaders(name));
         return String.join(",", headerValues);
     }
@@ -187,18 +147,5 @@ public class LoggingAspect {
             return response.getStatus();
         }
         return HttpServletResponse.SC_OK;
-    }
-
-    /**
-     * Restores the MDC request ID that was present before this aspect ran.
-     *
-     * @param previousRequestId previous MDC request ID, or null when none existed
-     */
-    private void restoreRequestId(String previousRequestId) {
-        if (previousRequestId == null) {
-            MDC.remove(MDC_REQUEST_ID);
-            return;
-        }
-        MDC.put(MDC_REQUEST_ID, previousRequestId);
     }
 }
