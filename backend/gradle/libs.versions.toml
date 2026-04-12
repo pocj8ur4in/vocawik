@@ -18,6 +18,7 @@ spring-boot-starter-log4j2 = { module = "org.springframework.boot:spring-boot-st
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-context = { module = "org.springframework:spring-context" }
+spring-webmvc = { module = "org.springframework:spring-webmvc" }
 
 [plugins]
 dependency-management = { id = "io.spring.dependency-management", version.ref = "dependency-management" }
