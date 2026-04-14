@@ -1,5 +1,6 @@
 package com.vocawik.module.web.locale;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -12,14 +13,27 @@ import org.springframework.core.Ordered;
 public class WebLocaleConfiguration {
 
     /**
-     * Creates the request locale filter used for HTTP locale context propagation.
+     * Creates the default request locale resolver backed by the Accept-Language header.
      *
      * @param properties locale resolution properties
+     * @return request locale resolver
+     */
+    @Bean
+    @ConditionalOnMissingBean(RequestLocaleResolver.class)
+    public RequestLocaleResolver requestLocaleResolver(WebLocaleProperties properties) {
+        return new AcceptLanguageRequestLocaleResolver(
+                properties.defaultLocale(), properties.supported());
+    }
+
+    /**
+     * Creates the request locale filter used for HTTP locale context propagation.
+     *
+     * @param requestLocaleResolver request locale resolver
      * @return request locale filter
      */
     @Bean
-    public RequestLocaleFilter requestLocaleFilter(WebLocaleProperties properties) {
-        return new RequestLocaleFilter(properties);
+    public RequestLocaleFilter requestLocaleFilter(RequestLocaleResolver requestLocaleResolver) {
+        return new RequestLocaleFilter(requestLocaleResolver);
     }
 
     /**

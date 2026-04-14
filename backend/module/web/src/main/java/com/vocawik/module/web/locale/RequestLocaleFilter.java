@@ -8,37 +8,24 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
 
-/** Servlet filter that resolves request locale from HTTP headers. */
+/** Servlet filter that propagates the resolved request locale. */
 public class RequestLocaleFilter implements Filter {
 
-    private final Locale defaultLocale;
-    private final List<Locale> supportedLocales;
-
-    /**
-     * Creates a request locale filter from web locale properties.
-     *
-     * @param properties locale resolution properties
-     */
-    public RequestLocaleFilter(WebLocaleProperties properties) {
-        this(properties.defaultLocale(), properties.supported());
-    }
+    private final RequestLocaleResolver localeResolver;
 
     /**
      * Creates a request locale filter.
      *
-     * @param defaultLocale locale used when no supported request locale is found
-     * @param supportedLocales supported locales
+     * @param localeResolver resolver used to select the request locale
      */
-    public RequestLocaleFilter(Locale defaultLocale, List<Locale> supportedLocales) {
-        this.defaultLocale = Objects.requireNonNull(defaultLocale);
-        this.supportedLocales = List.copyOf(Objects.requireNonNull(supportedLocales));
+    public RequestLocaleFilter(RequestLocaleResolver localeResolver) {
+        this.localeResolver = Objects.requireNonNull(localeResolver);
     }
 
     /**
@@ -60,7 +47,7 @@ public class RequestLocaleFilter implements Filter {
         }
 
         LocaleContext previousLocaleContext = LocaleContextHolder.getLocaleContext();
-        Locale locale = resolveLocale(httpRequest);
+        Locale locale = localeResolver.resolve(httpRequest);
 
         LocaleContextHolder.setLocale(locale);
         httpResponse.setHeader(HttpHeaders.CONTENT_LANGUAGE, locale.toLanguageTag());
@@ -69,27 +56,6 @@ public class RequestLocaleFilter implements Filter {
             chain.doFilter(request, response);
         } finally {
             LocaleContextHolder.setLocaleContext(previousLocaleContext);
-        }
-    }
-
-    /**
-     * Resolves the request locale from Accept-Language or falls back to the default locale.
-     *
-     * @param request HTTP request
-     * @return resolved locale
-     */
-    private Locale resolveLocale(HttpServletRequest request) {
-        String headerValue = request.getHeader(HttpHeaders.ACCEPT_LANGUAGE);
-        if (headerValue == null || headerValue.isBlank()) {
-            return defaultLocale;
-        }
-
-        try {
-            List<Locale.LanguageRange> ranges = Locale.LanguageRange.parse(headerValue);
-            Locale matched = Locale.lookup(ranges, supportedLocales);
-            return matched == null ? defaultLocale : matched;
-        } catch (IllegalArgumentException ignored) {
-            return defaultLocale;
         }
     }
 }

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.core.Ordered;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 class WebLocaleConfigurationTest {
 
@@ -20,6 +21,7 @@ class WebLocaleConfigurationTest {
         contextRunner.run(
                 context -> {
                     assertThat(context).hasSingleBean(WebLocaleProperties.class);
+                    assertThat(context).hasSingleBean(RequestLocaleResolver.class);
                     assertThat(context).hasSingleBean(RequestLocaleFilter.class);
                     assertThat(context).hasSingleBean(FilterRegistrationBean.class);
                     assertThat(context.getBean(FilterRegistrationBean.class).getOrder())
@@ -47,5 +49,20 @@ class WebLocaleConfigurationTest {
                             assertThat(properties.supported())
                                     .containsExactly(Locale.JAPANESE, Locale.ENGLISH);
                         });
+    }
+
+    @Test
+    @DisplayName("Should use custom request locale resolver")
+    void requestLocaleResolver_withCustomBean_shouldUseCustomBean() {
+        contextRunner
+                .withBean(RequestLocaleResolver.class, () -> request -> Locale.JAPANESE)
+                .run(
+                        context ->
+                                assertThat(
+                                                context.getBean(RequestLocaleResolver.class)
+                                                        .resolve(
+                                                                new MockHttpServletRequest(
+                                                                        "GET", "/api/v1/users")))
+                                        .isEqualTo(Locale.JAPANESE));
     }
 }
