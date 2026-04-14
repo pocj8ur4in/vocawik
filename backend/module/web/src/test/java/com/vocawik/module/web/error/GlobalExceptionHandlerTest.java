@@ -1,8 +1,11 @@
 package com.vocawik.module.web.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.LIST;
 import static org.mockito.Mockito.mock;
 
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -10,6 +13,9 @@ import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,17 +25,50 @@ class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
+    @DisplayName("Should handle validation exception with field details")
+    @SuppressWarnings("null")
+    void handleValidationException_shouldReturnFieldDetails() {
+        BeanPropertyBindingResult bindingResult =
+                new BeanPropertyBindingResult(new Object(), "request");
+        bindingResult.addError(new FieldError("request", "email", "must not be blank"));
+
+        ResponseEntity<ErrorResponse> response =
+                handler.handleValidationException(
+                        new MethodArgumentNotValidException(
+                                mock(MethodParameter.class), bindingResult));
+        ErrorResponse body = assertThat(response.getBody()).isNotNull().actual();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(body.status()).isEqualTo("BAD_REQUEST");
+        assertThat(body.message()).isEqualTo("Invalid request.");
+        assertThat(body.details().get(1)).containsKey("fieldViolations");
+        assertThat(body.details().get(1).get("fieldViolations"))
+                .asInstanceOf(LIST)
+                .singleElement()
+                .satisfies(
+                        field -> {
+                            Map<?, ?> fieldDetail = (Map<?, ?>) field;
+                            assertThat(fieldDetail.get("field")).isEqualTo("email");
+                            assertThat(fieldDetail.get("message")).isEqualTo("must not be blank");
+                        });
+    }
+
+    @Test
     @DisplayName("Should handle business exception with error code")
     void handleBusinessException_shouldUseErrorCode() {
         ResponseEntity<ErrorResponse> response =
                 handler.handleBusinessException(
-                        new BusinessException(ErrorCode.FORBIDDEN, "No access."));
+                        new BusinessException(
+                                ErrorCode.FORBIDDEN,
+                                "No access.",
+                                List.of(Map.of("requiredRole", "ADMIN"))));
         ErrorResponse body = assertThat(response.getBody()).isNotNull().actual();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(body.code()).isEqualTo(403);
         assertThat(body.status()).isEqualTo("FORBIDDEN");
         assertThat(body.message()).isEqualTo("No access.");
+        assertThat(body.details().get(1)).containsEntry("requiredRole", "ADMIN");
     }
 
     @Test
@@ -71,6 +110,10 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(body.status()).isEqualTo("BAD_REQUEST");
         assertThat(body.message()).isEqualTo("page parameter is required.");
+        Map<?, ?> violation =
+                (Map<?, ?>) ((List<?>) body.details().get(1).get("fieldViolations")).get(0);
+        assertThat(violation.get("field")).isEqualTo("page");
+        assertThat(violation.get("parameterType")).isEqualTo("Integer");
     }
 
     @Test
@@ -86,19 +129,10 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(body.status()).isEqualTo("BAD_REQUEST");
         assertThat(body.message()).isEqualTo("page has an invalid value.");
-    }
-
-    @Test
-    @DisplayName("Should handle response status exception")
-    void handleResponseStatusException_shouldUseDeclaredStatus() {
-        ResponseEntity<ErrorResponse> response =
-                handler.handleResponseStatusException(
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Missing."));
-        ErrorResponse body = assertThat(response.getBody()).isNotNull().actual();
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(body.status()).isEqualTo("NOT_FOUND");
-        assertThat(body.message()).isEqualTo("Missing.");
+        Map<?, ?> violation =
+                (Map<?, ?>) ((List<?>) body.details().get(1).get("fieldViolations")).get(0);
+        assertThat(violation.get("field")).isEqualTo("page");
+        assertThat(violation.get("expectedType")).isEqualTo("Integer");
     }
 
     @Test
@@ -106,6 +140,20 @@ class GlobalExceptionHandlerTest {
     void handleException_shouldReturnInternalError() {
         ResponseEntity<ErrorResponse> response =
                 handler.handleException(new RuntimeException("Boom."));
+        ErrorResponse body = assertThat(response.getBody()).isNotNull().actual();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(body.status()).isEqualTo("INTERNAL_ERROR");
+        assertThat(body.message()).isEqualTo("An unexpected error occurred.");
+    }
+
+    @Test
+    @DisplayName("Should hide response status exception reason")
+    void handleException_withResponseStatusException_shouldHideReason() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleException(
+                        new ResponseStatusException(
+                                HttpStatus.INTERNAL_SERVER_ERROR, "Database connection details."));
         ErrorResponse body = assertThat(response.getBody()).isNotNull().actual();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);

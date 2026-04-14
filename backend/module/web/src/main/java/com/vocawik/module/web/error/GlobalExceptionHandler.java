@@ -1,17 +1,16 @@
 package com.vocawik.module.web.error;
 
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** Handles controller exceptions and returns consistent HTTP error responses. */
@@ -28,11 +27,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex) {
-        String message = resolveValidationMessage(ex);
+        List<Map<String, String>> fields = resolveValidationFields(ex);
+        List<Map<String, Object>> details =
+                fields.isEmpty() ? List.of() : List.of(Map.of("fieldViolations", fields));
 
-        logger.warn("Validation failed: {}", message);
+        logger.warn("Validation failed: {}", fields);
 
-        return toResponse(ErrorCode.BAD_REQUEST, message);
+        return toResponse(ErrorCode.BAD_REQUEST, ErrorCode.BAD_REQUEST.message(), details);
     }
 
     /**
@@ -59,10 +60,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
             MissingServletRequestParameterException ex) {
         String message = ex.getParameterName() + " parameter is required.";
+        List<Map<String, Object>> details =
+                List.of(
+                        Map.of(
+                                "fieldViolations",
+                                List.of(
+                                        Map.of(
+                                                "field",
+                                                ex.getParameterName(),
+                                                "description",
+                                                message,
+                                                "reason",
+                                                "MISSING_PARAMETER",
+                                                "parameterType",
+                                                ex.getParameterType()))));
 
         logger.warn("Missing request parameter: {}", message);
 
-        return toResponse(ErrorCode.BAD_REQUEST, message);
+        return toResponse(ErrorCode.BAD_REQUEST, message, details);
     }
 
     /**
@@ -75,10 +90,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
             MethodArgumentTypeMismatchException ex) {
         String message = ex.getName() + " has an invalid value.";
+        List<Map<String, Object>> details =
+                List.of(
+                        Map.of(
+                                "fieldViolations",
+                                List.of(
+                                        Map.of(
+                                                "field",
+                                                ex.getName(),
+                                                "description",
+                                                message,
+                                                "reason",
+                                                "INVALID_PARAMETER_TYPE",
+                                                "expectedType",
+                                                resolveExpectedType(ex)))));
 
         logger.warn("Method argument type mismatch: {}", message);
 
-        return toResponse(ErrorCode.BAD_REQUEST, message);
+        return toResponse(ErrorCode.BAD_REQUEST, message, details);
     }
 
     /**
@@ -91,24 +120,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNoResourceFoundException(
             NoResourceFoundException ex) {
         return toResponse(ErrorCode.NOT_FOUND, ErrorCode.NOT_FOUND.message());
-    }
-
-    /**
-     * Handles exceptions that already declare an HTTP status.
-     *
-     * @param ex response status exception
-     * @return response using the declared HTTP status
-     */
-    @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
-        HttpStatusCode statusCode = ex.getStatusCode();
-        String status = resolveStatus(statusCode);
-        String message = resolveResponseStatusMessage(ex, status);
-
-        logger.warn("Response status exception [{}]: {}", statusCode.value(), message);
-
-        return ResponseEntity.status(statusCode)
-                .body(ErrorResponse.of(statusCode.value(), status, message));
     }
 
     /**
@@ -132,49 +143,50 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
-        ApiErrorCode errorCode = ex.getErrorCode();
+        ErrorCode errorCode = ex.getErrorCode();
         String message = messageOrDefault(ex.getMessage(), errorCode);
 
         logger.warn("Business exception [{}]: {}", errorCode.status(), message);
 
-        return toResponse(errorCode, message);
+        return toResponse(errorCode, message, ex.getDetails());
     }
 
     /**
-     * Converts a field validation exception into a readable message.
+     * Converts field validation errors into client-safe structured details.
      *
      * @param ex validation exception
-     * @return validation message
+     * @return field error details
      */
-    private String resolveValidationMessage(MethodArgumentNotValidException ex) {
-        String message =
-                ex.getBindingResult().getFieldErrors().stream()
-                        .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                        .collect(Collectors.joining(", "));
-        return message.isBlank() ? ErrorCode.BAD_REQUEST.message() : message;
+    private List<Map<String, String>> resolveValidationFields(MethodArgumentNotValidException ex) {
+        return ex.getBindingResult().getFieldErrors().stream()
+                .map(this::toValidationField)
+                .toList();
     }
 
     /**
-     * Resolves a response status exception message.
+     * Converts a field error into a serializable detail object.
      *
-     * @param ex response status exception
-     * @param status resolved machine-readable status
-     * @return response message
+     * @param error field validation error
+     * @return field detail map
      */
-    private String resolveResponseStatusMessage(ResponseStatusException ex, String status) {
-        String reason = ex.getReason();
-        return reason == null || reason.isBlank() ? status : reason;
+    private Map<String, String> toValidationField(FieldError error) {
+        String message = error.getDefaultMessage();
+        return Map.of(
+                "field",
+                error.getField(),
+                "message",
+                message == null || message.isBlank() ? ErrorCode.BAD_REQUEST.message() : message);
     }
 
     /**
-     * Resolves a machine-readable status from a Spring HTTP status code.
+     * Resolves the expected parameter type for argument mismatch details.
      *
-     * @param statusCode Spring HTTP status code
-     * @return machine-readable status
+     * @param ex method argument type mismatch exception
+     * @return expected parameter type name
      */
-    private String resolveStatus(HttpStatusCode statusCode) {
-        HttpStatus httpStatus = HttpStatus.resolve(statusCode.value());
-        return httpStatus == null ? "HTTP_" + statusCode.value() : httpStatus.name();
+    private String resolveExpectedType(MethodArgumentTypeMismatchException ex) {
+        Class<?> requiredType = ex.getRequiredType();
+        return requiredType == null ? "unknown" : requiredType.getSimpleName();
     }
 
     /**
@@ -184,19 +196,33 @@ public class GlobalExceptionHandler {
      * @param errorCode fallback error code
      * @return resolved message
      */
-    private String messageOrDefault(String message, ApiErrorCode errorCode) {
+    private String messageOrDefault(String message, ErrorCode errorCode) {
         return message == null || message.isBlank() ? errorCode.message() : message;
     }
 
     /**
-     * Builds a response entity for an API error code.
+     * Builds a response entity for an error code.
      *
-     * @param errorCode API error code
+     * @param errorCode error code
      * @param message response message
      * @return response entity
      */
-    private ResponseEntity<ErrorResponse> toResponse(ApiErrorCode errorCode, String message) {
+    private ResponseEntity<ErrorResponse> toResponse(ErrorCode errorCode, String message) {
         return ResponseEntity.status(errorCode.httpStatus().value())
                 .body(ErrorResponse.of(errorCode, message));
+    }
+
+    /**
+     * Builds a response entity for an error code with structured details.
+     *
+     * @param errorCode error code
+     * @param message response message
+     * @param details structured error details
+     * @return response entity
+     */
+    private ResponseEntity<ErrorResponse> toResponse(
+            ErrorCode errorCode, String message, List<Map<String, Object>> details) {
+        return ResponseEntity.status(errorCode.httpStatus().value())
+                .body(ErrorResponse.of(errorCode, message, details));
     }
 }
