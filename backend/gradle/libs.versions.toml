@@ -17,11 +17,13 @@ spring-boot = { module = "org.springframework.boot:spring-boot" }
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
 spring-boot-starter-aop = { module = "org.springframework.boot:spring-boot-starter-aop" }
 spring-boot-starter-log4j2 = { module = "org.springframework.boot:spring-boot-starter-log4j2" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-context = { module = "org.springframework:spring-context" }
 spring-webmvc = { module = "org.springframework:spring-webmvc" }
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
 
 [plugins]
 dependency-management = { id = "io.spring.dependency-management", version.ref = "dependency-management" }
