@@ -11,9 +11,13 @@ dependencies {
 	implementation libs.spring.context
 	implementation libs.jackson.databind
 	implementation libs.jackson.datatype.jsr310
+	implementation libs.jjwt.api
 	implementation libs.slf4j.api
 	compileOnly libs.lombok
 	annotationProcessor libs.lombok
+
+	runtimeOnly libs.jjwt.impl
+	runtimeOnly libs.jjwt.jackson
 
 	testImplementation libs.spring.boot.starter.test
 	testImplementation libs.spring.security.test
