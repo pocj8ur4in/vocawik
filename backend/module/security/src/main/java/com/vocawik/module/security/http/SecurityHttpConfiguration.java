@@ -2,6 +2,7 @@ package com.vocawik.module.security.http;
 
 import com.vocawik.module.security.error.ApiAccessDeniedHandler;
 import com.vocawik.module.security.error.ApiAuthenticationEntryPoint;
+import com.vocawik.module.security.guest.GuestAuthenticationFilter;
 import com.vocawik.module.security.jwt.JwtAuthenticationFilter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -30,6 +31,7 @@ public class SecurityHttpConfiguration {
      * @param properties HTTP security properties
      * @param authenticationEntryPoint handler for authentication failures
      * @param accessDeniedHandler handler for authorization failures
+     * @param guestAuthenticationFilter guest authentication filter
      * @param jwtAuthenticationFilter JWT authentication filter
      * @return configured security filter chain
      * @throws Exception if Spring Security fails to build the chain
@@ -40,6 +42,7 @@ public class SecurityHttpConfiguration {
             SecurityHttpProperties properties,
             ApiAuthenticationEntryPoint authenticationEntryPoint,
             ApiAccessDeniedHandler accessDeniedHandler,
+            ObjectProvider<GuestAuthenticationFilter> guestAuthenticationFilter,
             ObjectProvider<JwtAuthenticationFilter> jwtAuthenticationFilter)
             throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
@@ -62,6 +65,8 @@ public class SecurityHttpConfiguration {
                             authorize.anyRequest().authenticated();
                         });
 
+        guestAuthenticationFilter.ifAvailable(
+                filter -> http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class));
         jwtAuthenticationFilter.ifAvailable(
                 filter -> http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class));
 
