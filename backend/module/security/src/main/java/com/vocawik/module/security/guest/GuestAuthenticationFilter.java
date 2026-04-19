@@ -1,5 +1,6 @@
 package com.vocawik.module.security.guest;
 
+import com.vocawik.module.security.context.SecurityAuthorities;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -75,7 +76,9 @@ public class GuestAuthenticationFilter extends OncePerRequestFilter {
     private void authenticate(HttpServletRequest request, GuestPrincipal principal) {
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
-                        principal, null, List.of(new SimpleGrantedAuthority("ROLE_GUEST")));
+                        principal,
+                        null,
+                        List.of(new SimpleGrantedAuthority(SecurityAuthorities.role("GUEST"))));
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
         logger.debug("Set guest authentication for guestUuid={}", principal.guestUuid());
