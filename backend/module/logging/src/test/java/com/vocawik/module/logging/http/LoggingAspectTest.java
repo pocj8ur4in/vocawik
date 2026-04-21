@@ -202,11 +202,12 @@ class LoggingAspectTest {
     }
 
     @Test
-    @DisplayName("Should log request headers without masking")
-    void logAround_withRequestHeaders_shouldLogHeaderValues() throws Throwable {
+    @DisplayName("Should mask sensitive request headers")
+    void logAround_withSensitiveHeaders_shouldMaskHeaderValues() throws Throwable {
         MockHttpServletRequest request = setServletRequest("GET", "/api/v1/users");
         request.addHeader("Authorization", "Bearer secret-token");
         request.addHeader("Cookie", "refresh_token=secret");
+        request.addHeader("X-API-Key", "api-secret");
         request.addHeader("User-Agent", "test-agent");
         when(joinPoint.proceed()).thenReturn("result");
 
@@ -216,9 +217,35 @@ class LoggingAspectTest {
         assertThat(logAppender.messages())
                 .anyMatch(
                         message ->
-                                message.contains("Authorization=Bearer secret-token")
-                                        && message.contains("Cookie=refresh_token=secret")
+                                message.contains("Authorization=[masked]")
+                                        && message.contains("Cookie=[masked]")
+                                        && message.contains("X-API-Key=[masked]")
                                         && message.contains("User-Agent=test-agent"));
+        assertThat(logAppender.messages())
+                .noneMatch(
+                        message ->
+                                message.contains("secret-token")
+                                        || message.contains("refresh_token=secret")
+                                        || message.contains("api-secret"));
+    }
+
+    @Test
+    @DisplayName("Should mask request query string")
+    void logAround_withQueryString_shouldMaskQueryString() throws Throwable {
+        MockHttpServletRequest request = setServletRequest("GET", "/oauth/callback");
+        request.setQueryString("code=secret-code&state=secret-state");
+        when(joinPoint.proceed()).thenReturn("result");
+
+        Object result = loggingAspect.logAround(joinPoint);
+
+        assertThat(result).isEqualTo("result");
+        assertThat(logAppender.messages())
+                .anyMatch(message -> message.contains("GET /oauth/callback?[masked]"));
+        assertThat(logAppender.messages())
+                .noneMatch(
+                        message ->
+                                message.contains("secret-code")
+                                        || message.contains("secret-state"));
     }
 
     private MockHttpServletRequest setServletRequest(String method, String uri) {

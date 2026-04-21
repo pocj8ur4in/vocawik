@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -26,6 +28,16 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 @ConditionalOnProperty(prefix = "logging.http", name = "enabled", havingValue = "true")
 public class LoggingAspect {
+
+    private static final String MASKED_VALUE = "[masked]";
+    private static final Set<String> SENSITIVE_HEADERS =
+            Set.of(
+                    "authorization",
+                    "cookie",
+                    "proxy-authorization",
+                    "set-cookie",
+                    "x-api-key",
+                    "x-auth-token");
 
     private final ClientIpResolver clientIpResolver;
 
@@ -98,14 +110,14 @@ public class LoggingAspect {
     private String resolveFullUri(HttpServletRequest request) {
         String uri = request.getRequestURI();
         String query = request.getQueryString();
-        return query == null ? uri : uri + "?" + query;
+        return query == null || query.isBlank() ? uri : uri + "?" + MASKED_VALUE;
     }
 
     /**
      * Collects request headers into a single log-friendly string.
      *
      * @param request HTTP request
-     * @return formatted header map
+     * @return formatted header map, with sensitive values masked
      */
     private String collectHeaders(HttpServletRequest request) {
         List<String> values = new ArrayList<>();
@@ -121,13 +133,16 @@ public class LoggingAspect {
     }
 
     /**
-     * Formats one header value for logging.
+     * Formats one header value for logging, masking sensitive headers.
      *
      * @param name header name
      * @param request HTTP request
-     * @return comma-joined header values
+     * @return masked value for sensitive headers, or comma-joined header values
      */
     private String formatHeaderValue(String name, HttpServletRequest request) {
+        if (SENSITIVE_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+            return MASKED_VALUE;
+        }
         List<String> headerValues = Collections.list(request.getHeaders(name));
         return String.join(",", headerValues);
     }
