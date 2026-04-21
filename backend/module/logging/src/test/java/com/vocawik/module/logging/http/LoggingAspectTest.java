@@ -230,6 +230,26 @@ class LoggingAspectTest {
     }
 
     @Test
+    @DisplayName("Should omit raw request ID header from request logs")
+    void logAround_withRequestIdHeader_shouldOmitRawHeader() throws Throwable {
+        MockHttpServletRequest request = setServletRequest("GET", "/api/v1/users");
+        request.addHeader(RequestIdFilter.REQUEST_ID_HEADER, "attacker\nforged-log");
+        MDC.put(RequestIdFilter.MDC_REQUEST_ID, "safe-request-id");
+        when(joinPoint.proceed()).thenReturn("result");
+
+        Object result = loggingAspect.logAround(joinPoint);
+
+        assertThat(result).isEqualTo("result");
+        assertThat(logAppender.requestIds()).containsOnly("safe-request-id");
+        assertThat(logAppender.messages())
+                .noneMatch(
+                        message ->
+                                message.contains(RequestIdFilter.REQUEST_ID_HEADER)
+                                        || message.contains("attacker")
+                                        || message.contains("forged-log"));
+    }
+
+    @Test
     @DisplayName("Should mask request query string")
     void logAround_withQueryString_shouldMaskQueryString() throws Throwable {
         MockHttpServletRequest request = setServletRequest("GET", "/oauth/callback");

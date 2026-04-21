@@ -1,6 +1,7 @@
 package com.vocawik.module.logging.http;
 
 import com.vocawik.module.web.clientip.ClientIpResolver;
+import com.vocawik.module.web.request.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
@@ -117,13 +118,16 @@ public class LoggingAspect {
      * Collects request headers into a single log-friendly string.
      *
      * @param request HTTP request
-     * @return formatted header map, with sensitive values masked
+     * @return formatted header map, with sensitive values masked and the request ID omitted
      */
     private String collectHeaders(HttpServletRequest request) {
         List<String> values = new ArrayList<>();
         Enumeration<String> names = request.getHeaderNames();
         while (names != null && names.hasMoreElements()) {
             String name = names.nextElement();
+            if (RequestIdFilter.REQUEST_ID_HEADER.equalsIgnoreCase(name)) {
+                continue;
+            }
             values.add(name + "=" + formatHeaderValue(name, request));
         }
         if (values.isEmpty()) {
