@@ -5,21 +5,18 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
-import java.util.Locale;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /** Resolves the effective client IP using trusted proxy CIDR validation. */
-@Slf4j
 @Component
 public class ClientIpResolver {
 
-    // Forwarding headers are trusted only when the direct peer matches a trusted proxy CIDR.
     private static final String X_FORWARDED_FOR = "X-Forwarded-For";
-    private static final String X_REAL_IP = "X-Real-IP";
-    private static final String FORWARDED = "Forwarded";
     private static final String UNKNOWN = "unknown";
+    private static final int MAX_X_FORWARDED_FOR_LENGTH = 2_048;
+    private static final int MAX_PROXY_HOPS = 16;
 
     private final List<CidrRange> trustedProxyRanges;
 
@@ -33,7 +30,11 @@ public class ClientIpResolver {
     }
 
     /**
-     * Resolves the client IP from forwarding headers only when the source address is trusted.
+     * Resolves the client IP from {@code X-Forwarded-For} only when the direct peer is trusted.
+     *
+     * <p>The chain is inspected from the direct peer towards the client. Trusted proxy hops are
+     * discarded from the right, and the first untrusted address is treated as the client. Malformed
+     * or excessively long chains are ignored in favor of the direct peer address.
      *
      * @param request HTTP request
      * @return resolved client IP or {@code unknown}
@@ -43,208 +44,295 @@ public class ClientIpResolver {
             return UNKNOWN;
         }
 
-        String remoteAddr = normalizeIpLiteral(request.getRemoteAddr());
-        if (remoteAddr == null) {
+        InetAddress remoteAddress = parseIpLiteral(request.getRemoteAddr());
+        if (remoteAddress == null) {
             return UNKNOWN;
         }
-        if (!isTrustedProxy(remoteAddr)) {
-            return remoteAddr;
+        if (!isTrustedProxy(remoteAddress)) {
+            return remoteAddress.getHostAddress();
         }
 
-        String forwarded = request.getHeader(FORWARDED);
-        String fromForwarded = extractIpFromForwarded(forwarded);
-        if (fromForwarded != null) {
-            return fromForwarded;
+        String xForwardedFor = getSingleHeaderValue(request, X_FORWARDED_FOR);
+        if (xForwardedFor == null || xForwardedFor.isBlank()) {
+            return remoteAddress.getHostAddress();
+        }
+        if (xForwardedFor.length() > MAX_X_FORWARDED_FOR_LENGTH) {
+            return remoteAddress.getHostAddress();
         }
 
-        String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            for (String token : xForwardedFor.split(",")) {
-                String candidate = normalizeIpLiteral(token);
-                if (candidate != null) {
-                    return candidate;
-                }
+        String[] tokens = xForwardedFor.split(",", -1);
+        if (tokens.length > MAX_PROXY_HOPS) {
+            return remoteAddress.getHostAddress();
+        }
+
+        List<InetAddress> chain = new ArrayList<>(tokens.length + 1);
+        for (String token : tokens) {
+            InetAddress address = parseIpLiteral(token);
+            if (address == null) {
+                return remoteAddress.getHostAddress();
+            }
+            chain.add(address);
+        }
+        chain.add(remoteAddress);
+
+        for (int index = chain.size() - 1; index >= 0; index--) {
+            InetAddress address = chain.get(index);
+            if (!isTrustedProxy(address)) {
+                return address.getHostAddress();
             }
         }
-
-        String xRealIp = normalizeIpLiteral(request.getHeader(X_REAL_IP));
-        if (xRealIp != null) {
-            return xRealIp;
-        }
-        return remoteAddr;
+        return chain.get(0).getHostAddress();
     }
 
     /**
-     * Extracts the client IP from the RFC 7239 {@code Forwarded} header by reading the first valid
-     * {@code for} parameter.
+     * Returns the only value of the requested header.
      *
-     * <p>For example, {@code for="198.51.100.20:443";proto=https} resolves to {@code
-     * 198.51.100.20}, and {@code for="[2001:db8::1]"} resolves to the normalized IPv6 address.
+     * <p>Multiple header fields are treated as ambiguous and rejected.
      *
-     * @param forwarded raw {@code Forwarded} header value
-     * @return first valid {@code for} address, or null if none can be parsed
+     * @param request HTTP request containing the header
+     * @param headerName header name to read
+     * @return the single header value, or null when absent or repeated
      */
-    private String extractIpFromForwarded(String forwarded) {
-        if (forwarded == null || forwarded.isBlank()) {
+    private static String getSingleHeaderValue(HttpServletRequest request, String headerName) {
+        Enumeration<String> values = request.getHeaders(headerName);
+        if (values == null || !values.hasMoreElements()) {
             return null;
         }
 
-        String[] entries = forwarded.split(",");
-        for (String entry : entries) {
-            String[] params = entry.split(";");
-            for (String param : params) {
-                String trimmed = param.trim();
-                if (!trimmed.toLowerCase(Locale.ROOT).startsWith("for=")) {
-                    continue;
-                }
-
-                String value = trimmed.substring(4).trim();
-                String candidate = normalizeIpLiteral(value);
-                if (candidate != null) {
-                    return candidate;
-                }
-            }
-        }
-        return null;
+        String value = values.nextElement();
+        return values.hasMoreElements() ? null : value;
     }
 
     /**
-     * Normalizes an IP literal by removing surrounding quotes and resolving it to a canonical form.
+     * Parses an IPv4 or IPv6 literal without allowing hostname resolution.
      *
-     * @param rawValue the raw IP literal
-     * @return the normalized IP address or null if invalid
+     * <p>IPv4 addresses may include a port, while IPv6 addresses with a port must use brackets.
+     * Zone identifiers are rejected because forwarding headers cross host boundaries.
+     *
+     * @param rawValue raw address value
+     * @return parsed address, or null if the value is not a valid IP literal
      */
-    private String normalizeIpLiteral(String rawValue) {
+    private static InetAddress parseIpLiteral(String rawValue) {
         if (rawValue == null) {
             return null;
         }
 
         String value = rawValue.trim();
-        if (value.isEmpty() || UNKNOWN.equalsIgnoreCase(value)) {
+        if (value.isEmpty() || UNKNOWN.equalsIgnoreCase(value) || value.length() > 64) {
             return null;
         }
 
-        if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
-            value = value.substring(1, value.length() - 1).trim();
-        }
-
-        String host = value;
-        if (host.startsWith("[")) {
-            int closing = host.indexOf(']');
-            if (closing <= 1) {
+        String host;
+        if (value.startsWith("[")) {
+            int closingBracket = value.indexOf(']');
+            if (closingBracket <= 1 || !isValidPortSuffix(value.substring(closingBracket + 1))) {
                 return null;
             }
-            host = host.substring(1, closing);
-        } else if (host.chars().filter(ch -> ch == ':').count() == 1 && host.contains(".")) {
-            host = host.substring(0, host.lastIndexOf(':'));
+            host = value.substring(1, closingBracket);
+        } else {
+            int firstColon = value.indexOf(':');
+            int lastColon = value.lastIndexOf(':');
+            if (firstColon > 0
+                    && firstColon == lastColon
+                    && value.substring(0, firstColon).contains(".")) {
+                if (!isValidPortSuffix(value.substring(firstColon))) {
+                    return null;
+                }
+                host = value.substring(0, firstColon);
+            } else {
+                host = value;
+            }
         }
 
-        int zoneIndex = host.indexOf('%');
-        if (zoneIndex > 0) {
-            host = host.substring(0, zoneIndex);
-        }
-        if (host.isBlank()) {
+        return parseBareIpLiteral(host);
+    }
+
+    /**
+     * Parses an unwrapped IPv4 or IPv6 literal without allowing ports or zone identifiers.
+     *
+     * @param host raw address literal
+     * @return parsed address, or null if the value is invalid
+     */
+    private static InetAddress parseBareIpLiteral(String host) {
+        if (host == null || host.isEmpty() || host.length() > 45 || host.indexOf('%') >= 0) {
             return null;
+        }
+        if (host.indexOf(':') >= 0) {
+            return parseIpv6Literal(host);
+        }
+        return parseIpv4Literal(host);
+    }
+
+    /**
+     * Validates an optional decimal port suffix.
+     *
+     * @param suffix empty text or a colon-prefixed port
+     * @return whether the suffix is empty or contains a port from 0 through 65535
+     */
+    private static boolean isValidPortSuffix(String suffix) {
+        if (suffix.isEmpty()) {
+            return true;
+        }
+        if (suffix.charAt(0) != ':' || suffix.length() == 1) {
+            return false;
+        }
+
+        int port = 0;
+        for (int index = 1; index < suffix.length(); index++) {
+            char character = suffix.charAt(index);
+            if (character < '0' || character > '9') {
+                return false;
+            }
+            port = port * 10 + (character - '0');
+            if (port > 65_535) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Parses a strict dotted-decimal IPv4 literal without hostname resolution.
+     *
+     * @param value raw IPv4 literal
+     * @return parsed address, or null if the value is invalid
+     * @throws IllegalStateException if the runtime rejects the validated IPv4 byte length
+     */
+    private static InetAddress parseIpv4Literal(String value) {
+        String[] octets = value.split("\\.", -1);
+        if (octets.length != 4) {
+            return null;
+        }
+
+        byte[] address = new byte[4];
+        for (int index = 0; index < octets.length; index++) {
+            String octet = octets[index];
+            if (octet.isEmpty()
+                    || octet.length() > 3
+                    || (octet.length() > 1 && octet.charAt(0) == '0')) {
+                return null;
+            }
+
+            int valueOfOctet = 0;
+            for (int characterIndex = 0; characterIndex < octet.length(); characterIndex++) {
+                char character = octet.charAt(characterIndex);
+                if (character < '0' || character > '9') {
+                    return null;
+                }
+                valueOfOctet = valueOfOctet * 10 + (character - '0');
+            }
+            if (valueOfOctet > 255) {
+                return null;
+            }
+            address[index] = (byte) valueOfOctet;
         }
 
         try {
-            return InetAddress.getByName(host).getHostAddress();
-        } catch (UnknownHostException e) {
+            return InetAddress.getByAddress(address);
+        } catch (UnknownHostException impossible) {
+            throw new IllegalStateException("Unexpected IPv4 address length", impossible);
+        }
+    }
+
+    /**
+     * Parses an IPv6 literal after restricting input to numeric address characters.
+     *
+     * @param value raw IPv6 literal
+     * @return parsed address, or null if the value is invalid
+     */
+    private static InetAddress parseIpv6Literal(String value) {
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            boolean hexadecimal =
+                    character >= '0' && character <= '9'
+                            || character >= 'a' && character <= 'f'
+                            || character >= 'A' && character <= 'F';
+            if (!hexadecimal && character != ':' && character != '.') {
+                return null;
+            }
+        }
+
+        try {
+            // A colon and the character allow-list above guarantee this cannot be a hostname.
+            return InetAddress.getByName(value);
+        } catch (UnknownHostException invalidLiteral) {
             return null;
         }
     }
 
     /**
-     * Checks if the given IP address belongs to any of the trusted proxy CIDRs.
+     * Returns whether an address belongs to a configured trusted proxy range.
      *
-     * @param ip the IP address to check
-     * @return true if the IP is from a trusted proxy, false otherwise
+     * @param address address to check
+     * @return whether the address is a trusted proxy
      */
-    private boolean isTrustedProxy(String ip) {
-        if (ip == null || ip.isBlank()) {
-            return false;
-        }
-
-        try {
-            InetAddress address = InetAddress.getByName(ip);
-            for (CidrRange range : trustedProxyRanges) {
-                if (range.matches(address)) {
-                    return true;
-                }
+    private boolean isTrustedProxy(InetAddress address) {
+        for (CidrRange range : trustedProxyRanges) {
+            if (range.matches(address)) {
+                return true;
             }
-        } catch (UnknownHostException e) {
-            logger.debug("Cannot parse remote address: {}", ip);
         }
         return false;
     }
 
     /**
-     * Parses configured trusted proxy CIDRs.
+     * Parses the comma-separated trusted proxy CIDR configuration.
      *
-     * <p>For example, {@code "192.168.0.0/24, ::1/128"} is parsed into two ranges: network {@code
-     * 192.168.0.0} with prefix {@code 24}, and network {@code ::1} with prefix {@code 128}.
-     *
-     * @param raw comma-separated CIDR notation
-     * @return parsed CIDR ranges
+     * @param raw configured CIDR list
+     * @return parsed trusted proxy ranges
+     * @throws IllegalArgumentException if any configured CIDR is invalid
      */
     private List<CidrRange> parseTrustedProxyCidrs(String raw) {
-        List<CidrRange> ranges = new ArrayList<>();
-        Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .forEach(
-                        cidr -> {
-                            try {
-                                ranges.add(CidrRange.parse(cidr));
-                            } catch (IllegalArgumentException e) {
-                                logger.warn("Ignoring invalid trusted proxy CIDR: {}", cidr);
-                            }
-                        });
-        return ranges;
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(raw.split(",", -1)).map(String::trim).map(CidrRange::parse).toList();
     }
 
     /**
-     * CIDR range backed by a network address and prefix length.
+     * Represents an IPv4 or IPv6 network range used to identify trusted proxies.
      *
-     * <p>The network address is stored as raw IPv4 or IPv6 bytes, and {@link #matches(InetAddress)}
-     * compares only the prefix bits covered by the CIDR mask.
-     *
-     * @param network raw bytes of the CIDR network address
-     * @param prefixLength number of leading bits that must match
+     * @param network raw network address bytes
+     * @param prefixLength number of leading network bits
      */
     private record CidrRange(byte[] network, int prefixLength) {
 
         /**
-         * Parses a CIDR notation string into a {@link CidrRange}.
+         * Parses a CIDR expression without allowing hostname resolution.
          *
-         * @param cidr CIDR notation such as {@code 192.168.0.0/24} or {@code ::1/128}
+         * @param cidr CIDR expression to parse
          * @return parsed CIDR range
-         * @throws IllegalArgumentException if the notation or prefix length is invalid
+         * @throws IllegalArgumentException if the expression or prefix is invalid
          */
         private static CidrRange parse(String cidr) {
-            String[] parts = cidr.split("/", 2);
+            String[] parts = cidr.split("/", -1);
             if (parts.length != 2) {
-                throw new IllegalArgumentException("Invalid CIDR: " + cidr);
+                throw new IllegalArgumentException("Invalid trusted proxy CIDR: " + cidr);
+            }
+
+            InetAddress networkAddress = parseBareIpLiteral(parts[0]);
+            if (networkAddress == null) {
+                throw new IllegalArgumentException("Invalid trusted proxy CIDR: " + cidr);
             }
 
             try {
-                InetAddress networkAddress = InetAddress.getByName(parts[0]);
                 int prefix = Integer.parseInt(parts[1]);
                 int maxPrefix = networkAddress.getAddress().length * 8;
                 if (prefix < 0 || prefix > maxPrefix) {
-                    throw new IllegalArgumentException("Invalid CIDR prefix: " + cidr);
+                    throw new IllegalArgumentException("Invalid trusted proxy CIDR: " + cidr);
                 }
                 return new CidrRange(networkAddress.getAddress(), prefix);
-            } catch (UnknownHostException | NumberFormatException e) {
-                throw new IllegalArgumentException("Invalid CIDR: " + cidr, e);
+            } catch (NumberFormatException invalidPrefix) {
+                throw new IllegalArgumentException(
+                        "Invalid trusted proxy CIDR: " + cidr, invalidPrefix);
             }
         }
 
         /**
-         * Checks whether the given IP address belongs to this CIDR range.
+         * Checks whether an address is contained in this network range.
          *
-         * @param address IP address to compare against this range
-         * @return true when the address family and prefix bits match
+         * @param address address to compare
+         * @return whether the address matches the configured network prefix
          */
         private boolean matches(InetAddress address) {
             byte[] target = address.getAddress();
@@ -254,8 +342,8 @@ public class ClientIpResolver {
 
             int fullBytes = prefixLength / 8;
             int remainingBits = prefixLength % 8;
-            for (int i = 0; i < fullBytes; i++) {
-                if (target[i] != network[i]) {
+            for (int index = 0; index < fullBytes; index++) {
+                if (target[index] != network[index]) {
                     return false;
                 }
             }
