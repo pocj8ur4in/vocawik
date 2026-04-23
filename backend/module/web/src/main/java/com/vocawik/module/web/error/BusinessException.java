@@ -11,12 +11,12 @@ public class BusinessException extends RuntimeException {
     private final List<Map<String, Object>> details;
 
     /**
-     * Creates an exception with the error code's default message.
+     * Creates an exception whose response message is resolved from the request locale.
      *
      * @param errorCode application error code
      */
     public BusinessException(ErrorCode errorCode) {
-        this(errorCode, Objects.requireNonNull(errorCode, "errorCode").message(), List.of());
+        this(errorCode, null, List.of());
     }
 
     /**

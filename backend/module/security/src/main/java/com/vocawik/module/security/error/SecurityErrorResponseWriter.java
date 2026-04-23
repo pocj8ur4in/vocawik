@@ -3,6 +3,7 @@ package com.vocawik.module.security.error;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vocawik.module.web.error.ErrorCode;
 import com.vocawik.module.web.error.ErrorResponse;
+import com.vocawik.module.web.i18n.ErrorMessageResolver;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,14 +15,16 @@ import org.springframework.stereotype.Component;
 public class SecurityErrorResponseWriter {
 
     private final ObjectMapper objectMapper;
+    private final ErrorMessageResolver errorMessageResolver;
 
     /**
-     * Creates a security error response writer.
+     * Creates a writer using the default message bundles.
      *
      * @param objectMapper base JSON mapper configured by the application
      */
     public SecurityErrorResponseWriter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper.copy().findAndRegisterModules();
+        this.errorMessageResolver = new ErrorMessageResolver();
     }
 
     /**
@@ -39,6 +42,10 @@ public class SecurityErrorResponseWriter {
         response.setStatus(errorCode.httpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        objectMapper.writeValue(response.getWriter(), ErrorResponse.of(errorCode));
+        String message =
+                errorMessageResolver.resolve(
+                        errorCode,
+                        org.springframework.context.i18n.LocaleContextHolder.getLocale());
+        objectMapper.writeValue(response.getWriter(), ErrorResponse.of(errorCode, message));
     }
 }

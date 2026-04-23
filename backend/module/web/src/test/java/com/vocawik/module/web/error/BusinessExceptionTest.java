@@ -10,12 +10,12 @@ import org.junit.jupiter.api.Test;
 class BusinessExceptionTest {
 
     @Test
-    @DisplayName("Should use error code default message")
+    @DisplayName("Should defer default message resolution to the request handler")
     void constructor_withErrorCode_shouldUseDefaultMessage() {
         BusinessException exception = new BusinessException(ErrorCode.NOT_FOUND);
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
-        assertThat(exception).hasMessage("Resource not found.");
+        assertThat(exception).hasMessage(null);
         assertThat(exception.getDetails()).isEmpty();
     }
 

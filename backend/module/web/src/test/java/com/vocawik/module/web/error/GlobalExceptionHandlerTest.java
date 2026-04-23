@@ -5,9 +5,11 @@ import static org.assertj.core.api.InstanceOfAssertFactories.LIST;
 import static org.mockito.Mockito.mock;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
@@ -159,5 +161,20 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(body.status()).isEqualTo("INTERNAL_ERROR");
         assertThat(body.message()).isEqualTo("An unexpected error occurred.");
+    }
+
+    @Test
+    @DisplayName("Should localize default error messages from the request locale")
+    void handleException_withKoreanLocale_shouldReturnKoreanMessage() {
+        LocaleContextHolder.setLocale(Locale.KOREAN);
+        try {
+            ResponseEntity<ErrorResponse> response =
+                    handler.handleException(new RuntimeException());
+            ErrorResponse body = assertThat(response.getBody()).isNotNull().actual();
+
+            assertThat(body.message()).isEqualTo("예기치 않은 오류가 발생했습니다.");
+        } finally {
+            LocaleContextHolder.resetLocaleContext();
+        }
     }
 }

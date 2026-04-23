@@ -4,28 +4,27 @@ import org.springframework.http.HttpStatus;
 
 /** Common application error codes. */
 public enum ErrorCode {
-    BAD_REQUEST(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Invalid request."),
-    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required."),
-    FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied."),
-    NOT_FOUND(HttpStatus.NOT_FOUND, "NOT_FOUND", "Resource not found."),
-    INTERNAL_ERROR(
-            HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "An unexpected error occurred.");
+    BAD_REQUEST(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "error.bad-request"),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "error.unauthorized"),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "error.forbidden"),
+    NOT_FOUND(HttpStatus.NOT_FOUND, "NOT_FOUND", "error.not-found"),
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "error.internal");
 
     private final HttpStatus httpStatus;
     private final String reason;
-    private final String message;
+    private final String messageKey;
 
     /**
      * Creates a common error code.
      *
      * @param httpStatus HTTP status to return
      * @param reason stable business error reason
-     * @param message default error message
+     * @param messageKey message bundle key
      */
-    ErrorCode(HttpStatus httpStatus, String reason, String message) {
+    ErrorCode(HttpStatus httpStatus, String reason, String messageKey) {
         this.httpStatus = httpStatus;
         this.reason = reason;
-        this.message = message;
+        this.messageKey = messageKey;
     }
 
     /**
@@ -65,11 +64,11 @@ public enum ErrorCode {
     }
 
     /**
-     * Returns the default human-readable error message.
+     * Returns the message bundle key used to resolve a localized message.
      *
-     * @return default error message
+     * @return message bundle key
      */
-    public String message() {
-        return message;
+    public String messageKey() {
+        return messageKey;
     }
 }

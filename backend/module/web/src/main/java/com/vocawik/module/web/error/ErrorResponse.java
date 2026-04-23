@@ -67,16 +67,6 @@ public record ErrorResponse(ErrorBody error) {
     }
 
     /**
-     * Creates an error response using the error code's default message.
-     *
-     * @param errorCode error code
-     * @return error response
-     */
-    public static ErrorResponse of(ErrorCode errorCode) {
-        return of(errorCode, errorCode.message());
-    }
-
-    /**
      * Creates an error response using a custom message for the given error code.
      *
      * @param errorCode error code

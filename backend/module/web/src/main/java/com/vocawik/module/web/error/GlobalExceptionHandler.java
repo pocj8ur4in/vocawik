@@ -1,8 +1,12 @@
 package com.vocawik.module.web.error;
 
+import com.vocawik.module.web.i18n.ErrorMessageResolver;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -17,6 +21,23 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final ErrorMessageResolver errorMessageResolver;
+
+    /** Creates an exception handler using the default message bundles. */
+    public GlobalExceptionHandler() {
+        this(new ErrorMessageResolver());
+    }
+
+    /**
+     * Creates an exception handler using the localized message resolver.
+     *
+     * @param errorMessageResolver localized error message resolver
+     */
+    @Autowired
+    public GlobalExceptionHandler(ErrorMessageResolver errorMessageResolver) {
+        this.errorMessageResolver = errorMessageResolver;
+    }
 
     /**
      * Handles validation errors from request body binding.
@@ -33,7 +54,7 @@ public class GlobalExceptionHandler {
 
         logger.warn("Validation failed: {}", fields);
 
-        return toResponse(ErrorCode.BAD_REQUEST, ErrorCode.BAD_REQUEST.message(), details);
+        return toResponse(ErrorCode.BAD_REQUEST, resolveMessage(ErrorCode.BAD_REQUEST), details);
     }
 
     /**
@@ -119,7 +140,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResourceFoundException(
             NoResourceFoundException ex) {
-        return toResponse(ErrorCode.NOT_FOUND, ErrorCode.NOT_FOUND.message());
+        return toResponse(ErrorCode.NOT_FOUND, resolveMessage(ErrorCode.NOT_FOUND));
     }
 
     /**
@@ -132,7 +153,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleException(Exception ex) {
         logger.error("Unhandled exception: ", ex);
 
-        return toResponse(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.message());
+        return toResponse(ErrorCode.INTERNAL_ERROR, resolveMessage(ErrorCode.INTERNAL_ERROR));
     }
 
     /**
@@ -175,7 +196,9 @@ public class GlobalExceptionHandler {
                 "field",
                 error.getField(),
                 "message",
-                message == null || message.isBlank() ? ErrorCode.BAD_REQUEST.message() : message);
+                message == null || message.isBlank()
+                        ? resolveMessage(ErrorCode.BAD_REQUEST)
+                        : message);
     }
 
     /**
@@ -197,7 +220,18 @@ public class GlobalExceptionHandler {
      * @return resolved message
      */
     private String messageOrDefault(String message, ErrorCode errorCode) {
-        return message == null || message.isBlank() ? errorCode.message() : message;
+        return message == null || message.isBlank() ? resolveMessage(errorCode) : message;
+    }
+
+    /**
+     * Resolves a message using the locale selected for the current request.
+     *
+     * @param errorCode error code
+     * @return localized error message
+     */
+    private String resolveMessage(ErrorCode errorCode) {
+        Locale locale = LocaleContextHolder.getLocale();
+        return errorMessageResolver.resolve(errorCode, locale);
     }
 
     /**
