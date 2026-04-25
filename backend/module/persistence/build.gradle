@@ -1,0 +1,21 @@
+plugins {
+	id 'java-library'
+}
+
+dependencies {
+	api libs.jakarta.persistence.api
+	api libs.spring.data.jpa
+	api "com.querydsl:querydsl-jpa:${libs.versions.querydsl.get()}:jakarta"
+
+	implementation libs.spring.boot.autoconfigure
+	implementation libs.spring.context
+	implementation libs.slf4j.api
+	implementation libs.uuid.creator
+	compileOnly libs.lombok
+	annotationProcessor libs.lombok
+	annotationProcessor libs.jakarta.persistence.api
+	annotationProcessor "com.querydsl:querydsl-apt:${libs.versions.querydsl.get()}:jakarta"
+
+	testImplementation libs.spring.boot.starter.test
+	testRuntimeOnly libs.junit.platform.launcher
+}
