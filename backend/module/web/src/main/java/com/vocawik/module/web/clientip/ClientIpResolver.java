@@ -7,10 +7,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
-import org.springframework.stereotype.Component;
 
 /** Resolves the effective client IP using trusted proxy CIDR validation. */
-@Component
 public class ClientIpResolver {
 
     private static final String X_FORWARDED_FOR = "X-Forwarded-For";
