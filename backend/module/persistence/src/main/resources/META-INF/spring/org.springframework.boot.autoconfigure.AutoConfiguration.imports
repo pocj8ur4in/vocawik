@@ -1,0 +1,2 @@
+com.vocawik.module.persistence.autoconfigure.PersistenceJpaAuditingAutoConfiguration
+com.vocawik.module.persistence.autoconfigure.PersistenceQuerydslAutoConfiguration

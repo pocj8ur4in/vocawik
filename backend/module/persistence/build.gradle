@@ -17,5 +17,6 @@ dependencies {
 	annotationProcessor "com.querydsl:querydsl-apt:${libs.versions.querydsl.get()}:jakarta"
 
 	testImplementation libs.spring.boot.starter.test
+	testImplementation libs.spring.boot.starter.data.jpa
 	testRuntimeOnly libs.junit.platform.launcher
 }
