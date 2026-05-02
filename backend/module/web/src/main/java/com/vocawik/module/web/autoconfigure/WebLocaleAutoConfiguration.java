@@ -1,26 +1,37 @@
-package com.vocawik.module.web.locale;
+package com.vocawik.module.web.autoconfigure;
 
+import com.vocawik.module.web.locale.AcceptLanguageRequestLocaleResolver;
+import com.vocawik.module.web.locale.RequestLocaleFilter;
+import com.vocawik.module.web.locale.RequestLocaleResolver;
+import com.vocawik.module.web.locale.WebLocaleProperties;
+import jakarta.servlet.Filter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** Configures request locale support. */
-@Configuration(proxyBeanMethods = false)
+/** Automatically configures request locale resolution and servlet locale propagation. */
+@AutoConfiguration(after = WebRequestAutoConfiguration.class)
+@ConditionalOnClass({Filter.class, WebMvcConfigurer.class})
 @EnableConfigurationProperties(WebLocaleProperties.class)
-public class WebLocaleConfiguration {
+public class WebLocaleAutoConfiguration {
+
+    /** Creates the request locale automatic configuration. */
+    public WebLocaleAutoConfiguration() {}
 
     /**
-     * Creates the default request locale resolver backed by the Accept-Language header.
+     * Creates the default request locale resolver backed by the Accept Language header.
      *
      * @param properties locale resolution properties
      * @return request locale resolver
      */
     @Bean
     @ConditionalOnMissingBean(RequestLocaleResolver.class)
-    public RequestLocaleResolver requestLocaleResolver(WebLocaleProperties properties) {
+    RequestLocaleResolver requestLocaleResolver(WebLocaleProperties properties) {
         return new AcceptLanguageRequestLocaleResolver(
                 properties.defaultLocale(), properties.supported());
     }
@@ -32,7 +43,8 @@ public class WebLocaleConfiguration {
      * @return request locale filter
      */
     @Bean
-    public RequestLocaleFilter requestLocaleFilter(RequestLocaleResolver requestLocaleResolver) {
+    @ConditionalOnMissingBean(RequestLocaleFilter.class)
+    RequestLocaleFilter requestLocaleFilter(RequestLocaleResolver requestLocaleResolver) {
         return new RequestLocaleFilter(requestLocaleResolver);
     }
 
@@ -43,7 +55,7 @@ public class WebLocaleConfiguration {
      * @return filter registration bean
      */
     @Bean
-    public FilterRegistrationBean<RequestLocaleFilter> requestLocaleFilterRegistration(
+    FilterRegistrationBean<RequestLocaleFilter> requestLocaleFilterRegistration(
             RequestLocaleFilter requestLocaleFilter) {
         FilterRegistrationBean<RequestLocaleFilter> registration =
                 new FilterRegistrationBean<>(requestLocaleFilter);

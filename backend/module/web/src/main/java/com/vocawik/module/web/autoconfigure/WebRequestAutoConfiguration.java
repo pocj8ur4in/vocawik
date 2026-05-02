@@ -1,13 +1,21 @@
-package com.vocawik.module.web.request;
+package com.vocawik.module.web.autoconfigure;
 
+import com.vocawik.module.web.request.RequestIdFilter;
+import jakarta.servlet.Filter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
-/** Configures request correlation support. */
-@Configuration(proxyBeanMethods = false)
-public class WebRequestConfiguration {
+/** Automatically configures servlet request correlation and response request IDs. */
+@AutoConfiguration
+@ConditionalOnClass(Filter.class)
+public class WebRequestAutoConfiguration {
+
+    /** Creates the request correlation automatic configuration. */
+    public WebRequestAutoConfiguration() {}
 
     /**
      * Creates the request ID filter used for HTTP request correlation.
@@ -15,7 +23,8 @@ public class WebRequestConfiguration {
      * @return request ID filter
      */
     @Bean
-    public RequestIdFilter requestIdFilter() {
+    @ConditionalOnMissingBean(RequestIdFilter.class)
+    RequestIdFilter requestIdFilter() {
         return new RequestIdFilter();
     }
 
@@ -26,7 +35,7 @@ public class WebRequestConfiguration {
      * @return filter registration bean
      */
     @Bean
-    public FilterRegistrationBean<RequestIdFilter> requestIdFilterRegistration(
+    FilterRegistrationBean<RequestIdFilter> requestIdFilterRegistration(
             RequestIdFilter requestIdFilter) {
         FilterRegistrationBean<RequestIdFilter> registration =
                 new FilterRegistrationBean<>(requestIdFilter);

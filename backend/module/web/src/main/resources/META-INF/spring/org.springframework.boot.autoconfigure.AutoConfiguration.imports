@@ -1,1 +1,3 @@
 com.vocawik.module.web.autoconfigure.WebClientIpAutoConfiguration
+com.vocawik.module.web.autoconfigure.WebRequestAutoConfiguration
+com.vocawik.module.web.autoconfigure.WebLocaleAutoConfiguration
