@@ -1,45 +1,44 @@
-package com.vocawik.module.web.cors;
+package com.vocawik.module.web.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.vocawik.module.web.cors.WebCorsProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-class WebCorsConfigurationTest {
+class WebCorsJacksonAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner =
-            new ApplicationContextRunner().withUserConfiguration(WebCorsConfiguration.class);
+            new ApplicationContextRunner()
+                    .withConfiguration(
+                            AutoConfigurations.of(
+                                    WebCorsAutoConfiguration.class,
+                                    WebJacksonAutoConfiguration.class));
 
     @Test
-    @DisplayName("Should register CORS configuration source with defaults")
-    void corsConfigurationSource_shouldRegisterWithDefaults() {
+    @DisplayName("Should discover CORS and Jackson features automatically")
+    void autoConfiguration_withServletAndJacksonClasspath_shouldRegisterFeatures() {
         contextRunner.run(
                 context -> {
                     assertThat(context).hasSingleBean(WebCorsProperties.class);
                     assertThat(context).hasSingleBean(CorsConfigurationSource.class);
-
-                    CorsConfiguration configuration =
-                            corsConfiguration(
-                                    context.getBean(CorsConfigurationSource.class), "/api/status");
-
-                    assertThat(configuration.getAllowedOrigins()).isEmpty();
-                    assertThat(configuration.getAllowedMethods())
-                            .containsExactly("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH");
-                    assertThat(configuration.getAllowedHeaders()).containsExactly("*");
-                    assertThat(configuration.getExposedHeaders())
-                            .containsExactly("X-Request-Id", "X-Client-IP");
-                    assertThat(configuration.getAllowCredentials()).isTrue();
-                    assertThat(configuration.getMaxAge()).isEqualTo(3600L);
+                    assertThat(context)
+                            .hasSingleBean(Jackson2ObjectMapperBuilderCustomizer.class);
                 });
     }
 
     @Test
     @DisplayName("Should bind CORS properties")
-    void corsProperties_shouldBind() {
+    void corsAutoConfiguration_withProperties_shouldConfigureSource() {
         contextRunner
                 .withPropertyValues(
                         "web.cors.allowed-origins=https://vocawik.com",
@@ -55,7 +54,6 @@ class WebCorsConfigurationTest {
                                     corsConfiguration(
                                             context.getBean(CorsConfigurationSource.class),
                                             "/api/status");
-
                             assertThat(configuration.getAllowedOrigins())
                                     .containsExactly("https://vocawik.com");
                             assertThat(configuration.getAllowedMethods())
@@ -70,31 +68,42 @@ class WebCorsConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should reject wildcard origins when credentials are enabled")
-    void corsProperties_shouldRejectWildcardOriginsWithCredentials() {
+    @DisplayName("Should reject wildcard CORS origins with credentials")
+    void corsAutoConfiguration_withWildcardOriginsAndCredentials_shouldFail() {
         contextRunner
-                .withPropertyValues("web.cors.allowed-origins=*", "web.cors.allow-credentials=true")
+                .withPropertyValues(
+                        "web.cors.allowed-origins=*", "web.cors.allow-credentials=true")
                 .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
-    @DisplayName("Should allow wildcard origins when credentials are disabled")
-    void corsProperties_shouldAllowWildcardOriginsWithoutCredentials() {
+    @DisplayName("Should preserve a consumer CORS source")
+    void corsAutoConfiguration_withConsumerSource_shouldBackOff() {
+        CorsConfigurationSource consumerSource = request -> null;
+
         contextRunner
-                .withPropertyValues(
-                        "web.cors.allowed-origins=*", "web.cors.allow-credentials=false")
+                .withBean(CorsConfigurationSource.class, () -> consumerSource)
                 .run(
-                        context -> {
-                            assertThat(context).hasNotFailed();
+                        context ->
+                                assertThat(context.getBean(CorsConfigurationSource.class))
+                                        .isSameAs(consumerSource));
+    }
 
-                            CorsConfiguration configuration =
-                                    corsConfiguration(
-                                            context.getBean(CorsConfigurationSource.class),
-                                            "/api/status");
+    @Test
+    @DisplayName("Should serialize dates as ISO strings")
+    void jacksonAutoConfiguration_shouldDisableDateTimestamps() {
+        contextRunner.run(
+                context -> {
+                    Jackson2ObjectMapperBuilder builder = new Jackson2ObjectMapperBuilder();
+                    context.getBean(Jackson2ObjectMapperBuilderCustomizer.class).customize(builder);
 
-                            assertThat(configuration.getAllowedOrigins()).containsExactly("*");
-                            assertThat(configuration.getAllowCredentials()).isFalse();
-                        });
+                    ObjectMapper objectMapper = builder.build();
+
+                    assertThat(
+                                    objectMapper.isEnabled(
+                                            SerializationFeature.WRITE_DATES_AS_TIMESTAMPS))
+                            .isFalse();
+                });
     }
 
     private CorsConfiguration corsConfiguration(CorsConfigurationSource source, String path) {

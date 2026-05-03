@@ -1,16 +1,25 @@
-package com.vocawik.module.web.cors;
+package com.vocawik.module.web.autoconfigure;
 
+import com.vocawik.module.web.cors.WebCorsProperties;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
 
-/** Configures CORS policy. */
-@Configuration(proxyBeanMethods = false)
+/** Automatically configures the shared servlet CORS policy. */
+@AutoConfiguration
+@ConditionalOnClass({HttpServletRequest.class, CorsConfigurationSource.class})
 @EnableConfigurationProperties(WebCorsProperties.class)
-public class WebCorsConfiguration {
+public class WebCorsAutoConfiguration {
+
+    /** Creates the CORS automatic configuration. */
+    public WebCorsAutoConfiguration() {}
 
     /**
      * Creates the CORS configuration.
@@ -19,7 +28,10 @@ public class WebCorsConfiguration {
      * @return CORS configuration source
      */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(WebCorsProperties properties) {
+    @ConditionalOnMissingBean(
+            value = CorsConfigurationSource.class,
+            ignored = HandlerMappingIntrospector.class)
+    CorsConfigurationSource corsConfigurationSource(WebCorsProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(properties.allowedOrigins());
         configuration.setAllowedMethods(properties.allowedMethods());
