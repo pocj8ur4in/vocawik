@@ -7,11 +7,9 @@ import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.stereotype.Component;
 
 /** Handles authorization failures with the standard API error response. */
 @Slf4j
-@Component
 public class ApiAccessDeniedHandler implements AccessDeniedHandler {
 
     private final SecurityErrorResponseWriter errorResponseWriter;

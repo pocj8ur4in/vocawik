@@ -8,10 +8,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
 
 /** Writes security failures using the API error response format. */
-@Component
 public class SecurityErrorResponseWriter {
 
     private final ObjectMapper objectMapper;
