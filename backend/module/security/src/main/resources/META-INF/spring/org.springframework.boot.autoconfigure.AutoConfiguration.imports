@@ -1,1 +1,2 @@
 com.vocawik.module.security.autoconfigure.SecurityErrorAutoConfiguration
+com.vocawik.module.security.autoconfigure.SecurityPasswordEncoderAutoConfiguration
