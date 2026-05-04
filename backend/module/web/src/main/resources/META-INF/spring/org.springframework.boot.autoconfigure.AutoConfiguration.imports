@@ -3,3 +3,5 @@ com.vocawik.module.web.autoconfigure.WebRequestAutoConfiguration
 com.vocawik.module.web.autoconfigure.WebLocaleAutoConfiguration
 com.vocawik.module.web.autoconfigure.WebCorsAutoConfiguration
 com.vocawik.module.web.autoconfigure.WebJacksonAutoConfiguration
+com.vocawik.module.web.autoconfigure.WebValidationAutoConfiguration
+com.vocawik.module.web.autoconfigure.WebApiErrorAutoConfiguration

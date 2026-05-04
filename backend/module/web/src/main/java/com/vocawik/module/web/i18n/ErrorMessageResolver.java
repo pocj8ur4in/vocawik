@@ -6,10 +6,8 @@ import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.context.support.ResourceBundleMessageSource;
-import org.springframework.stereotype.Component;
 
 /** Resolves localized API error messages from the active request locale. */
-@Component
 public class ErrorMessageResolver {
 
     private final MessageSource messageSource;
