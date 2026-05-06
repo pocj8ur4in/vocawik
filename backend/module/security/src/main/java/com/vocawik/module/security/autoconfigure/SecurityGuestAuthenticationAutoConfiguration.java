@@ -1,15 +1,25 @@
-package com.vocawik.module.security.guest;
+package com.vocawik.module.security.autoconfigure;
 
+import com.vocawik.module.security.guest.GuestAuthenticationFilter;
+import com.vocawik.module.security.guest.GuestAuthenticationProvider;
+import jakarta.servlet.Filter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-/** Configures guest authentication when a guest provider is available. */
-@Configuration(proxyBeanMethods = false)
+/** Automatically configures guest authentication when its provider and MVC handler mapping are available. */
+@AutoConfiguration(
+        afterName = "org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration")
+@ConditionalOnClass({Filter.class, RequestMappingHandlerMapping.class})
 @ConditionalOnBean({GuestAuthenticationProvider.class, RequestMappingHandlerMapping.class})
-public class GuestAuthenticationConfiguration {
+public class SecurityGuestAuthenticationAutoConfiguration {
+
+    /** Creates the guest authentication automatic configuration. */
+    public SecurityGuestAuthenticationAutoConfiguration() {}
 
     /**
      * Creates the filter that authenticates allowed anonymous requests as guests.
@@ -19,7 +29,8 @@ public class GuestAuthenticationConfiguration {
      * @return guest authentication filter
      */
     @Bean
-    public GuestAuthenticationFilter guestAuthenticationFilter(
+    @ConditionalOnMissingBean(GuestAuthenticationFilter.class)
+    GuestAuthenticationFilter guestAuthenticationFilter(
             RequestMappingHandlerMapping requestMappingHandlerMapping,
             GuestAuthenticationProvider guestAuthenticationProvider) {
         return new GuestAuthenticationFilter(
@@ -33,7 +44,7 @@ public class GuestAuthenticationConfiguration {
      * @return disabled servlet registration for the guest filter
      */
     @Bean
-    public FilterRegistrationBean<GuestAuthenticationFilter> guestAuthenticationFilterRegistration(
+    FilterRegistrationBean<GuestAuthenticationFilter> guestAuthenticationFilterRegistration(
             GuestAuthenticationFilter guestAuthenticationFilter) {
         FilterRegistrationBean<GuestAuthenticationFilter> registration =
                 new FilterRegistrationBean<>(guestAuthenticationFilter);
