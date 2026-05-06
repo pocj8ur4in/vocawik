@@ -1,3 +1,4 @@
 com.vocawik.module.security.autoconfigure.SecurityErrorAutoConfiguration
 com.vocawik.module.security.autoconfigure.SecurityHttpAutoConfiguration
+com.vocawik.module.security.autoconfigure.SecurityJwtAutoConfiguration
 com.vocawik.module.security.autoconfigure.SecurityPasswordEncoderAutoConfiguration

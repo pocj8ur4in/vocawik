@@ -1,16 +1,27 @@
-package com.vocawik.module.security.jwt;
+package com.vocawik.module.security.autoconfigure;
 
+import com.vocawik.module.security.jwt.JwtAuthenticationFilter;
+import com.vocawik.module.security.jwt.JwtProperties;
+import com.vocawik.module.security.jwt.JwtProvider;
+import io.jsonwebtoken.Jwts;
+import jakarta.servlet.Filter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-/** Configures JWT authentication support. */
-@Configuration(proxyBeanMethods = false)
+/** Automatically configures JWT authentication when a signing-secret property is present. */
+@AutoConfiguration
+@ConditionalOnClass({Jwts.class, Filter.class})
 @ConditionalOnProperty(prefix = "security.jwt", name = "secret")
 @EnableConfigurationProperties(JwtProperties.class)
-public class JwtConfiguration {
+public class SecurityJwtAutoConfiguration {
+
+    /** Creates the JWT automatic configuration. */
+    public SecurityJwtAutoConfiguration() {}
 
     /**
      * Creates the JWT provider used to issue and verify tokens.
@@ -19,7 +30,8 @@ public class JwtConfiguration {
      * @return JWT provider
      */
     @Bean
-    public JwtProvider jwtProvider(JwtProperties properties) {
+    @ConditionalOnMissingBean(JwtProvider.class)
+    JwtProvider jwtProvider(JwtProperties properties) {
         return new JwtProvider(properties);
     }
 
@@ -30,7 +42,8 @@ public class JwtConfiguration {
      * @return JWT authentication filter
      */
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtProvider jwtProvider) {
+    @ConditionalOnMissingBean(JwtAuthenticationFilter.class)
+    JwtAuthenticationFilter jwtAuthenticationFilter(JwtProvider jwtProvider) {
         return new JwtAuthenticationFilter(jwtProvider);
     }
 
@@ -41,7 +54,7 @@ public class JwtConfiguration {
      * @return disabled servlet registration for the JWT filter
      */
     @Bean
-    public FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration(
+    FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration(
             JwtAuthenticationFilter jwtAuthenticationFilter) {
         FilterRegistrationBean<JwtAuthenticationFilter> registration =
                 new FilterRegistrationBean<>(jwtAuthenticationFilter);

@@ -2,9 +2,11 @@ package com.vocawik.module.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.vocawik.module.security.autoconfigure.SecurityJwtAutoConfiguration;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class JwtPropertiesTest {
@@ -13,7 +15,8 @@ class JwtPropertiesTest {
             "dGVzdC1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLW9ubHktbXVzdC1iZS1hdC1sZWFzdC0yNTYtYml0cy1sb25n";
 
     private final ApplicationContextRunner contextRunner =
-            new ApplicationContextRunner().withUserConfiguration(JwtConfiguration.class);
+            new ApplicationContextRunner()
+                    .withConfiguration(AutoConfigurations.of(SecurityJwtAutoConfiguration.class));
 
     @Test
     @DisplayName("Should bind JWT properties")
