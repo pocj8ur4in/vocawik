@@ -17,9 +17,24 @@ class SecurityHttpPropertiesTest {
     @DisplayName("Should use empty allows by default")
     void securityHttpProperties_shouldUseDefaultAllows() {
         contextRunner.run(
-                context ->
-                        assertThat(context.getBean(SecurityHttpProperties.class).allows())
-                                .isEmpty());
+                context -> {
+                    assertThat(context.getBean(SecurityHttpProperties.class).allows()).isEmpty();
+                    assertThat(context.getBean(SecurityHttpProperties.class).defaultChainEnabled())
+                            .isTrue();
+                });
+    }
+
+    @Test
+    @DisplayName("Should bind final chain opt out")
+    void securityHttpProperties_shouldBindDefaultChainEnabled() {
+        contextRunner
+                .withPropertyValues("security.http.default-chain-enabled=false")
+                .run(
+                        context ->
+                                assertThat(
+                                                context.getBean(SecurityHttpProperties.class)
+                                                        .defaultChainEnabled())
+                                        .isFalse());
     }
 
     @Test
