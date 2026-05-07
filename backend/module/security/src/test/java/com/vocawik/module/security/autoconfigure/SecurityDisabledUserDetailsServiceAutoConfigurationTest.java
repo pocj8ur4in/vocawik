@@ -1,24 +1,27 @@
-package com.vocawik.module.security.user;
+package com.vocawik.module.security.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-class DisabledUserDetailsServiceConfigurationTest {
+class SecurityDisabledUserDetailsServiceAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner =
             new ApplicationContextRunner()
-                    .withUserConfiguration(DisabledUserDetailsServiceConfiguration.class);
+                    .withConfiguration(
+                            AutoConfigurations.of(
+                                    SecurityDisabledUserDetailsServiceAutoConfiguration.class));
 
     @Test
-    @DisplayName("Should register disabled user details service")
-    void userDetailsService_shouldRejectLocalLogin() {
+    @DisplayName("Should register disabled user details service automatically")
+    void autoConfiguration_shouldRejectLocalLogin() {
         contextRunner.run(
                 context -> {
                     UserDetailsService userDetailsService =
@@ -31,8 +34,8 @@ class DisabledUserDetailsServiceConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should not override custom user details service")
-    void userDetailsService_withCustomBean_shouldBackOff() {
+    @DisplayName("Should preserve a consumer user details service")
+    void autoConfiguration_withCustomBean_shouldBackOff() {
         UserDetailsService customUserDetailsService =
                 username ->
                         User.withUsername(username)

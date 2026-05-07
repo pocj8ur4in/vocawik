@@ -5,3 +5,4 @@ com.vocawik.module.security.autoconfigure.SecurityGuestAuthenticationAutoConfigu
 com.vocawik.module.security.autoconfigure.SecurityCurrentGuestAutoConfiguration
 com.vocawik.module.security.autoconfigure.SecurityCurrentUserAutoConfiguration
 com.vocawik.module.security.autoconfigure.SecurityPasswordEncoderAutoConfiguration
+com.vocawik.module.security.autoconfigure.SecurityDisabledUserDetailsServiceAutoConfiguration
